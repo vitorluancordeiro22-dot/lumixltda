@@ -311,22 +311,45 @@ async def delete_product(product_id: str, current_user = Depends(get_current_use
 
 # ========== PRODUCT BATCHES ==========
 
-async def generate_batch_number(collection_name: str, date_str: str) -> str:
-    date_obj = datetime.fromisoformat(date_str)
-    yymm = date_obj.strftime('%y%m')
+async def generate_batch_number(date_str: str) -> str:
+    """
+    Gera número de lote no formato AAMMCCC onde:
+    AA = 2 últimos dígitos do ano
+    MM = mês com 2 dígitos  
+    CCC = contador sequencial global (001, 002, 003...)
     
-    # Find last batch for this month
-    batches = await db[collection_name].find(
+    O contador é compartilhado entre produtos e matérias-primas
+    para garantir numeração única e sequencial.
+    """
+    date_obj = datetime.fromisoformat(date_str)
+    yymm = date_obj.strftime('%y%m')  # AAMM
+    
+    # Buscar TODOS os lotes (produtos + matérias-primas) deste mês
+    product_batches = await db.product_batches.find(
         {'batch_number': {'$regex': f'^{yymm}'}},
         {'_id': 0, 'batch_number': 1}
     ).to_list(1000)
     
-    if not batches:
+    raw_material_batches = await db.raw_material_batches.find(
+        {'batch_number': {'$regex': f'^{yymm}'}},
+        {'_id': 0, 'batch_number': 1}
+    ).to_list(1000)
+    
+    # Combinar todos os lotes
+    all_batches = product_batches + raw_material_batches
+    
+    if not all_batches:
         counter = 1
     else:
-        counters = [int(b['batch_number'][-3:]) for b in batches if len(b['batch_number']) >= 7]
+        # Extrair todos os contadores e pegar o maior
+        counters = [
+            int(b['batch_number'][-3:]) 
+            for b in all_batches 
+            if len(b['batch_number']) >= 7 and b['batch_number'][-3:].isdigit()
+        ]
         counter = max(counters) + 1 if counters else 1
     
+    # Formato: AAMMCCC (ex: 2512001 = Dezembro/2025, lote 001)
     return f"{yymm}{counter:03d}"
 
 @api_router.get('/product-batches', response_model=List[ProductBatch])
