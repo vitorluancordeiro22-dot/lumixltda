@@ -126,7 +126,7 @@ export const Team = () => {
                 <Label className="text-white">Cargo/Função</Label>
                 <Input value={formData.role} onChange={(e) => setFormData({...formData, role: e.target.value})} className="bg-slate-900/50 border-slate-700 text-white" required placeholder="Ex: Operador, Pesador, Envasador" />
               </div>
-              <Button type="submit" className="w-full bg-primary hover:bg-primary/90">Salvar</Button>
+              <Button type="submit" disabled={submitting} className="w-full bg-primary hover:bg-primary/90">Salvar</Button>
             </form>
           </DialogContent>
         </Dialog>
