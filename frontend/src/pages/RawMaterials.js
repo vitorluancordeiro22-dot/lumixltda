@@ -190,6 +190,15 @@ export const RawMaterials = () => {
               <DialogHeader>
                 <DialogTitle className="text-white">Soltar Lote de Matéria-Prima</DialogTitle>
               </DialogHeader>
+              {nextBatchNumber && (
+                <div className="p-4 rounded-lg bg-primary/10 border border-primary/30">
+                  <p className="text-sm text-slate-400 mb-1">Número do Próximo Lote:</p>
+                  <p className="text-2xl font-bold text-primary">{nextBatchNumber}</p>
+                  <p className="text-xs text-slate-500 mt-1">
+                    {nextBatchNumber.substring(0, 2)}/{nextBatchNumber.substring(2, 4)}/20{nextBatchNumber.substring(0, 2)} - Lote #{nextBatchNumber.substring(4, 7)}
+                  </p>
+                </div>
+              )}
               <form onSubmit={handleBatchSubmit} className="space-y-4">
                 <div>
                   <Label className="text-white">Matéria-Prima</Label>
