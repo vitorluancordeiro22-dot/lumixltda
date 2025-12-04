@@ -39,6 +39,23 @@ export const RawMaterials = () => {
     };
   }, []);
 
+  const fetchNextBatchNumber = async (date) => {
+    try {
+      const response = await api.get('/batches/next-number', { params: { date } });
+      if (isMountedRef.current) {
+        setNextBatchNumber(response.data.batch_number);
+      }
+    } catch (error) {
+      console.error('Error fetching next batch number:', error);
+    }
+  };
+
+  React.useEffect(() => {
+    if (batchDialogOpen && batchFormData.date) {
+      fetchNextBatchNumber(batchFormData.date);
+    }
+  }, [batchDialogOpen, batchFormData.date]);
+
   const fetchMaterials = async () => {
     try {
       const response = await api.get('/raw-materials');
