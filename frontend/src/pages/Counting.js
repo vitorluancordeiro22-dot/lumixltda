@@ -15,6 +15,9 @@ export const Counting = () => {
   const [teamMembers, setTeamMembers] = useState([]);
   const [selectedBatch, setSelectedBatch] = useState(null);
   const [countings, setCountings] = useState([]);
+  const [submitting, setSubmitting] = useState(false);
+  const isMountedRef = React.useRef(true);
+  
   const [formData, setFormData] = useState({
     one_liter: 0,
     two_liter: 0,
@@ -23,13 +26,18 @@ export const Counting = () => {
   });
 
   useEffect(() => {
+    isMountedRef.current = true;
     fetchBatches();
     fetchProducts();
     fetchTeamMembers();
+    
+    return () => {
+      isMountedRef.current = false;
+    };
   }, []);
 
   useEffect(() => {
-    if (selectedBatch) {
+    if (selectedBatch && isMountedRef.current) {
       fetchCountings(selectedBatch.id);
     }
   }, [selectedBatch]);
