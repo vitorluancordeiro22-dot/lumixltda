@@ -12,6 +12,7 @@ import { Counting } from './pages/Counting';
 import { Team } from './pages/Team';
 import { Trash } from './pages/Trash';
 import { Settings } from './pages/Settings';
+import { Batches } from './pages/Batches';
 import './App.css';
 
 const PrivateRoute = ({ children }) => {
