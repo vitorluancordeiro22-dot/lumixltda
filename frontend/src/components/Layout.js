@@ -24,6 +24,7 @@ const menuItems = [
   { path: '/raw-materials', icon: Boxes, label: 'Matérias-Primas' },
   { path: '/production-orders', icon: ClipboardList, label: 'Ordens de Produção' },
   { path: '/counting', icon: Calculator, label: 'Contagem' },
+  { path: '/batches', icon: ListChecks, label: 'Gerenciar Lotes' },
   { path: '/team', icon: Users, label: 'Equipe' },
   { path: '/trash', icon: Trash2, label: 'Lixeira' },
   { path: '/settings', icon: Settings, label: 'Configurações' },
