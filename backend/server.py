@@ -399,19 +399,42 @@ async def create_product_batch(data: ProductBatchCreate, current_user = Depends(
     return ProductBatch(**batch_doc)
 
 @api_router.put('/product-batches/{batch_id}', response_model=ProductBatch)
-async def update_product_batch(batch_id: str, data: ProductBatchCreate, current_user = Depends(get_current_user)):
+async def update_product_batch(batch_id: str, data: ProductBatchUpdate, current_user = Depends(get_current_user)):
     batch = await db.product_batches.find_one({'id': batch_id}, {'_id': 0})
-    if not batch or batch.get('status') != 'em_aberto':
-        raise HTTPException(status_code=400, detail='Only open batches can be edited')
+    if not batch:
+        raise HTTPException(status_code=404, detail='Batch not found')
     
-    await db.product_batches.update_one(
-        {'id': batch_id},
-        {'$set': {
-            'date': data.date,
-            'unit': data.unit,
-            'planned_liters': data.planned_liters
-        }}
-    )
+    # Preparar campos para atualização
+    update_fields = {}
+    
+    if data.batch_number is not None:
+        # Verificar se o novo número já existe (exceto no lote atual)
+        existing = await db.product_batches.find_one({
+            'batch_number': data.batch_number,
+            'id': {'$ne': batch_id},
+            'deleted': False
+        })
+        existing_rm = await db.raw_material_batches.find_one({
+            'batch_number': data.batch_number,
+            'deleted': False
+        })
+        if existing or existing_rm:
+            raise HTTPException(status_code=400, detail='Batch number already exists')
+        update_fields['batch_number'] = data.batch_number
+    
+    if data.date is not None:
+        update_fields['date'] = data.date
+    if data.unit is not None:
+        update_fields['unit'] = data.unit
+    if data.planned_liters is not None:
+        update_fields['planned_liters'] = data.planned_liters
+    
+    if update_fields:
+        await db.product_batches.update_one(
+            {'id': batch_id},
+            {'$set': update_fields}
+        )
+    
     updated = await db.product_batches.find_one({'id': batch_id}, {'_id': 0})
     return ProductBatch(**updated)
 
