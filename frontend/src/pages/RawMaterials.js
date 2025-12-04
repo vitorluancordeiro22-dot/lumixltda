@@ -233,7 +233,7 @@ export const RawMaterials = () => {
                     <Input type="number" step="0.01" value={formData.total_stock} onChange={(e) => setFormData({...formData, total_stock: e.target.value})} className="bg-slate-900/50 border-slate-700 text-white" />
                   </div>
                 </div>
-                <Button type="submit" className="w-full bg-primary hover:bg-primary/90">Salvar</Button>
+                <Button type="submit" disabled={submitting} className="w-full bg-primary hover:bg-primary/90">Salvar</Button>
               </form>
             </DialogContent>
           </Dialog>
