@@ -118,6 +118,11 @@ class RawMaterialBatchCreate(BaseModel):
     date: str
     quantity: float
 
+class RawMaterialBatchUpdate(BaseModel):
+    batch_number: Optional[str] = None
+    date: Optional[str] = None
+    quantity: Optional[float] = None
+
 class MaterialUsed(BaseModel):
     raw_material_id: str
     quantity: float
