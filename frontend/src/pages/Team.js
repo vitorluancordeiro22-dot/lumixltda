@@ -29,29 +29,47 @@ export const Team = () => {
   const fetchMembers = async () => {
     try {
       const response = await api.get('/team');
-      setMembers(response.data);
+      if (isMountedRef.current) {
+        setMembers(response.data);
+      }
     } catch (error) {
-      toast.error('Erro ao carregar equipe');
+      if (isMountedRef.current) {
+        toast.error('Erro ao carregar equipe');
+      }
     } finally {
-      setLoading(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
     }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (submitting) return;
+    
+    setSubmitting(true);
     try {
       if (selectedMember) {
         await api.put(`/team/${selectedMember.id}`, formData);
-        toast.success('Membro atualizado!');
       } else {
         await api.post('/team', formData);
-        toast.success('Membro adicionado!');
       }
-      setDialogOpen(false);
-      resetForm();
-      fetchMembers();
+      
+      if (isMountedRef.current) {
+        const successMessage = selectedMember ? 'Membro atualizado!' : 'Membro adicionado!';
+        setDialogOpen(false);
+        resetForm();
+        await fetchMembers();
+        toast.success(successMessage);
+      }
     } catch (error) {
-      toast.error('Erro ao salvar');
+      if (isMountedRef.current) {
+        toast.error('Erro ao salvar');
+      }
+    } finally {
+      if (isMountedRef.current) {
+        setSubmitting(false);
+      }
     }
   };
 
@@ -59,10 +77,14 @@ export const Team = () => {
     if (!window.confirm('Deseja mover este membro para a lixeira?')) return;
     try {
       await api.delete(`/team/${id}`);
-      toast.success('Membro movido para lixeira');
-      fetchMembers();
+      if (isMountedRef.current) {
+        await fetchMembers();
+        toast.success('Membro movido para lixeira');
+      }
     } catch (error) {
-      toast.error('Erro ao excluir');
+      if (isMountedRef.current) {
+        toast.error('Erro ao excluir');
+      }
     }
   };
 
