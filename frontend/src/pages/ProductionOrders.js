@@ -17,6 +17,9 @@ export const ProductionOrders = () => {
   const [teamMembers, setTeamMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const isMountedRef = React.useRef(true);
+  
   const [formData, setFormData] = useState({
     product_id: '',
     product_batch_id: '',
@@ -27,10 +30,15 @@ export const ProductionOrders = () => {
   });
 
   useEffect(() => {
+    isMountedRef.current = true;
     fetchOrders();
     fetchProducts();
     fetchBatches();
     fetchTeamMembers();
+    
+    return () => {
+      isMountedRef.current = false;
+    };
   }, []);
 
   const fetchOrders = async () => {
