@@ -97,6 +97,12 @@ class ProductBatchCreate(BaseModel):
     unit: str
     planned_liters: float
 
+class ProductBatchUpdate(BaseModel):
+    batch_number: Optional[str] = None
+    date: Optional[str] = None
+    unit: Optional[str] = None
+    planned_liters: Optional[float] = None
+
 class RawMaterialBatch(BaseModel):
     id: str
     raw_material_id: str
