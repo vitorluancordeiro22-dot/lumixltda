@@ -15,6 +15,9 @@ export const RawMaterials = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [batchDialogOpen, setBatchDialogOpen] = useState(false);
   const [selectedMaterial, setSelectedMaterial] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const isMountedRef = React.useRef(true);
+  
   const [formData, setFormData] = useState({
     name: '',
     type: 'Litros',
@@ -27,7 +30,12 @@ export const RawMaterials = () => {
   });
 
   useEffect(() => {
+    isMountedRef.current = true;
     fetchMaterials();
+    
+    return () => {
+      isMountedRef.current = false;
+    };
   }, []);
 
   const fetchMaterials = async () => {
