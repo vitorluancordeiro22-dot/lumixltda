@@ -473,7 +473,7 @@ async def get_raw_material_batches(current_user = Depends(get_current_user)):
 async def create_raw_material_batch(data: RawMaterialBatchCreate, current_user = Depends(get_current_user)):
     import uuid
     batch_id = str(uuid.uuid4())
-    batch_number = await generate_batch_number('raw_material_batches', data.date)
+    batch_number = await generate_batch_number(data.date)
     
     batch_doc = {
         'id': batch_id,
