@@ -28,6 +28,7 @@ export const RawMaterials = () => {
     date: new Date().toISOString().split('T')[0],
     quantity: ''
   });
+  const [nextBatchNumber, setNextBatchNumber] = useState('');
 
   useEffect(() => {
     isMountedRef.current = true;
