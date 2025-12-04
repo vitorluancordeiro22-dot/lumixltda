@@ -194,7 +194,7 @@ export const RawMaterials = () => {
                   <Label className="text-white">Quantidade Recebida</Label>
                   <Input type="number" step="0.01" value={batchFormData.quantity} onChange={(e) => setBatchFormData({...batchFormData, quantity: e.target.value})} className="bg-slate-900/50 border-slate-700 text-white" required />
                 </div>
-                <Button type="submit" className="w-full bg-primary hover:bg-primary/90">Criar Lote</Button>
+                <Button type="submit" disabled={submitting} className="w-full bg-primary hover:bg-primary/90">Criar Lote</Button>
               </form>
             </DialogContent>
           </Dialog>
