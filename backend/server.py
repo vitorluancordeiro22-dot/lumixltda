@@ -1,72 +1,697 @@
-from fastapi import FastAPI, APIRouter
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
 from pathlib import Path
-from pydantic import BaseModel, Field, ConfigDict
-from typing import List
-import uuid
-from datetime import datetime, timezone
-
+from pydantic import BaseModel, Field, ConfigDict, EmailStr
+from typing import List, Optional, Dict, Any
+from datetime import datetime, timezone, timedelta
+import bcrypt
+import jwt
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-# MongoDB connection
 mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
-# Create the main app without a prefix
 app = FastAPI()
-
-# Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
+security = HTTPBearer()
 
+JWT_SECRET = os.getenv('JWT_SECRET', 'lumix-secret-key-2025')
+JWT_ALGORITHM = 'HS256'
 
-# Define Models
-class StatusCheck(BaseModel):
-    model_config = ConfigDict(extra="ignore")  # Ignore MongoDB's _id field
+# ========== MODELS ==========
+
+class UserRegister(BaseModel):
+    email: EmailStr
+    password: str
+    name: str
+
+class UserLogin(BaseModel):
+    email: EmailStr
+    password: str
+
+class User(BaseModel):
+    id: str
+    email: str
+    name: str
+    created_at: str
+
+class TokenResponse(BaseModel):
+    token: str
+    user: User
+
+class ProductRecipe(BaseModel):
+    raw_material_id: str
+    quantity_per_liter: float
+
+class Product(BaseModel):
+    id: str
+    name: str
+    unit: str  # Litros ou Kg
+    expected_liters: float
+    recipes: List[ProductRecipe]
+    created_at: str
+    deleted: bool = False
+
+class ProductCreate(BaseModel):
+    name: str
+    unit: str
+    expected_liters: float
+    recipes: List[ProductRecipe]
+
+class RawMaterial(BaseModel):
+    id: str
+    name: str
+    type: str  # Kg ou Litros
+    total_stock: float
+    created_at: str
+    deleted: bool = False
+
+class RawMaterialCreate(BaseModel):
+    name: str
+    type: str
+    total_stock: float = 0.0
+
+class ProductBatch(BaseModel):
+    id: str
+    product_id: str
+    batch_number: str
+    date: str
+    unit: str
+    planned_liters: float
+    status: str  # em_aberto, finalizado
+    total_bottled: float = 0.0
+    created_at: str
+    deleted: bool = False
+
+class ProductBatchCreate(BaseModel):
+    product_id: str
+    date: str
+    unit: str
+    planned_liters: float
+
+class RawMaterialBatch(BaseModel):
+    id: str
+    raw_material_id: str
+    batch_number: str
+    date: str
+    quantity: float
+    status: str
+    created_at: str
+    deleted: bool = False
+
+class RawMaterialBatchCreate(BaseModel):
+    raw_material_id: str
+    date: str
+    quantity: float
+
+class MaterialUsed(BaseModel):
+    raw_material_id: str
+    quantity: float
+
+class ProductionOrder(BaseModel):
+    id: str
+    product_id: str
+    product_batch_id: str
+    date: str
+    weigher: str
+    production_size: float
+    materials_used: List[MaterialUsed]
+    status: str  # em_producao, finalizado
+    created_at: str
+    deleted: bool = False
+
+class ProductionOrderCreate(BaseModel):
+    product_id: str
+    product_batch_id: str
+    date: str
+    weigher: str
+    production_size: float
+    materials_used: List[MaterialUsed]
+
+class Counting(BaseModel):
+    id: str
+    product_batch_id: str
+    one_liter: int = 0
+    two_liter: int = 0
+    five_liter: int = 0
+    total: float = 0.0
+    operator: str
+    created_at: str
+
+class CountingCreate(BaseModel):
+    one_liter: int = 0
+    two_liter: int = 0
+    five_liter: int = 0
+    operator: str
+
+class TeamMember(BaseModel):
+    id: str
+    name: str
+    role: str
+    active: bool = True
+    created_at: str
+    deleted: bool = False
+
+class TeamMemberCreate(BaseModel):
+    name: str
+    role: str
+
+class TrashItem(BaseModel):
+    id: str
+    item_type: str
+    item_data: Dict[str, Any]
+    deleted_at: str
+
+class DashboardSummary(BaseModel):
+    open_batches: int
+    in_production_orders: int
+    liters_bottled_month: float
+
+# ========== AUTH UTILS ==========
+
+def hash_password(password: str) -> str:
+    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
+def verify_password(password: str, hashed: str) -> bool:
+    return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
+
+def create_token(user_id: str) -> str:
+    payload = {
+        'user_id': user_id,
+        'exp': datetime.now(timezone.utc) + timedelta(days=7)
+    }
+    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    try:
+        token = credentials.credentials
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        user_id = payload.get('user_id')
+        user = await db.users.find_one({'id': user_id}, {'_id': 0})
+        if not user:
+            raise HTTPException(status_code=401, detail='User not found')
+        return user
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail='Token expired')
+    except Exception:
+        raise HTTPException(status_code=401, detail='Invalid token')
+
+# ========== AUTH ENDPOINTS ==========
+
+@api_router.post('/auth/register', response_model=TokenResponse)
+async def register(data: UserRegister):
+    existing = await db.users.find_one({'email': data.email}, {'_id': 0})
+    if existing:
+        raise HTTPException(status_code=400, detail='Email already registered')
     
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    client_name: str
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-
-class StatusCheckCreate(BaseModel):
-    client_name: str
-
-# Add your routes to the router instead of directly to app
-@api_router.get("/")
-async def root():
-    return {"message": "Hello World"}
-
-@api_router.post("/status", response_model=StatusCheck)
-async def create_status_check(input: StatusCheckCreate):
-    status_dict = input.model_dump()
-    status_obj = StatusCheck(**status_dict)
+    import uuid
+    user_id = str(uuid.uuid4())
+    user_doc = {
+        'id': user_id,
+        'email': data.email,
+        'password': hash_password(data.password),
+        'name': data.name,
+        'created_at': datetime.now(timezone.utc).isoformat()
+    }
+    await db.users.insert_one(user_doc)
     
-    # Convert to dict and serialize datetime to ISO string for MongoDB
-    doc = status_obj.model_dump()
-    doc['timestamp'] = doc['timestamp'].isoformat()
-    
-    _ = await db.status_checks.insert_one(doc)
-    return status_obj
+    token = create_token(user_id)
+    user = User(
+        id=user_id,
+        email=data.email,
+        name=data.name,
+        created_at=user_doc['created_at']
+    )
+    return TokenResponse(token=token, user=user)
 
-@api_router.get("/status", response_model=List[StatusCheck])
-async def get_status_checks():
-    # Exclude MongoDB's _id field from the query results
-    status_checks = await db.status_checks.find({}, {"_id": 0}).to_list(1000)
+@api_router.post('/auth/login', response_model=TokenResponse)
+async def login(data: UserLogin):
+    user = await db.users.find_one({'email': data.email}, {'_id': 0})
+    if not user or not verify_password(data.password, user['password']):
+        raise HTTPException(status_code=401, detail='Invalid credentials')
     
-    # Convert ISO string timestamps back to datetime objects
-    for check in status_checks:
-        if isinstance(check['timestamp'], str):
-            check['timestamp'] = datetime.fromisoformat(check['timestamp'])
-    
-    return status_checks
+    token = create_token(user['id'])
+    user_obj = User(
+        id=user['id'],
+        email=user['email'],
+        name=user['name'],
+        created_at=user['created_at']
+    )
+    return TokenResponse(token=token, user=user_obj)
 
-# Include the router in the main app
+@api_router.get('/auth/me', response_model=User)
+async def get_me(current_user = Depends(get_current_user)):
+    return User(**current_user)
+
+# ========== PRODUCTS ==========
+
+@api_router.get('/products', response_model=List[Product])
+async def get_products(current_user = Depends(get_current_user)):
+    products = await db.products.find({'deleted': False}, {'_id': 0}).to_list(1000)
+    return products
+
+@api_router.post('/products', response_model=Product)
+async def create_product(data: ProductCreate, current_user = Depends(get_current_user)):
+    import uuid
+    product_id = str(uuid.uuid4())
+    product_doc = {
+        'id': product_id,
+        'name': data.name,
+        'unit': data.unit,
+        'expected_liters': data.expected_liters,
+        'recipes': [r.model_dump() for r in data.recipes],
+        'created_at': datetime.now(timezone.utc).isoformat(),
+        'deleted': False
+    }
+    await db.products.insert_one(product_doc)
+    return Product(**product_doc)
+
+@api_router.put('/products/{product_id}', response_model=Product)
+async def update_product(product_id: str, data: ProductCreate, current_user = Depends(get_current_user)):
+    result = await db.products.update_one(
+        {'id': product_id},
+        {'$set': {
+            'name': data.name,
+            'unit': data.unit,
+            'expected_liters': data.expected_liters,
+            'recipes': [r.model_dump() for r in data.recipes]
+        }}
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail='Product not found')
+    product = await db.products.find_one({'id': product_id}, {'_id': 0})
+    return Product(**product)
+
+@api_router.delete('/products/{product_id}')
+async def delete_product(product_id: str, current_user = Depends(get_current_user)):
+    product = await db.products.find_one({'id': product_id}, {'_id': 0})
+    if not product:
+        raise HTTPException(status_code=404, detail='Product not found')
+    
+    await db.trash.insert_one({
+        'id': str(__import__('uuid').uuid4()),
+        'item_type': 'product',
+        'item_data': product,
+        'deleted_at': datetime.now(timezone.utc).isoformat()
+    })
+    await db.products.update_one({'id': product_id}, {'$set': {'deleted': True}})
+    return {'message': 'Product moved to trash'}
+
+# ========== PRODUCT BATCHES ==========
+
+async def generate_batch_number(collection_name: str, date_str: str) -> str:
+    date_obj = datetime.fromisoformat(date_str)
+    yymm = date_obj.strftime('%y%m')
+    
+    # Find last batch for this month
+    batches = await db[collection_name].find(
+        {'batch_number': {'$regex': f'^{yymm}'}},
+        {'_id': 0, 'batch_number': 1}
+    ).to_list(1000)
+    
+    if not batches:
+        counter = 1
+    else:
+        counters = [int(b['batch_number'][-3:]) for b in batches if len(b['batch_number']) >= 7]
+        counter = max(counters) + 1 if counters else 1
+    
+    return f"{yymm}{counter:03d}"
+
+@api_router.get('/product-batches', response_model=List[ProductBatch])
+async def get_product_batches(current_user = Depends(get_current_user)):
+    batches = await db.product_batches.find({'deleted': False}, {'_id': 0}).to_list(1000)
+    return batches
+
+@api_router.post('/product-batches', response_model=ProductBatch)
+async def create_product_batch(data: ProductBatchCreate, current_user = Depends(get_current_user)):
+    import uuid
+    batch_id = str(uuid.uuid4())
+    batch_number = await generate_batch_number('product_batches', data.date)
+    
+    batch_doc = {
+        'id': batch_id,
+        'product_id': data.product_id,
+        'batch_number': batch_number,
+        'date': data.date,
+        'unit': data.unit,
+        'planned_liters': data.planned_liters,
+        'status': 'em_aberto',
+        'total_bottled': 0.0,
+        'created_at': datetime.now(timezone.utc).isoformat(),
+        'deleted': False
+    }
+    await db.product_batches.insert_one(batch_doc)
+    return ProductBatch(**batch_doc)
+
+@api_router.put('/product-batches/{batch_id}', response_model=ProductBatch)
+async def update_product_batch(batch_id: str, data: ProductBatchCreate, current_user = Depends(get_current_user)):
+    batch = await db.product_batches.find_one({'id': batch_id}, {'_id': 0})
+    if not batch or batch.get('status') != 'em_aberto':
+        raise HTTPException(status_code=400, detail='Only open batches can be edited')
+    
+    await db.product_batches.update_one(
+        {'id': batch_id},
+        {'$set': {
+            'date': data.date,
+            'unit': data.unit,
+            'planned_liters': data.planned_liters
+        }}
+    )
+    updated = await db.product_batches.find_one({'id': batch_id}, {'_id': 0})
+    return ProductBatch(**updated)
+
+@api_router.delete('/product-batches/{batch_id}')
+async def delete_product_batch(batch_id: str, current_user = Depends(get_current_user)):
+    batch = await db.product_batches.find_one({'id': batch_id}, {'_id': 0})
+    if not batch:
+        raise HTTPException(status_code=404, detail='Batch not found')
+    
+    await db.trash.insert_one({
+        'id': str(__import__('uuid').uuid4()),
+        'item_type': 'product_batch',
+        'item_data': batch,
+        'deleted_at': datetime.now(timezone.utc).isoformat()
+    })
+    await db.product_batches.update_one({'id': batch_id}, {'$set': {'deleted': True}})
+    return {'message': 'Batch moved to trash'}
+
+# ========== RAW MATERIALS ==========
+
+@api_router.get('/raw-materials', response_model=List[RawMaterial])
+async def get_raw_materials(current_user = Depends(get_current_user)):
+    materials = await db.raw_materials.find({'deleted': False}, {'_id': 0}).to_list(1000)
+    return materials
+
+@api_router.post('/raw-materials', response_model=RawMaterial)
+async def create_raw_material(data: RawMaterialCreate, current_user = Depends(get_current_user)):
+    import uuid
+    material_id = str(uuid.uuid4())
+    material_doc = {
+        'id': material_id,
+        'name': data.name,
+        'type': data.type,
+        'total_stock': data.total_stock,
+        'created_at': datetime.now(timezone.utc).isoformat(),
+        'deleted': False
+    }
+    await db.raw_materials.insert_one(material_doc)
+    return RawMaterial(**material_doc)
+
+@api_router.put('/raw-materials/{material_id}', response_model=RawMaterial)
+async def update_raw_material(material_id: str, data: RawMaterialCreate, current_user = Depends(get_current_user)):
+    result = await db.raw_materials.update_one(
+        {'id': material_id},
+        {'$set': {
+            'name': data.name,
+            'type': data.type,
+            'total_stock': data.total_stock
+        }}
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail='Material not found')
+    material = await db.raw_materials.find_one({'id': material_id}, {'_id': 0})
+    return RawMaterial(**material)
+
+@api_router.delete('/raw-materials/{material_id}')
+async def delete_raw_material(material_id: str, current_user = Depends(get_current_user)):
+    material = await db.raw_materials.find_one({'id': material_id}, {'_id': 0})
+    if not material:
+        raise HTTPException(status_code=404, detail='Material not found')
+    
+    await db.trash.insert_one({
+        'id': str(__import__('uuid').uuid4()),
+        'item_type': 'raw_material',
+        'item_data': material,
+        'deleted_at': datetime.now(timezone.utc).isoformat()
+    })
+    await db.raw_materials.update_one({'id': material_id}, {'$set': {'deleted': True}})
+    return {'message': 'Material moved to trash'}
+
+# ========== RAW MATERIAL BATCHES ==========
+
+@api_router.get('/raw-material-batches', response_model=List[RawMaterialBatch])
+async def get_raw_material_batches(current_user = Depends(get_current_user)):
+    batches = await db.raw_material_batches.find({'deleted': False}, {'_id': 0}).to_list(1000)
+    return batches
+
+@api_router.post('/raw-material-batches', response_model=RawMaterialBatch)
+async def create_raw_material_batch(data: RawMaterialBatchCreate, current_user = Depends(get_current_user)):
+    import uuid
+    batch_id = str(uuid.uuid4())
+    batch_number = await generate_batch_number('raw_material_batches', data.date)
+    
+    batch_doc = {
+        'id': batch_id,
+        'raw_material_id': data.raw_material_id,
+        'batch_number': batch_number,
+        'date': data.date,
+        'quantity': data.quantity,
+        'status': 'em_aberto',
+        'created_at': datetime.now(timezone.utc).isoformat(),
+        'deleted': False
+    }
+    await db.raw_material_batches.insert_one(batch_doc)
+    
+    # Update stock
+    await db.raw_materials.update_one(
+        {'id': data.raw_material_id},
+        {'$inc': {'total_stock': data.quantity}}
+    )
+    
+    return RawMaterialBatch(**batch_doc)
+
+@api_router.delete('/raw-material-batches/{batch_id}')
+async def delete_raw_material_batch(batch_id: str, current_user = Depends(get_current_user)):
+    batch = await db.raw_material_batches.find_one({'id': batch_id}, {'_id': 0})
+    if not batch:
+        raise HTTPException(status_code=404, detail='Batch not found')
+    
+    await db.trash.insert_one({
+        'id': str(__import__('uuid').uuid4()),
+        'item_type': 'raw_material_batch',
+        'item_data': batch,
+        'deleted_at': datetime.now(timezone.utc).isoformat()
+    })
+    await db.raw_material_batches.update_one({'id': batch_id}, {'$set': {'deleted': True}})
+    return {'message': 'Batch moved to trash'}
+
+# ========== PRODUCTION ORDERS ==========
+
+@api_router.get('/production-orders', response_model=List[ProductionOrder])
+async def get_production_orders(current_user = Depends(get_current_user)):
+    orders = await db.production_orders.find({'deleted': False}, {'_id': 0}).to_list(1000)
+    return orders
+
+@api_router.post('/production-orders', response_model=ProductionOrder)
+async def create_production_order(data: ProductionOrderCreate, current_user = Depends(get_current_user)):
+    import uuid
+    order_id = str(uuid.uuid4())
+    
+    # Deduct stock for each material
+    for material in data.materials_used:
+        result = await db.raw_materials.update_one(
+            {'id': material.raw_material_id},
+            {'$inc': {'total_stock': -material.quantity}}
+        )
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail=f'Material {material.raw_material_id} not found')
+    
+    order_doc = {
+        'id': order_id,
+        'product_id': data.product_id,
+        'product_batch_id': data.product_batch_id,
+        'date': data.date,
+        'weigher': data.weigher,
+        'production_size': data.production_size,
+        'materials_used': [m.model_dump() for m in data.materials_used],
+        'status': 'em_producao',
+        'created_at': datetime.now(timezone.utc).isoformat(),
+        'deleted': False
+    }
+    await db.production_orders.insert_one(order_doc)
+    return ProductionOrder(**order_doc)
+
+@api_router.delete('/production-orders/{order_id}')
+async def delete_production_order(order_id: str, current_user = Depends(get_current_user)):
+    order = await db.production_orders.find_one({'id': order_id}, {'_id': 0})
+    if not order:
+        raise HTTPException(status_code=404, detail='Order not found')
+    
+    await db.trash.insert_one({
+        'id': str(__import__('uuid').uuid4()),
+        'item_type': 'production_order',
+        'item_data': order,
+        'deleted_at': datetime.now(timezone.utc).isoformat()
+    })
+    await db.production_orders.update_one({'id': order_id}, {'$set': {'deleted': True}})
+    return {'message': 'Order moved to trash'}
+
+# ========== COUNTING ==========
+
+@api_router.get('/counting/{batch_id}', response_model=List[Counting])
+async def get_counting(batch_id: str, current_user = Depends(get_current_user)):
+    counts = await db.counting.find({'product_batch_id': batch_id}, {'_id': 0}).to_list(1000)
+    return counts
+
+@api_router.post('/counting/{batch_id}', response_model=Counting)
+async def add_counting(batch_id: str, data: CountingCreate, current_user = Depends(get_current_user)):
+    import uuid
+    
+    # Calculate total
+    total = (data.one_liter * 1) + (data.two_liter * 2) + (data.five_liter * 5)
+    
+    count_doc = {
+        'id': str(uuid.uuid4()),
+        'product_batch_id': batch_id,
+        'one_liter': data.one_liter,
+        'two_liter': data.two_liter,
+        'five_liter': data.five_liter,
+        'total': float(total),
+        'operator': data.operator,
+        'created_at': datetime.now(timezone.utc).isoformat()
+    }
+    await db.counting.insert_one(count_doc)
+    
+    # Update batch total
+    batch = await db.product_batches.find_one({'id': batch_id}, {'_id': 0})
+    if batch:
+        new_total = batch.get('total_bottled', 0.0) + total
+        await db.product_batches.update_one(
+            {'id': batch_id},
+            {'$set': {'total_bottled': new_total}}
+        )
+        
+        # Check if batch is complete
+        if new_total >= batch['planned_liters']:
+            await db.product_batches.update_one(
+                {'id': batch_id},
+                {'$set': {'status': 'finalizado'}}
+            )
+    
+    return Counting(**count_doc)
+
+# ========== TEAM ==========
+
+@api_router.get('/team', response_model=List[TeamMember])
+async def get_team(current_user = Depends(get_current_user)):
+    members = await db.team.find({'deleted': False}, {'_id': 0}).to_list(1000)
+    return members
+
+@api_router.post('/team', response_model=TeamMember)
+async def create_team_member(data: TeamMemberCreate, current_user = Depends(get_current_user)):
+    import uuid
+    member_id = str(uuid.uuid4())
+    member_doc = {
+        'id': member_id,
+        'name': data.name,
+        'role': data.role,
+        'active': True,
+        'created_at': datetime.now(timezone.utc).isoformat(),
+        'deleted': False
+    }
+    await db.team.insert_one(member_doc)
+    return TeamMember(**member_doc)
+
+@api_router.put('/team/{member_id}', response_model=TeamMember)
+async def update_team_member(member_id: str, data: TeamMemberCreate, current_user = Depends(get_current_user)):
+    result = await db.team.update_one(
+        {'id': member_id},
+        {'$set': {'name': data.name, 'role': data.role}}
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail='Member not found')
+    member = await db.team.find_one({'id': member_id}, {'_id': 0})
+    return TeamMember(**member)
+
+@api_router.delete('/team/{member_id}')
+async def delete_team_member(member_id: str, current_user = Depends(get_current_user)):
+    member = await db.team.find_one({'id': member_id}, {'_id': 0})
+    if not member:
+        raise HTTPException(status_code=404, detail='Member not found')
+    
+    await db.trash.insert_one({
+        'id': str(__import__('uuid').uuid4()),
+        'item_type': 'team_member',
+        'item_data': member,
+        'deleted_at': datetime.now(timezone.utc).isoformat()
+    })
+    await db.team.update_one({'id': member_id}, {'$set': {'deleted': True}})
+    return {'message': 'Member moved to trash'}
+
+# ========== TRASH ==========
+
+@api_router.get('/trash', response_model=List[TrashItem])
+async def get_trash(current_user = Depends(get_current_user)):
+    items = await db.trash.find({}, {'_id': 0}).to_list(1000)
+    return items
+
+@api_router.post('/trash/restore/{item_id}')
+async def restore_from_trash(item_id: str, current_user = Depends(get_current_user)):
+    trash_item = await db.trash.find_one({'id': item_id}, {'_id': 0})
+    if not trash_item:
+        raise HTTPException(status_code=404, detail='Item not found')
+    
+    item_type = trash_item['item_type']
+    item_data = trash_item['item_data']
+    
+    collection_map = {
+        'product': 'products',
+        'product_batch': 'product_batches',
+        'raw_material': 'raw_materials',
+        'raw_material_batch': 'raw_material_batches',
+        'production_order': 'production_orders',
+        'team_member': 'team'
+    }
+    
+    if item_type in collection_map:
+        await db[collection_map[item_type]].update_one(
+            {'id': item_data['id']},
+            {'$set': {'deleted': False}}
+        )
+        await db.trash.delete_one({'id': item_id})
+        return {'message': 'Item restored'}
+    
+    raise HTTPException(status_code=400, detail='Unknown item type')
+
+@api_router.delete('/trash/{item_id}')
+async def delete_from_trash_permanently(item_id: str, current_user = Depends(get_current_user)):
+    result = await db.trash.delete_one({'id': item_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail='Item not found')
+    return {'message': 'Item permanently deleted'}
+
+# ========== DASHBOARD ==========
+
+@api_router.get('/dashboard/summary', response_model=DashboardSummary)
+async def get_dashboard_summary(current_user = Depends(get_current_user)):
+    open_batches = await db.product_batches.count_documents({'status': 'em_aberto', 'deleted': False})
+    in_production = await db.production_orders.count_documents({'status': 'em_producao', 'deleted': False})
+    
+    # Calculate liters bottled this month
+    now = datetime.now(timezone.utc)
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0).isoformat()
+    
+    counts = await db.counting.find(
+        {'created_at': {'$gte': month_start}},
+        {'_id': 0, 'total': 1}
+    ).to_list(10000)
+    
+    liters_month = sum(c.get('total', 0) for c in counts)
+    
+    return DashboardSummary(
+        open_batches=open_batches,
+        in_production_orders=in_production,
+        liters_bottled_month=liters_month
+    )
+
 app.include_router(api_router)
 
 app.add_middleware(
@@ -77,7 +702,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
