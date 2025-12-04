@@ -23,7 +23,7 @@ app = FastAPI()
 api_router = APIRouter(prefix="/api")
 security = HTTPBearer()
 
-JWT_SECRET = os.getenv('JWT_SECRET', 'lumix-secret-key-2025')
+JWT_SECRET = os.environ['JWT_SECRET']
 JWT_ALGORITHM = 'HS256'
 
 # ========== MODELS ==========
