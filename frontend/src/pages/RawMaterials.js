@@ -127,10 +127,14 @@ export const RawMaterials = () => {
     if (!window.confirm('Deseja mover esta matéria-prima para a lixeira?')) return;
     try {
       await api.delete(`/raw-materials/${id}`);
-      toast.success('Matéria-prima movida para lixeira');
-      fetchMaterials();
+      if (isMountedRef.current) {
+        await fetchMaterials();
+        toast.success('Matéria-prima movida para lixeira');
+      }
     } catch (error) {
-      toast.error('Erro ao excluir');
+      if (isMountedRef.current) {
+        toast.error('Erro ao excluir');
+      }
     }
   };
 
