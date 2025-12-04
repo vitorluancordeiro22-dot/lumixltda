@@ -1,0 +1,129 @@
+{
+  "project_name": "Gestão Inteligente de Produção – Lumix",
+  "design_philosophy": {
+    "persona": "E1: The Anti-AI Designer",
+    "theme": "Midnight Industrial Premium",
+    "core_principles": [
+      "Fusion: Industrial Robustness x SaaS Elegance",
+      "Clarity: High contrast for factory floor visibility",
+      "Tactility: Large touch targets (56px+) for operators",
+      "Depth: Layered dark surfaces (Navy > Slate > Glass)"
+    ]
+  },
+  "typography": {
+    "font_family": {
+      "headings": "Manrope, sans-serif",
+      "body": "IBM Plex Sans, sans-serif",
+      "mono": "JetBrains Mono, monospace"
+    },
+    "installation": "import '@fontsource/manrope'; import '@fontsource/ibm-plex-sans';",
+    "scale": {
+      "h1": "text-4xl md:text-5xl font-bold tracking-tight",
+      "h2": "text-3xl font-semibold tracking-tight",
+      "h3": "text-2xl font-medium",
+      "body_lg": "text-lg leading-relaxed",
+      "body_base": "text-base leading-relaxed text-slate-300",
+      "caption": "text-sm text-slate-400 uppercase tracking-wider"
+    }
+  },
+  "colors": {
+    "palette": {
+      "background": "#0B1120",
+      "foreground": "#F8FAFC",
+      "card": "#151F32",
+      "card_foreground": "#F8FAFC",
+      "primary": "#0EA5E9",
+      "primary_foreground": "#0F172A",
+      "secondary": "#1E293B",
+      "secondary_foreground": "#F8FAFC",
+      "muted": "#1E293B",
+      "muted_foreground": "#94A3B8",
+      "accent": "#0EA5E9",
+      "accent_foreground": "#FFFFFF",
+      "destructive": "#EF4444",
+      "border": "#1E293B",
+      "input": "#1E293B",
+      "ring": "#0EA5E9"
+    },
+    "usage_rules": [
+      "NEVER use pure black (#000000). Use #0B1120 (Deep Navy).",
+      "Primary Action Buttons: Sky Blue (#0EA5E9) with dark text for maximum visibility.",
+      "Status 'Open': Slate/Gray.",
+      "Status 'In Production': Amber/Orange.",
+      "Status 'Completed': Emerald/Green.",
+      "Critical Actions (Delete): Red-500."
+    ]
+  },
+  "components": {
+    "buttons": {
+      "default": "h-12 px-6 rounded-md font-medium transition-all active:scale-95",
+      "primary": "bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_0_20px_rgba(14,165,233,0.3)]",
+      "secondary": "bg-secondary text-secondary-foreground hover:bg-secondary/80 border border-slate-700",
+      "ghost": "hover:bg-slate-800 text-slate-300 hover:text-white",
+      "mobile_touch": "h-14 text-lg w-full"
+    },
+    "cards": {
+      "base": "bg-card/50 backdrop-blur-md border border-white/5 rounded-lg shadow-xl",
+      "interactive": "hover:border-primary/50 transition-colors cursor-pointer group",
+      "glass": "bg-[#151F32]/80 backdrop-blur-xl border border-white/10"
+    },
+    "inputs": {
+      "base": "h-12 bg-slate-900/50 border-slate-700 focus:border-primary focus:ring-1 focus:ring-primary rounded-md text-white placeholder:text-slate-500"
+    },
+    "layout": {
+      "container": "max-w-7xl mx-auto p-4 md:p-8",
+      "section_spacing": "space-y-8",
+      "grid_dashboard": "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
+    }
+  },
+  "layout_structure": {
+    "sidebar": {
+      "width": "w-64",
+      "style": "fixed left-0 top-0 h-full bg-[#0B1120] border-r border-white/5 z-50 hidden md:flex flex-col",
+      "mobile_trigger": "md:hidden fixed top-4 left-4 z-50"
+    },
+    "main_content": {
+      "wrapper": "md:ml-64 min-h-screen bg-[#0B1120] text-white relative overflow-x-hidden"
+    },
+    "pages": {
+      "dashboard": {
+        "type": "Bento Grid",
+        "widgets": ["Summary Cards (Open Lots, In Production, Liters)", "Recent Activity List", "Quick Actions"]
+      },
+      "products": {
+        "view": "List/Card Hybrid",
+        "actions": ["Create Product (Modal)", "Release Batch (Modal)"],
+        "details": ["Recipe Management", "Unit Toggle (Kg/L)"]
+      },
+      "production_orders": {
+        "view": "Kanban or Status List",
+        "card_content": ["Product Name", "Batch ID", "Status Badge", "Progress Bar"]
+      },
+      "counting": {
+        "view": "Big Button Interface (Touch Friendly)",
+        "elements": ["Huge Counter Display", "+1L Button", "+2L Button", "+5L Button", "Finish Batch Button"]
+      }
+    }
+  },
+  "visual_assets": {
+    "images": {
+      "login_bg": "https://images.unsplash.com/photo-1720036236697-018370867320?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzZ8MHwxfHNlYXJjaHwxfHxtb2Rlcm4lMjBpbmR1c3RyaWFsJTIwZmFjdG9yeSUyMGludGVyaW9yJTIwZGFyayUyMGJsdWUlMjBsaWdodGluZ3xlbnwwfHx8fDE3NjQ4NjkxNzV8MA&ixlib=rb-4.1.0&q=85",
+      "team_placeholder": "https://images.pexels.com/photos/3856118/pexels-photo-3856118.jpeg",
+      "production_placeholder": "https://images.pexels.com/photos/5532718/pexels-photo-5532718.jpeg"
+    },
+    "icons": {
+      "library": "lucide-react",
+      "style": "stroke-width={1.5} className='w-6 h-6'"
+    }
+  },
+  "universal_guidelines": [
+    "ALL interactive elements must have data-testid attributes.",
+    "Mobile First: Ensure all forms and buttons are usable on a 375px width screen.",
+    "Feedback: Every action (save, delete, release) must show a Sonner toast.",
+    "Empty States: Never leave a list empty. Show a helpful illustration or text.",
+    "Loading: Use Skeleton loaders, not spinners, for content areas.",
+    "Navigation: Use Breadcrumbs on every inner page.",
+    "No Gradients on Text: Keep text solid white or slate for readability."
+  ],
+  "instructions_to_main_agent": "You are building a high-performance industrial app. Prioritize speed and clarity. Use the provided color palette variables in your Tailwind config. Implement the Sidebar as a permanent fixture on Desktop and a Sheet on Mobile. Use Shadcn components but override their styles with the classes defined in 'components' section above."
+}
