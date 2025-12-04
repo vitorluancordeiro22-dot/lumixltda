@@ -42,6 +42,7 @@ function App() {
             <Route path="raw-materials" element={<RawMaterials />} />
             <Route path="production-orders" element={<ProductionOrders />} />
             <Route path="counting" element={<Counting />} />
+            <Route path="batches" element={<Batches />} />
             <Route path="team" element={<Team />} />
             <Route path="trash" element={<Trash />} />
             <Route path="settings" element={<Settings />} />
