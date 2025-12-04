@@ -84,14 +84,26 @@ export const Counting = () => {
       toast.error('Selecione um lote');
       return;
     }
+    if (submitting) return;
+    
+    setSubmitting(true);
     try {
       await api.post(`/counting/${selectedBatch.id}`, formData);
-      toast.success('Contagem registrada!');
-      setFormData({ one_liter: 0, two_liter: 0, five_liter: 0, operator: '' });
-      fetchCountings(selectedBatch.id);
-      fetchBatches();
+      
+      if (isMountedRef.current) {
+        setFormData({ one_liter: 0, two_liter: 0, five_liter: 0, operator: '' });
+        fetchCountings(selectedBatch.id);
+        await fetchBatches();
+        toast.success('Contagem registrada!');
+      }
     } catch (error) {
-      toast.error('Erro ao registrar contagem');
+      if (isMountedRef.current) {
+        toast.error('Erro ao registrar contagem');
+      }
+    } finally {
+      if (isMountedRef.current) {
+        setSubmitting(false);
+      }
     }
   };
 
