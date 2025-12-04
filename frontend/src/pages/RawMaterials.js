@@ -41,55 +41,85 @@ export const RawMaterials = () => {
   const fetchMaterials = async () => {
     try {
       const response = await api.get('/raw-materials');
-      setMaterials(response.data);
+      if (isMountedRef.current) {
+        setMaterials(response.data);
+      }
     } catch (error) {
-      toast.error('Erro ao carregar matérias-primas');
+      if (isMountedRef.current) {
+        toast.error('Erro ao carregar matérias-primas');
+      }
     } finally {
-      setLoading(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
     }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (submitting) return;
+    
+    setSubmitting(true);
     try {
       if (selectedMaterial) {
         await api.put(`/raw-materials/${selectedMaterial.id}`, {
           ...formData,
           total_stock: parseFloat(formData.total_stock)
         });
-        toast.success('Matéria-prima atualizada!');
       } else {
         await api.post('/raw-materials', {
           ...formData,
           total_stock: parseFloat(formData.total_stock)
         });
-        toast.success('Matéria-prima criada!');
       }
-      setDialogOpen(false);
-      resetForm();
-      fetchMaterials();
+      
+      if (isMountedRef.current) {
+        const successMessage = selectedMaterial ? 'Matéria-prima atualizada!' : 'Matéria-prima criada!';
+        setDialogOpen(false);
+        resetForm();
+        await fetchMaterials();
+        toast.success(successMessage);
+      }
     } catch (error) {
-      toast.error('Erro ao salvar matéria-prima');
+      if (isMountedRef.current) {
+        toast.error('Erro ao salvar matéria-prima');
+      }
+    } finally {
+      if (isMountedRef.current) {
+        setSubmitting(false);
+      }
     }
   };
 
   const handleBatchSubmit = async (e) => {
     e.preventDefault();
+    if (submitting) return;
+    
+    setSubmitting(true);
     try {
       await api.post('/raw-material-batches', {
         ...batchFormData,
         quantity: parseFloat(batchFormData.quantity)
       });
-      toast.success('Lote criado e estoque atualizado!');
-      setBatchDialogOpen(false);
-      setBatchFormData({
-        raw_material_id: '',
-        date: new Date().toISOString().split('T')[0],
-        quantity: ''
-      });
-      fetchMaterials();
+      
+      if (isMountedRef.current) {
+        setBatchDialogOpen(false);
+        setBatchFormData({
+          raw_material_id: '',
+          date: new Date().toISOString().split('T')[0],
+          quantity: ''
+        });
+        await fetchMaterials();
+        toast.success('Lote criado e estoque atualizado!');
+      }
     } catch (error) {
-      toast.error('Erro ao criar lote');
+      if (isMountedRef.current) {
+        toast.error('Erro ao criar lote');
+      }
+    } finally {
+      if (isMountedRef.current) {
+        setSubmitting(false);
+      }
     }
   };
 
