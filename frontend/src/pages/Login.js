@@ -16,23 +16,44 @@ export const Login = () => {
   const [loading, setLoading] = useState(false);
   const { login, register } = useAuth();
   const navigate = useNavigate();
+  const isMountedRef = React.useRef(true);
+
+  React.useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (loading) return;
+    
     setLoading(true);
     try {
       if (isLogin) {
         await login(email, password);
-        toast.success('Login realizado com sucesso!');
       } else {
         await register(email, password, name);
-        toast.success('Cadastro realizado com sucesso!');
       }
-      navigate('/dashboard');
+      
+      if (isMountedRef.current) {
+        const successMessage = isLogin ? 'Login realizado com sucesso!' : 'Cadastro realizado com sucesso!';
+        toast.success(successMessage);
+        setTimeout(() => {
+          if (isMountedRef.current) {
+            navigate('/dashboard');
+          }
+        }, 100);
+      }
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao autenticar');
+      if (isMountedRef.current) {
+        toast.error(error.response?.data?.detail || 'Erro ao autenticar');
+      }
     } finally {
-      setLoading(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
     }
   };
 
