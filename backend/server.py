@@ -538,6 +538,52 @@ async def create_raw_material_batch(data: RawMaterialBatchCreate, current_user =
     
     return RawMaterialBatch(**batch_doc)
 
+@api_router.put('/raw-material-batches/{batch_id}', response_model=RawMaterialBatch)
+async def update_raw_material_batch(batch_id: str, data: RawMaterialBatchUpdate, current_user = Depends(get_current_user)):
+    batch = await db.raw_material_batches.find_one({'id': batch_id}, {'_id': 0})
+    if not batch:
+        raise HTTPException(status_code=404, detail='Batch not found')
+    
+    # Preparar campos para atualização
+    update_fields = {}
+    
+    if data.batch_number is not None:
+        # Verificar se o novo número já existe (exceto no lote atual)
+        existing = await db.raw_material_batches.find_one({
+            'batch_number': data.batch_number,
+            'id': {'$ne': batch_id},
+            'deleted': False
+        })
+        existing_prod = await db.product_batches.find_one({
+            'batch_number': data.batch_number,
+            'deleted': False
+        })
+        if existing or existing_prod:
+            raise HTTPException(status_code=400, detail='Batch number already exists')
+        update_fields['batch_number'] = data.batch_number
+    
+    if data.date is not None:
+        update_fields['date'] = data.date
+    
+    # Se a quantidade mudou, ajustar o estoque
+    if data.quantity is not None and data.quantity != batch.get('quantity', 0):
+        old_quantity = batch.get('quantity', 0)
+        quantity_diff = data.quantity - old_quantity
+        await db.raw_materials.update_one(
+            {'id': batch['raw_material_id']},
+            {'$inc': {'total_stock': quantity_diff}}
+        )
+        update_fields['quantity'] = data.quantity
+    
+    if update_fields:
+        await db.raw_material_batches.update_one(
+            {'id': batch_id},
+            {'$set': update_fields}
+        )
+    
+    updated = await db.raw_material_batches.find_one({'id': batch_id}, {'_id': 0})
+    return RawMaterialBatch(**updated)
+
 @api_router.delete('/raw-material-batches/{batch_id}')
 async def delete_raw_material_batch(batch_id: str, current_user = Depends(get_current_user)):
     batch = await db.raw_material_batches.find_one({'id': batch_id}, {'_id': 0})
