@@ -118,17 +118,29 @@ export const ProductionOrders = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (submitting) return;
+    
+    setSubmitting(true);
     try {
       await api.post('/production-orders', {
         ...formData,
         production_size: parseFloat(formData.production_size)
       });
-      toast.success('Ordem criada e estoque descontado!');
-      setDialogOpen(false);
-      resetForm();
-      fetchOrders();
+      
+      if (isMountedRef.current) {
+        setDialogOpen(false);
+        resetForm();
+        await fetchOrders();
+        toast.success('Ordem criada e estoque descontado!');
+      }
     } catch (error) {
-      toast.error('Erro ao criar ordem');
+      if (isMountedRef.current) {
+        toast.error('Erro ao criar ordem');
+      }
+    } finally {
+      if (isMountedRef.current) {
+        setSubmitting(false);
+      }
     }
   };
 
@@ -136,10 +148,14 @@ export const ProductionOrders = () => {
     if (!window.confirm('Deseja mover esta ordem para a lixeira?')) return;
     try {
       await api.delete(`/production-orders/${id}`);
-      toast.success('Ordem movida para lixeira');
-      fetchOrders();
+      if (isMountedRef.current) {
+        await fetchOrders();
+        toast.success('Ordem movida para lixeira');
+      }
     } catch (error) {
-      toast.error('Erro ao excluir');
+      if (isMountedRef.current) {
+        toast.error('Erro ao excluir');
+      }
     }
   };
 
