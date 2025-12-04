@@ -227,7 +227,7 @@ export const Counting = () => {
                 </Select>
               </div>
 
-              <Button type="submit" data-testid="submit-counting-button" className="w-full h-14 text-lg bg-primary hover:bg-primary/90 glow-primary">
+              <Button type="submit" disabled={submitting} data-testid="submit-counting-button" className="w-full h-14 text-lg bg-primary hover:bg-primary/90 glow-primary">
                 <Plus className="w-5 h-5 mr-2" />
                 Registrar Contagem
               </Button>
