@@ -253,7 +253,7 @@ export const ProductionOrders = () => {
                   </div>
                 </div>
               )}
-              <Button type="submit" className="w-full bg-primary hover:bg-primary/90">Criar Ordem</Button>
+              <Button type="submit" disabled={submitting} className="w-full bg-primary hover:bg-primary/90">Criar Ordem</Button>
             </form>
           </DialogContent>
         </Dialog>
