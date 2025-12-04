@@ -352,6 +352,15 @@ async def generate_batch_number(date_str: str) -> str:
     # Formato: AAMMCCC (ex: 2512001 = Dezembro/2025, lote 001)
     return f"{yymm}{counter:03d}"
 
+@api_router.get('/batches/next-number')
+async def get_next_batch_number(date: str, current_user = Depends(get_current_user)):
+    """
+    Retorna o próximo número de lote para uma data específica.
+    Útil para mostrar no frontend antes de criar o lote.
+    """
+    next_number = await generate_batch_number(date)
+    return {'batch_number': next_number, 'date': date}
+
 @api_router.get('/product-batches', response_model=List[ProductBatch])
 async def get_product_batches(current_user = Depends(get_current_user)):
     batches = await db.product_batches.find({'deleted': False}, {'_id': 0}).to_list(1000)
