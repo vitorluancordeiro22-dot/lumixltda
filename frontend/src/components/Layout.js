@@ -14,7 +14,8 @@ import {
   Settings, 
   Menu,
   LogOut,
-  Zap
+  Zap,
+  ListChecks
 } from 'lucide-react';
 
 const menuItems = [
