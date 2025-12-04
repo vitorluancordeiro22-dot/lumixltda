@@ -206,6 +206,10 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
 
 # ========== AUTH ENDPOINTS ==========
 
+@api_router.get('/')
+async def root():
+    return {'message': 'Lumix API - Gestão Inteligente de Produção'}
+
 @api_router.post('/auth/register', response_model=TokenResponse)
 async def register(data: UserRegister):
     existing = await db.users.find_one({'email': data.email}, {'_id': 0})
