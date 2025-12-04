@@ -44,11 +44,17 @@ export const ProductionOrders = () => {
   const fetchOrders = async () => {
     try {
       const response = await api.get('/production-orders');
-      setOrders(response.data);
+      if (isMountedRef.current) {
+        setOrders(response.data);
+      }
     } catch (error) {
-      toast.error('Erro ao carregar ordens');
+      if (isMountedRef.current) {
+        toast.error('Erro ao carregar ordens');
+      }
     } finally {
-      setLoading(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
     }
   };
 
