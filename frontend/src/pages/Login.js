@@ -38,14 +38,9 @@ export const Login = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center relative overflow-hidden">
-      {/* Background Image */}
-      <div 
-        className="absolute inset-0 bg-cover bg-center"
-        style={{
-          backgroundImage: 'url(https://images.unsplash.com/photo-1720036236697-018370867320?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzZ8MHwxfHNlYXJjaHwxfHxtb2Rlcm4lMjBpbmR1c3RyaWFsJTIwZmFjdG9yeSUyMGludGVyaW9yJTIwZGFyayUyMGJsdWUlMjBsaWdodGluZ3xlbnwwfHx8fDE3NjQ4NjkxNzV8MA&ixlib=rb-4.1.0&q=85)',
-        }}
-      />
-      <div className="absolute inset-0 bg-background/80 backdrop-blur-sm" />
+      {/* Background with gradient overlay */}
+      <div className="absolute inset-0 bg-gradient-to-br from-[#0B1120] via-[#1a2942] to-[#0B1120]" />
+      <div className="absolute inset-0 bg-background/60 backdrop-blur-sm" />
 
       {/* Login Card */}
       <Card data-testid="login-card" className="relative z-10 w-full max-w-md mx-4 p-8 glass-effect border border-white/10">
