@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import api from '../lib/api';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
@@ -16,6 +16,9 @@ export const Products = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [batchDialogOpen, setBatchDialogOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const isMountedRef = useRef(true);
+  
   const [formData, setFormData] = useState({
     name: '',
     unit: 'Litros',
@@ -30,25 +33,38 @@ export const Products = () => {
   });
 
   useEffect(() => {
+    isMountedRef.current = true;
     fetchProducts();
     fetchRawMaterials();
+    
+    return () => {
+      isMountedRef.current = false;
+    };
   }, []);
 
   const fetchProducts = async () => {
     try {
       const response = await api.get('/products');
-      setProducts(response.data);
+      if (isMountedRef.current) {
+        setProducts(response.data);
+      }
     } catch (error) {
-      toast.error('Erro ao carregar produtos');
+      if (isMountedRef.current) {
+        toast.error('Erro ao carregar produtos');
+      }
     } finally {
-      setLoading(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
     }
   };
 
   const fetchRawMaterials = async () => {
     try {
       const response = await api.get('/raw-materials');
-      setRawMaterials(response.data);
+      if (isMountedRef.current) {
+        setRawMaterials(response.data);
+      }
     } catch (error) {
       console.error('Error loading raw materials:', error);
     }
@@ -56,45 +72,69 @@ export const Products = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (submitting) return;
+    
+    setSubmitting(true);
     try {
       if (selectedProduct) {
         await api.put(`/products/${selectedProduct.id}`, {
           ...formData,
           expected_liters: parseFloat(formData.expected_liters)
         });
-        toast.success('Produto atualizado!');
       } else {
         await api.post('/products', {
           ...formData,
           expected_liters: parseFloat(formData.expected_liters)
         });
-        toast.success('Produto criado!');
       }
-      setDialogOpen(false);
-      resetForm();
-      fetchProducts();
+      
+      if (isMountedRef.current) {
+        const successMessage = selectedProduct ? 'Produto atualizado!' : 'Produto criado!';
+        setDialogOpen(false);
+        resetForm();
+        await fetchProducts();
+        toast.success(successMessage);
+      }
     } catch (error) {
-      toast.error('Erro ao salvar produto');
+      if (isMountedRef.current) {
+        toast.error('Erro ao salvar produto');
+      }
+    } finally {
+      if (isMountedRef.current) {
+        setSubmitting(false);
+      }
     }
   };
 
   const handleBatchSubmit = async (e) => {
     e.preventDefault();
+    if (submitting) return;
+    
+    setSubmitting(true);
     try {
       await api.post('/product-batches', {
         ...batchFormData,
         planned_liters: parseFloat(batchFormData.planned_liters)
       });
-      toast.success('Lote criado!');
-      setBatchDialogOpen(false);
-      setBatchFormData({
-        product_id: '',
-        date: new Date().toISOString().split('T')[0],
-        unit: 'Litros',
-        planned_liters: ''
-      });
+      
+      if (isMountedRef.current) {
+        setBatchDialogOpen(false);
+        setBatchFormData({
+          product_id: '',
+          date: new Date().toISOString().split('T')[0],
+          unit: 'Litros',
+          planned_liters: ''
+        });
+        toast.success('Lote criado!');
+      }
     } catch (error) {
-      toast.error('Erro ao criar lote');
+      if (isMountedRef.current) {
+        toast.error('Erro ao criar lote');
+      }
+    } finally {
+      if (isMountedRef.current) {
+        setSubmitting(false);
+      }
     }
   };
 
@@ -102,10 +142,14 @@ export const Products = () => {
     if (!window.confirm('Deseja mover este produto para a lixeira?')) return;
     try {
       await api.delete(`/products/${id}`);
-      toast.success('Produto movido para lixeira');
-      fetchProducts();
+      if (isMountedRef.current) {
+        await fetchProducts();
+        toast.success('Produto movido para lixeira');
+      }
     } catch (error) {
-      toast.error('Erro ao excluir produto');
+      if (isMountedRef.current) {
+        toast.error('Erro ao excluir produto');
+      }
     }
   };
 
@@ -203,7 +247,7 @@ export const Products = () => {
                   <Label className="text-white">Litragem Planejada</Label>
                   <Input type="number" step="0.01" value={batchFormData.planned_liters} onChange={(e) => setBatchFormData({...batchFormData, planned_liters: e.target.value})} className="bg-slate-900/50 border-slate-700 text-white" required />
                 </div>
-                <Button type="submit" className="w-full bg-primary hover:bg-primary/90">Criar Lote</Button>
+                <Button type="submit" disabled={submitting} className="w-full bg-primary hover:bg-primary/90">Criar Lote</Button>
               </form>
             </DialogContent>
           </Dialog>
@@ -250,7 +294,7 @@ export const Products = () => {
                     </Button>
                   </div>
                   {formData.recipes.map((recipe, index) => (
-                    <div key={index} className="flex gap-2 items-end">
+                    <div key={`recipe-${index}-${recipe.raw_material_id}`} className="flex gap-2 items-end">
                       <div className="flex-1">
                         <Label className="text-white text-xs">Matéria-Prima</Label>
                         <Select value={recipe.raw_material_id} onValueChange={(v) => updateRecipe(index, 'raw_material_id', v)}>
@@ -274,7 +318,7 @@ export const Products = () => {
                     </div>
                   ))}
                 </div>
-                <Button type="submit" className="w-full bg-primary hover:bg-primary/90">Salvar</Button>
+                <Button type="submit" disabled={submitting} className="w-full bg-primary hover:bg-primary/90">Salvar</Button>
               </form>
             </DialogContent>
           </Dialog>
