@@ -13,10 +13,17 @@ export const Team = () => {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedMember, setSelectedMember] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const isMountedRef = React.useRef(true);
   const [formData, setFormData] = useState({ name: '', role: '' });
 
   useEffect(() => {
+    isMountedRef.current = true;
     fetchMembers();
+    
+    return () => {
+      isMountedRef.current = false;
+    };
   }, []);
 
   const fetchMembers = async () => {
