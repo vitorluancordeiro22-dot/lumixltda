@@ -13,8 +13,6 @@ Drawer.displayName = "Drawer"
 
 const DrawerTrigger = DrawerPrimitive.Trigger
 
-const DrawerPortal = DrawerPrimitive.Portal
-
 const DrawerClose = DrawerPrimitive.Close
 
 const DrawerOverlay = React.forwardRef(({ className, ...props }, ref) => (
@@ -26,7 +24,7 @@ const DrawerOverlay = React.forwardRef(({ className, ...props }, ref) => (
 DrawerOverlay.displayName = DrawerPrimitive.Overlay.displayName
 
 const DrawerContent = React.forwardRef(({ className, children, ...props }, ref) => (
-  <DrawerPortal>
+  <>
     <DrawerOverlay />
     <DrawerPrimitive.Content
       ref={ref}
@@ -38,7 +36,7 @@ const DrawerContent = React.forwardRef(({ className, children, ...props }, ref) 
       <div className="mx-auto mt-4 h-2 w-[100px] rounded-full bg-muted" />
       {children}
     </DrawerPrimitive.Content>
-  </DrawerPortal>
+  </>
 ))
 DrawerContent.displayName = "DrawerContent"
 
@@ -78,7 +76,6 @@ DrawerDescription.displayName = DrawerPrimitive.Description.displayName
 
 export {
   Drawer,
-  DrawerPortal,
   DrawerOverlay,
   DrawerTrigger,
   DrawerClose,
