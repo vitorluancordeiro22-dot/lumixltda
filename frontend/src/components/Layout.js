@@ -15,7 +15,8 @@ import {
   Menu,
   LogOut,
   Zap,
-  ListChecks
+  ListChecks,
+  Truck
 } from 'lucide-react';
 
 const menuItems = [
