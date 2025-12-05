@@ -505,7 +505,9 @@ async def update_raw_material(material_id: str, data: RawMaterialCreate, current
         {'$set': {
             'name': data.name,
             'type': data.type,
-            'total_stock': data.total_stock
+            'total_stock': data.total_stock,
+            'supplier_id': data.supplier_id,
+            'received_date': data.received_date
         }}
     )
     if result.matched_count == 0:
