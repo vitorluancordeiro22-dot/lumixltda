@@ -490,6 +490,8 @@ async def create_raw_material(data: RawMaterialCreate, current_user = Depends(ge
         'name': data.name,
         'type': data.type,
         'total_stock': data.total_stock,
+        'supplier_id': data.supplier_id,
+        'received_date': data.received_date,
         'created_at': datetime.now(timezone.utc).isoformat(),
         'deleted': False
     }
