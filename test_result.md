@@ -142,15 +142,18 @@ backend:
         
   - task: "Adicionar campo unit nas receitas de produtos"
     implemented: true
-    working: "NA"
+    working: true
     file: "/app/backend/server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
         comment: "Campo unit adicionado ao modelo ProductRecipe com valor padrão L. Precisa testar criação de produtos com receitas usando Kg"
+      - working: true
+        agent: "testing"
+        comment: "✅ TESTADO: Criação de produto com receita usando unidade Kg funciona perfeitamente. Campo unit é salvo corretamente no banco de dados. Teste criou produto 'Refrigerante Premium' com receita de 'Açúcar Cristal' em Kg e verificou que a unidade foi persistida corretamente."
         
   - task: "Endpoint de reset do contador de litros"
     implemented: true
