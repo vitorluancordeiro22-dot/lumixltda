@@ -329,7 +329,19 @@ export const RawMaterials = () => {
                   </Button>
                 </div>
               </div>
-              <div className="p-3 rounded-lg bg-slate-800/50 border border-slate-700">
+              <div className="space-y-2">
+                {material.supplier_id && (
+                  <p className="text-sm text-slate-400">
+                    <span className="text-slate-500">Fornecedor:</span> {getSupplierName(material.supplier_id)}
+                  </p>
+                )}
+                {material.received_date && (
+                  <p className="text-sm text-slate-400">
+                    <span className="text-slate-500">Recebido em:</span> {new Date(material.received_date).toLocaleDateString('pt-BR')}
+                  </p>
+                )}
+              </div>
+              <div className="p-3 rounded-lg bg-slate-800/50 border border-slate-700 mt-3">
                 <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">Estoque Atual</p>
                 <p className="text-2xl font-bold text-white">{material.total_stock.toFixed(2)} {material.type}</p>
               </div>
