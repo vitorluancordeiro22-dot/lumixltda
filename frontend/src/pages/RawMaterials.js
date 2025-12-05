@@ -36,11 +36,23 @@ export const RawMaterials = () => {
   useEffect(() => {
     isMountedRef.current = true;
     fetchMaterials();
+    fetchSuppliers();
     
     return () => {
       isMountedRef.current = false;
     };
   }, []);
+
+  const fetchSuppliers = async () => {
+    try {
+      const response = await api.get('/suppliers');
+      if (isMountedRef.current) {
+        setSuppliers(response.data);
+      }
+    } catch (error) {
+      console.error('Error loading suppliers:', error);
+    }
+  };
 
   const fetchNextBatchNumber = async (date) => {
     try {
