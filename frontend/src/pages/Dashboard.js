@@ -71,7 +71,7 @@ export const Dashboard = () => {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
           <h1 className="text-4xl md:text-5xl font-bold text-white mb-2">Dashboard</h1>
           <p className="text-lg text-slate-300">Visão geral da produção</p>
@@ -80,7 +80,7 @@ export const Dashboard = () => {
           onClick={handleResetLiters}
           disabled={resetting}
           variant="outline"
-          className="border-slate-700 text-white hover:bg-slate-800"
+          className="border-slate-700 text-white hover:bg-slate-800 shrink-0"
         >
           <RotateCcw className="w-4 h-4 mr-2" />
           {resetting ? 'Resetando...' : 'Resetar Litros'}
