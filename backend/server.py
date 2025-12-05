@@ -78,6 +78,8 @@ class RawMaterialCreate(BaseModel):
     name: str
     type: str
     total_stock: float = 0.0
+    supplier_id: str = ''
+    received_date: str = ''
 
 class ProductBatch(BaseModel):
     id: str
