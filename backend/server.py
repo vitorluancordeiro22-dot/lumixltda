@@ -50,6 +50,7 @@ class TokenResponse(BaseModel):
 class ProductRecipe(BaseModel):
     raw_material_id: str
     quantity_per_liter: float
+    unit: str = 'L'  # L (Litros) ou Kg
 
 class Product(BaseModel):
     id: str
