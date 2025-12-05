@@ -162,13 +162,13 @@ export const Team = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {members.map(member => (
             <Card key={member.id} data-testid={`member-card-${member.id}`} className="p-6 glass-effect border-white/5 hover:border-primary/50 transition-smooth">
-              <div className="flex items-start justify-between">
-                <div className="flex items-start gap-4">
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex items-start gap-4 flex-1 cursor-pointer" onClick={() => handleViewHistory(member)}>
                   <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center">
                     <Users className="w-6 h-6 text-primary" />
                   </div>
                   <div>
-                    <h3 className="text-xl font-bold text-white mb-1">{member.name}</h3>
+                    <h3 className="text-xl font-bold text-white mb-1 hover:text-primary transition-colors">{member.name}</h3>
                     <p className="text-sm text-slate-400">{member.role}</p>
                   </div>
                 </div>
@@ -181,6 +181,14 @@ export const Team = () => {
                   </Button>
                 </div>
               </div>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => handleViewHistory(member)}
+                className="w-full border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800"
+              >
+                Ver Histórico de Envasamento
+              </Button>
             </Card>
           ))}
         </div>
