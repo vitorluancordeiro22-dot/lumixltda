@@ -76,27 +76,35 @@ export const IndustrialOPs = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (submitting) return;
+    if (submitting || !isMountedRef.current) return;
 
     setSubmitting(true);
+    
     try {
-      await api.post('/industrial-ops', {
+      const response = await api.post('/industrial-ops', {
         ...formData,
         planned_quantity: parseFloat(formData.planned_quantity),
         temperature: formData.temperature ? parseFloat(formData.temperature) : null
       });
 
-      if (isMountedRef.current) {
-        setDialogOpen(false);
-        resetForm();
-        await fetchOPs();
-        toast.success('OP criada com sucesso!');
-      }
+      if (!isMountedRef.current) return;
+      
+      toast.success('OP criada com sucesso!');
+      resetForm();
+      setDialogOpen(false);
+      
+      // Fetch OPs after dialog is closed
+      setTimeout(() => {
+        if (isMountedRef.current) {
+          fetchOPs();
+        }
+      }, 300);
+      
     } catch (error) {
-      if (isMountedRef.current) {
-        const errorMsg = error.response?.data?.detail || 'Erro ao criar OP';
-        toast.error(errorMsg);
-      }
+      if (!isMountedRef.current) return;
+      
+      const errorMsg = error.response?.data?.detail || 'Erro ao criar OP';
+      toast.error(errorMsg);
     } finally {
       if (isMountedRef.current) {
         setSubmitting(false);
