@@ -285,6 +285,23 @@ export const RawMaterials = () => {
                     <Input type="number" step="0.01" value={formData.total_stock} onChange={(e) => setFormData({...formData, total_stock: e.target.value})} className="bg-slate-900/50 border-slate-700 text-white" />
                   </div>
                 </div>
+                <div>
+                  <Label className="text-white">Fornecedor</Label>
+                  <Select value={formData.supplier_id} onValueChange={(v) => setFormData({...formData, supplier_id: v})}>
+                    <SelectTrigger className="bg-slate-900/50 border-slate-700 text-white">
+                      <SelectValue placeholder="Selecione o fornecedor" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-slate-900 border-slate-700">
+                      {suppliers.map(s => (
+                        <SelectItem key={s.id} value={s.id} className="text-white">{s.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-white">Data de Recebimento</Label>
+                  <Input type="date" value={formData.received_date} onChange={(e) => setFormData({...formData, received_date: e.target.value})} className="bg-slate-900/50 border-slate-700 text-white" />
+                </div>
                 <Button type="submit" disabled={submitting} className="w-full bg-primary hover:bg-primary/90">Salvar</Button>
               </form>
             </DialogContent>
