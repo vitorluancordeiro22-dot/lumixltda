@@ -763,6 +763,126 @@ async def delete_team_member(member_id: str, current_user = Depends(get_current_
     await db.team.update_one({'id': member_id}, {'$set': {'deleted': True}})
     return {'message': 'Member moved to trash'}
 
+# ========== SUPPLIERS ==========
+
+@api_router.get('/suppliers', response_model=List[Supplier])
+async def get_suppliers(current_user = Depends(get_current_user)):
+    suppliers = await db.suppliers.find({'deleted': False}, {'_id': 0}).to_list(1000)
+    return suppliers
+
+@api_router.post('/suppliers', response_model=Supplier)
+async def create_supplier(data: SupplierCreate, current_user = Depends(get_current_user)):
+    import uuid
+    supplier_id = str(uuid.uuid4())
+    supplier_doc = {
+        'id': supplier_id,
+        'name': data.name,
+        'contact': data.contact,
+        'phone': data.phone,
+        'email': data.email,
+        'address': data.address,
+        'created_at': datetime.now(timezone.utc).isoformat(),
+        'deleted': False
+    }
+    await db.suppliers.insert_one(supplier_doc)
+    return Supplier(**supplier_doc)
+
+@api_router.put('/suppliers/{supplier_id}', response_model=Supplier)
+async def update_supplier(supplier_id: str, data: SupplierCreate, current_user = Depends(get_current_user)):
+    result = await db.suppliers.update_one(
+        {'id': supplier_id},
+        {'$set': {
+            'name': data.name,
+            'contact': data.contact,
+            'phone': data.phone,
+            'email': data.email,
+            'address': data.address
+        }}
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail='Supplier not found')
+    supplier = await db.suppliers.find_one({'id': supplier_id}, {'_id': 0})
+    return Supplier(**supplier)
+
+@api_router.delete('/suppliers/{supplier_id}')
+async def delete_supplier(supplier_id: str, current_user = Depends(get_current_user)):
+    supplier = await db.suppliers.find_one({'id': supplier_id}, {'_id': 0})
+    if not supplier:
+        raise HTTPException(status_code=404, detail='Supplier not found')
+    
+    await db.trash.insert_one({
+        'id': str(__import__('uuid').uuid4()),
+        'item_type': 'supplier',
+        'item_data': supplier,
+        'deleted_at': datetime.now(timezone.utc).isoformat()
+    })
+    await db.suppliers.update_one({'id': supplier_id}, {'$set': {'deleted': True}})
+    return {'message': 'Supplier moved to trash'}
+
+# ========== EMPLOYEE HISTORY ==========
+
+@api_router.get('/team/{member_id}/history')
+async def get_employee_history(member_id: str, current_user = Depends(get_current_user)):
+    """
+    Retorna o histórico de envasamento de um funcionário.
+    Inclui todas as contagens onde ele foi o operador.
+    """
+    member = await db.team.find_one({'id': member_id}, {'_id': 0})
+    if not member:
+        raise HTTPException(status_code=404, detail='Team member not found')
+    
+    # Buscar todas as contagens deste operador
+    countings = await db.counting.find(
+        {'operator': member['name']},
+        {'_id': 0}
+    ).sort('created_at', -1).to_list(1000)
+    
+    # Buscar informações dos lotes relacionados
+    batch_ids = [c['product_batch_id'] for c in countings]
+    batches = await db.product_batches.find(
+        {'id': {'$in': batch_ids}},
+        {'_id': 0}
+    ).to_list(1000)
+    
+    # Mapear batches
+    batch_map = {b['id']: b for b in batches}
+    
+    # Buscar produtos
+    product_ids = [b['product_id'] for b in batches]
+    products = await db.products.find(
+        {'id': {'$in': product_ids}},
+        {'_id': 0}
+    ).to_list(1000)
+    
+    product_map = {p['id']: p for p in products}
+    
+    # Montar histórico
+    history = []
+    total_liters = 0
+    
+    for counting in countings:
+        batch = batch_map.get(counting['product_batch_id'])
+        if batch:
+            product = product_map.get(batch['product_id'])
+            history.append({
+                'id': counting['id'],
+                'date': counting['created_at'],
+                'product_name': product['name'] if product else 'N/A',
+                'batch_number': batch['batch_number'],
+                'one_liter': counting['one_liter'],
+                'two_liter': counting['two_liter'],
+                'five_liter': counting['five_liter'],
+                'total_liters': counting['total']
+            })
+            total_liters += counting['total']
+    
+    return {
+        'member': member,
+        'total_liters_bottled': total_liters,
+        'total_operations': len(history),
+        'history': history
+    }
+
 # ========== TRASH ==========
 
 @api_router.get('/trash', response_model=List[TrashItem])
