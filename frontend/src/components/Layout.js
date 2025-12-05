@@ -16,7 +16,8 @@ import {
   LogOut,
   Zap,
   ListChecks,
-  Truck
+  Truck,
+  Archive
 } from 'lucide-react';
 
 const menuItems = [
@@ -27,6 +28,7 @@ const menuItems = [
   { path: '/counting', icon: Calculator, label: 'Contagem' },
   { path: '/batches', icon: ListChecks, label: 'Gerenciar Lotes' },
   { path: '/suppliers', icon: Truck, label: 'Fornecedores' },
+  { path: '/archives', icon: Archive, label: 'Arquivos' },
   { path: '/team', icon: Users, label: 'Equipe' },
   { path: '/trash', icon: Trash2, label: 'Lixeira' },
   { path: '/settings', icon: Settings, label: 'Configurações' },
