@@ -9,6 +9,14 @@ import { Upload, FileText, Download, CheckCircle, AlertCircle } from 'lucide-rea
 export const ProductFileManager = ({ product, onUpdate }) => {
   const [uploading, setUploading] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const isMountedRef = React.useRef(true);
+  
+  React.useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   const fileTypes = [
     { key: 'op_model', label: 'Modelo de OP', required: true },
@@ -21,7 +29,7 @@ export const ProductFileManager = ({ product, onUpdate }) => {
   };
 
   const handleFileUpload = async (fileType, file) => {
-    if (!file) return;
+    if (!file || !isMountedRef.current) return;
 
     setUploading(true);
     try {
@@ -39,22 +47,36 @@ export const ProductFileManager = ({ product, onUpdate }) => {
         }
       );
 
+      if (!isMountedRef.current) return;
+      
       toast.success('Arquivo enviado com sucesso!');
-      if (onUpdate) onUpdate();
+      if (onUpdate) {
+        setTimeout(() => {
+          if (isMountedRef.current) onUpdate();
+        }, 300);
+      }
     } catch (error) {
+      if (!isMountedRef.current) return;
+      
       const errorMsg = error.response?.data?.detail || 'Erro ao enviar arquivo';
       toast.error(errorMsg);
     } finally {
-      setUploading(false);
+      if (isMountedRef.current) {
+        setUploading(false);
+      }
     }
   };
 
   const handleFileDownload = async (fileType) => {
+    if (!isMountedRef.current) return;
+    
     try {
       const response = await api.get(
         `/products/${product.id}/download-model/${fileType}`,
         { responseType: 'blob' }
       );
+
+      if (!isMountedRef.current) return;
 
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
@@ -64,9 +86,13 @@ export const ProductFileManager = ({ product, onUpdate }) => {
       link.click();
       link.remove();
 
-      toast.success('Download iniciado!');
+      if (isMountedRef.current) {
+        toast.success('Download iniciado!');
+      }
     } catch (error) {
-      toast.error('Erro ao baixar arquivo');
+      if (isMountedRef.current) {
+        toast.error('Erro ao baixar arquivo');
+      }
     }
   };
 
