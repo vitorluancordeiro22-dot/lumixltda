@@ -145,6 +145,9 @@ backend:
       - working: true
         agent: "main"
         comment: "Endpoints /api/archive/products/{year}/{month} e /api/archive/raw-materials/{year}/{month} criados"
+      - working: true
+        agent: "testing"
+        comment: "✅ TESTADO: Ambos endpoints funcionando. /api/archive/products/2025/10 retornou 1 produto arquivado com todos os dados corretos (batch_number, archived_year, archived_month, archived_at). /api/archive/raw-materials/2025/10 retornou 0 materiais (correto pois não havia materiais finalizados)."
         
   - task: "Adicionar campo unit nas receitas de produtos"
     implemented: true
