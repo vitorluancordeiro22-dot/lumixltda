@@ -109,18 +109,15 @@ class LumixAPITester:
         return False
 
     def test_user_login(self):
-        """Test user login with existing user"""
-        if not self.created_items['users']:
-            return False
-            
-        user = self.created_items['users'][0]
+        """Test user login with provided credentials"""
+        # Use the credentials provided in the review request
         login_data = {
-            "email": user['email'],
-            "password": "TestPass123!"
+            "email": "teste@teste.com",
+            "password": "password"
         }
         
         success, response = self.run_test(
-            "User Login",
+            "User Login (Provided Credentials)",
             "POST",
             "auth/login",
             200,
