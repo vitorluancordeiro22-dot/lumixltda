@@ -390,13 +390,6 @@ export const Products = () => {
                   <p className="mb-1">Receita: {product.recipes.length} matéria(s)-prima(s)</p>
                 </div>
               )}
-              
-              <div className="mt-4 pt-4 border-t border-slate-700">
-                <ProductFileManager 
-                  product={product} 
-                  onUpdate={fetchProducts}
-                />
-              </div>
             </Card>
           ))}
         </div>
