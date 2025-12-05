@@ -92,7 +92,7 @@ async def generate_op_number(db):
 
 # ========== ROUTES ==========
 
-def setup_industrial_op_routes(api_router: APIRouter, db, fs, get_current_user):
+def setup_industrial_op_routes(api_router: APIRouter, db, fs, get_current_user, generate_batch_number_fn):
     """Configura todas as rotas de OP Industrial"""
     
     # ========== UPLOAD DE ARQUIVOS MODELO ==========
