@@ -102,6 +102,27 @@ export const Team = () => {
     setFormData({ name: '', role: '' });
   };
 
+  const handleViewHistory = async (member) => {
+    setSelectedMember(member);
+    setHistoryDialogOpen(true);
+    setLoadingHistory(true);
+    
+    try {
+      const response = await api.get(`/team/${member.id}/history`);
+      if (isMountedRef.current) {
+        setMemberHistory(response.data);
+      }
+    } catch (error) {
+      if (isMountedRef.current) {
+        toast.error('Erro ao carregar histórico');
+      }
+    } finally {
+      if (isMountedRef.current) {
+        setLoadingHistory(false);
+      }
+    }
+  };
+
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
