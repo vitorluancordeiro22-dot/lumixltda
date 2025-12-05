@@ -12,7 +12,10 @@ export const Team = () => {
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
   const [selectedMember, setSelectedMember] = useState(null);
+  const [memberHistory, setMemberHistory] = useState(null);
+  const [loadingHistory, setLoadingHistory] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const isMountedRef = React.useRef(true);
   const [formData, setFormData] = useState({ name: '', role: '' });
