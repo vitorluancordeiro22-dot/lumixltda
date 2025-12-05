@@ -336,8 +336,10 @@ export const Products = () => {
                         </Select>
                       </div>
                       <div className="w-32">
-                        <Label className="text-white text-xs">Qtd/Litro</Label>
-                        <Input type="number" step="0.001" value={recipe.quantity_per_liter} onChange={(e) => updateRecipe(index, 'quantity_per_liter', e.target.value)} className="bg-slate-900/50 border-slate-700 text-white" />
+                        <Label className="text-white text-xs">
+                          Qtd/{rawMaterials.find(rm => rm.id === recipe.raw_material_id)?.type || 'unidade'}
+                        </Label>
+                        <Input type="number" step="0.001" value={recipe.quantity_per_liter} onChange={(e) => updateRecipe(index, 'quantity_per_liter', e.target.value)} className="bg-slate-900/50 border-slate-700 text-white" placeholder="Ex: 0.5" />
                       </div>
                       <Button type="button" onClick={() => removeRecipe(index)} size="icon" variant="destructive">
                         <Trash2 className="w-4 h-4" />
