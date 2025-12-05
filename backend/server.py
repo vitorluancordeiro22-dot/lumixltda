@@ -71,6 +71,8 @@ class RawMaterial(BaseModel):
     name: str
     type: str  # Kg ou Litros
     total_stock: float
+    supplier_id: str = ''
+    received_date: str = ''
     created_at: str
     deleted: bool = False
 
