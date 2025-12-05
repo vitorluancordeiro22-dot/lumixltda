@@ -17,7 +17,8 @@ import {
   Zap,
   ListChecks,
   Truck,
-  Archive
+  Archive,
+  FileText
 } from 'lucide-react';
 
 const menuItems = [
@@ -25,6 +26,7 @@ const menuItems = [
   { path: '/products', icon: Package, label: 'Produtos' },
   { path: '/raw-materials', icon: Boxes, label: 'Matérias-Primas' },
   { path: '/production-orders', icon: ClipboardList, label: 'Ordens de Produção' },
+  { path: '/industrial-ops', icon: FileText, label: 'OP Industrial' },
   { path: '/counting', icon: Calculator, label: 'Contagem' },
   { path: '/batches', icon: ListChecks, label: 'Gerenciar Lotes' },
   { path: '/suppliers', icon: Truck, label: 'Fornecedores' },
