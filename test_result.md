@@ -175,6 +175,9 @@ backend:
       - working: true
         agent: "main"
         comment: "Endpoint /api/dashboard/reset-liters criado e testado via curl. Reseta contador de 122.0 para 0.0 com sucesso"
+      - working: true
+        agent: "testing"
+        comment: "✅ TESTADO: Reset do contador funcionando perfeitamente. Teste verificou contador inicial (205.0 litros), executou reset que deletou 2 registros de contagem, e confirmou que contador ficou em 0.0 litros. Endpoint retorna mensagem de sucesso e quantidade de registros deletados."
 
 frontend:
   - task: "Página de Arquivos (Archives)"
