@@ -248,14 +248,24 @@ export const Batches = () => {
                       <p className="text-sm text-slate-400">Lote: {batch.batch_number}</p>
                       <p className="text-xs text-slate-500">{formatBatchNumber(batch.batch_number)}</p>
                     </div>
-                    <Button 
-                      size="icon" 
-                      variant="ghost" 
-                      onClick={() => handleEdit(batch, 'material')}
-                      className="text-slate-300 hover:text-white"
-                    >
-                      <Edit className="w-4 h-4" />
-                    </Button>
+                    <div className="flex gap-1">
+                      <Button 
+                        size="icon" 
+                        variant="ghost" 
+                        onClick={() => handleEdit(batch, 'material')}
+                        className="text-slate-300 hover:text-white"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                      <Button 
+                        size="icon" 
+                        variant="ghost" 
+                        onClick={() => handleDelete(batch, 'material')}
+                        className="text-red-400 hover:text-red-300"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </div>
                   <div className="space-y-2 text-sm">
                     <div className="flex items-center gap-2 text-slate-400">
