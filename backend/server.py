@@ -1104,7 +1104,7 @@ async def reset_liters_counter(current_user = Depends(get_current_user)):
 
 # ========== INDUSTRIAL OP ROUTES ==========
 from industrial_op_routes import setup_industrial_op_routes
-setup_industrial_op_routes(api_router, db, fs, get_current_user)
+setup_industrial_op_routes(api_router, db, fs, get_current_user, generate_batch_number)
 
 app.include_router(api_router)
 
