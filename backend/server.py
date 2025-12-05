@@ -175,6 +175,23 @@ class TeamMemberCreate(BaseModel):
     name: str
     role: str
 
+class Supplier(BaseModel):
+    id: str
+    name: str
+    contact: str
+    phone: str
+    email: str
+    address: str
+    created_at: str
+    deleted: bool = False
+
+class SupplierCreate(BaseModel):
+    name: str
+    contact: str = ''
+    phone: str = ''
+    email: str = ''
+    address: str = ''
+
 class TrashItem(BaseModel):
     id: str
     item_type: str
