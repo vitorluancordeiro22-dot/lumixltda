@@ -8,6 +8,7 @@ import { Label } from '../components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { toast } from 'sonner';
 import { Plus, Edit, Trash2, Package } from 'lucide-react';
+import { ProductFileManager } from '../components/ProductFileManager';
 
 export const Products = () => {
   const [products, setProducts] = useState([]);
@@ -385,10 +386,17 @@ export const Products = () => {
                 </div>
               </div>
               {product.recipes && product.recipes.length > 0 && (
-                <div className="text-sm text-slate-400">
+                <div className="text-sm text-slate-400 mb-3">
                   <p className="mb-1">Receita: {product.recipes.length} matéria(s)-prima(s)</p>
                 </div>
               )}
+              
+              <div className="mt-4 pt-4 border-t border-slate-700">
+                <ProductFileManager 
+                  product={product} 
+                  onUpdate={fetchProducts}
+                />
+              </div>
             </Card>
           ))}
         </div>
