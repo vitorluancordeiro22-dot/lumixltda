@@ -174,7 +174,6 @@ def setup_industrial_op_routes(api_router: APIRouter, db, fs, get_current_user, 
     @api_router.post('/industrial-ops', response_model=IndustrialOP)
     async def create_industrial_op(
         op_data: IndustrialOPCreate,
-        generate_batch_number_fn,
         current_user = Depends(get_current_user)
     ):
         """Criar nova Ordem de Produção Industrial"""
