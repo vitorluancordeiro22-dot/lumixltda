@@ -18,10 +18,13 @@ export const RawMaterials = () => {
   const [submitting, setSubmitting] = useState(false);
   const isMountedRef = React.useRef(true);
   
+  const [suppliers, setSuppliers] = useState([]);
   const [formData, setFormData] = useState({
     name: '',
     type: 'Litros',
-    total_stock: '0'
+    total_stock: '0',
+    supplier_id: '',
+    received_date: new Date().toISOString().split('T')[0]
   });
   const [batchFormData, setBatchFormData] = useState({
     raw_material_id: '',
