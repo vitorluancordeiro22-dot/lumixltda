@@ -2,12 +2,12 @@
 Rotas e Endpoints para Sistema de OP Industrial
 """
 
-from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, status
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, status as http_status
 from fastapi.responses import StreamingResponse
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorGridFSBucket
 from datetime import datetime, timezone
 from uuid import uuid4
-from typing import List
+from typing import List, Optional
 import io
 from bson import ObjectId
 
@@ -174,6 +174,7 @@ def setup_industrial_op_routes(api_router: APIRouter, db, fs, get_current_user):
     @api_router.post('/industrial-ops', response_model=IndustrialOP)
     async def create_industrial_op(
         op_data: IndustrialOPCreate,
+        generate_batch_number_fn,
         current_user = Depends(get_current_user)
     ):
         """Criar nova Ordem de Produção Industrial"""
@@ -198,10 +199,9 @@ def setup_industrial_op_routes(api_router: APIRouter, db, fs, get_current_user):
         op_number = await generate_op_number(db)
         
         # Gerar lote do produto (usar sistema existente)
-        from datetime import datetime
         now = datetime.now(timezone.utc)
         date_str = now.strftime('%Y-%m-%d')
-        batch_response = await generate_batch_number(date_str)
+        batch_response = await generate_batch_number_fn(date_str)
         batch_number = batch_response['batch_number']
         
         # Auto-selecionar matérias-primas (LIFO - mais recentes com estoque)
@@ -304,15 +304,15 @@ def setup_industrial_op_routes(api_router: APIRouter, db, fs, get_current_user):
     
     @api_router.get('/industrial-ops', response_model=List[IndustrialOP])
     async def list_industrial_ops(
-        status: Optional[OPStatus] = None,
+        op_status: Optional[OPStatus] = None,
         product_id: Optional[str] = None,
         current_user = Depends(get_current_user)
     ):
         """Listar Ordens de Produção"""
         
         filter_query = {}
-        if status:
-            filter_query['status'] = status.value
+        if op_status:
+            filter_query['status'] = op_status.value
         if product_id:
             filter_query['product_id'] = product_id
         
