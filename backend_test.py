@@ -366,6 +366,187 @@ class LumixAPITester:
         )
         return success
 
+    def test_product_with_kg_recipe(self):
+        """Test creating product with Kg unit in recipe"""
+        if not self.created_items['raw_materials']:
+            return False
+            
+        material_id = self.created_items['raw_materials'][0]['id']
+        product_data = {
+            "name": "Produto com Receita Kg",
+            "unit": "Litros",
+            "expected_liters": 300.0,
+            "recipes": [
+                {
+                    "raw_material_id": material_id,
+                    "quantity_per_liter": 1.2,
+                    "unit": "Kg"  # Testing Kg unit
+                }
+            ]
+        }
+        
+        success, response = self.run_test(
+            "Create Product with Kg Recipe",
+            "POST",
+            "products",
+            200,
+            data=product_data
+        )
+        
+        if success:
+            # Verify the unit was saved correctly
+            recipe = response.get('recipes', [{}])[0]
+            if recipe.get('unit') == 'Kg':
+                print(f"   ✅ Recipe unit correctly saved as Kg")
+                self.created_items['products'].append(response)
+                return True
+            else:
+                print(f"   ❌ Recipe unit not saved correctly. Expected 'Kg', got '{recipe.get('unit')}'")
+                return False
+        return success
+
+    def test_finalize_batches_for_archive(self):
+        """Finalize some batches to prepare for archiving test"""
+        success_count = 0
+        
+        # Finalize product batches
+        for batch in self.created_items['product_batches']:
+            # Update batch status to 'finalizado'
+            success, response = self.run_test(
+                f"Finalize Product Batch {batch['batch_number']}",
+                "PUT",
+                f"product-batches/{batch['id']}",
+                200,
+                data={"status": "finalizado"}  # This might not work as status is not in update model
+            )
+            if success:
+                success_count += 1
+        
+        # Finalize raw material batches  
+        for batch in self.created_items['raw_material_batches']:
+            # Update batch status to 'finalizado'
+            success, response = self.run_test(
+                f"Finalize Raw Material Batch {batch['batch_number']}",
+                "PUT", 
+                f"raw-material-batches/{batch['id']}",
+                200,
+                data={"status": "finalizado"}  # This might not work as status is not in update model
+            )
+            if success:
+                success_count += 1
+                
+        return success_count > 0
+
+    def test_auto_archive_month(self):
+        """Test auto-archive endpoint"""
+        success, response = self.run_test(
+            "Auto Archive Month",
+            "POST",
+            "archive/auto-archive-month",
+            200
+        )
+        
+        if success:
+            print(f"   Archive results: {response}")
+        return success
+
+    def test_get_archive_months(self):
+        """Test getting list of archived months"""
+        success, response = self.run_test(
+            "Get Archive Months",
+            "GET",
+            "archive/months",
+            200
+        )
+        
+        if success:
+            print(f"   Available archive months: {len(response)} months")
+            if response:
+                # Store first month for next test
+                self.archive_month = response[0]
+        return success
+
+    def test_get_archived_products(self):
+        """Test getting archived products for a specific month"""
+        if not hasattr(self, 'archive_month'):
+            print("   Skipping - no archive months available")
+            return True
+            
+        month_data = self.archive_month
+        success, response = self.run_test(
+            f"Get Archived Products {month_data['month_name']}",
+            "GET",
+            f"archive/products/{month_data['year']}/{month_data['month']}",
+            200
+        )
+        
+        if success:
+            print(f"   Found {len(response)} archived products")
+        return success
+
+    def test_get_archived_raw_materials(self):
+        """Test getting archived raw materials for a specific month"""
+        if not hasattr(self, 'archive_month'):
+            print("   Skipping - no archive months available")
+            return True
+            
+        month_data = self.archive_month
+        success, response = self.run_test(
+            f"Get Archived Raw Materials {month_data['month_name']}",
+            "GET",
+            f"archive/raw-materials/{month_data['year']}/{month_data['month']}",
+            200
+        )
+        
+        if success:
+            print(f"   Found {len(response)} archived raw materials")
+        return success
+
+    def test_dashboard_reset_liters(self):
+        """Test dashboard reset liters functionality"""
+        # First get current dashboard to see liters count
+        success, response = self.run_test(
+            "Get Dashboard Before Reset",
+            "GET",
+            "dashboard/summary",
+            200
+        )
+        
+        if success:
+            liters_before = response.get('liters_bottled_month', 0)
+            print(f"   Liters before reset: {liters_before}")
+        
+        # Now reset the counter
+        success, response = self.run_test(
+            "Reset Liters Counter",
+            "POST",
+            "dashboard/reset-liters",
+            200
+        )
+        
+        if success:
+            print(f"   Reset result: {response}")
+            
+            # Verify the reset worked by checking dashboard again
+            success2, response2 = self.run_test(
+                "Get Dashboard After Reset",
+                "GET",
+                "dashboard/summary",
+                200
+            )
+            
+            if success2:
+                liters_after = response2.get('liters_bottled_month', 0)
+                print(f"   Liters after reset: {liters_after}")
+                if liters_after == 0:
+                    print(f"   ✅ Reset successful - counter is now 0")
+                    return True
+                else:
+                    print(f"   ❌ Reset failed - counter is still {liters_after}")
+                    return False
+        
+        return success
+
 def main():
     print("🚀 Starting Lumix API Testing...")
     print("=" * 50)
