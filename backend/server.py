@@ -207,6 +207,11 @@ class DashboardSummary(BaseModel):
     in_production_orders: int
     liters_bottled_month: float
 
+class MonthlyArchive(BaseModel):
+    year: int
+    month: int
+    month_name: str
+
 # ========== AUTH UTILS ==========
 
 def hash_password(password: str) -> str:
