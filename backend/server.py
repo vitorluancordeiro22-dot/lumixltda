@@ -1,8 +1,9 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, status
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, UploadFile, File
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.responses import StreamingResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
-from motor.motor_asyncio import AsyncIOMotorClient
+from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorGridFSBucket
 import os
 import logging
 from pathlib import Path
@@ -11,6 +12,16 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime, timezone, timedelta
 import bcrypt
 import jwt
+from uuid import uuid4
+import io
+from bson import ObjectId
+
+# Industrial OP imports
+from industrial_op import (
+    OPStatus, FileType, FileMetadata, ProductFileModels,
+    RawMaterialUsage, OPHistoryEntry, IndustrialOP,
+    IndustrialOPCreate, IndustrialOPUpdate, OPStatusChange
+)
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
