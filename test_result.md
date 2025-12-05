@@ -101,3 +101,133 @@
 #====================================================================================================
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
+user_problem_statement: "Implementar 3 features prioritárias: 1) Sistema de arquivamento mensal automático, 2) Adicionar opção de Kg nas receitas de produtos, 3) Adicionar botão de reset no contador de litros do dashboard"
+
+backend:
+  - task: "Sistema de arquivamento mensal - Endpoint auto-archive"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Endpoint /api/archive/auto-archive-month criado e testado via curl com sucesso. Arquiva lotes finalizados de meses anteriores"
+        
+  - task: "Sistema de arquivamento - Endpoint para listar meses"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Endpoint /api/archive/months criado. Retorna lista de meses com arquivos disponíveis"
+        
+  - task: "Sistema de arquivamento - Endpoints para buscar arquivos por mês"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Endpoints /api/archive/products/{year}/{month} e /api/archive/raw-materials/{year}/{month} criados"
+        
+  - task: "Adicionar campo unit nas receitas de produtos"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Campo unit adicionado ao modelo ProductRecipe com valor padrão L. Precisa testar criação de produtos com receitas usando Kg"
+        
+  - task: "Endpoint de reset do contador de litros"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Endpoint /api/dashboard/reset-liters criado e testado via curl. Reseta contador de 122.0 para 0.0 com sucesso"
+
+frontend:
+  - task: "Página de Arquivos (Archives)"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/pages/Archives.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Página já existia do agente anterior. Verificada via screenshot, carrega corretamente. Precisa testar funcionalidade completa de arquivamento"
+        
+  - task: "Rota e menu para Arquivos"
+    implemented: true
+    working: true
+    file: "/app/frontend/src/App.js, /app/frontend/src/components/Layout.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Rota /archives adicionada ao App.js e link Arquivos adicionado ao menu lateral. Verificado via screenshot que aparece no menu"
+        
+  - task: "Seletor de unidade (L/Kg) nas receitas de produtos"
+    implemented: true
+    working: true
+    file: "/app/frontend/src/pages/Products.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Seletor de unidade adicionado à seção de receitas. Verificado via screenshot que aparece corretamente no modal de criação de produto"
+        
+  - task: "Botão de reset no Dashboard"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/pages/Dashboard.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Botão Resetar Litros adicionado ao header do Dashboard. O botão existe no DOM (confirmado via script playwright), mas não aparece visível nos screenshots. Layout responsivo melhorado. Precisa testar visualmente e funcionalmente"
+
+metadata:
+  created_by: "main_agent"
+  version: "1.0"
+  test_sequence: 1
+  run_ui: true
+
+test_plan:
+  current_focus:
+    - "Sistema de arquivamento completo (backend + frontend)"
+    - "Criação de produto com receita usando unidade Kg"
+    - "Botão de reset no Dashboard (visibilidade e funcionalidade)"
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
+  - agent: "main"
+    message: "Implementei as 3 features solicitadas. Testes via curl confirmam que os endpoints de backend funcionam. Screenshots confirmam que a UI está carregando. O botão de reset no Dashboard existe no DOM mas não aparece claramente nos screenshots - pode ser problema de layout responsivo. Preciso do testing agent para: 1) Testar fluxo completo de arquivamento (criar lotes, finalizar, arquivar), 2) Testar criação de produto com receita usando Kg, 3) Testar visibilidade e funcionalidade do botão de reset no dashboard. Credenciais: teste@teste.com / password"
