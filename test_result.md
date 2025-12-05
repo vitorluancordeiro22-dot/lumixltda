@@ -130,6 +130,9 @@ backend:
       - working: true
         agent: "main"
         comment: "Endpoint /api/archive/months criado. Retorna lista de meses com arquivos disponíveis"
+      - working: true
+        agent: "testing"
+        comment: "✅ TESTADO: Endpoint /api/archive/months funcionando. Após arquivamento, retornou 1 mês disponível ('Outubro de 2025') com formato correto: year, month, month_name."
         
   - task: "Sistema de arquivamento - Endpoints para buscar arquivos por mês"
     implemented: true
