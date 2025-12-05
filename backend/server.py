@@ -1090,6 +1090,21 @@ async def get_dashboard_summary(current_user = Depends(get_current_user)):
         liters_bottled_month=liters_month
     )
 
+@api_router.post('/dashboard/reset-liters')
+async def reset_liters_counter(current_user = Depends(get_current_user)):
+    """
+    Remove todas as contagens do mês atual para resetar o contador de litros.
+    """
+    now = datetime.now(timezone.utc)
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0).isoformat()
+    
+    result = await db.counting.delete_many({'created_at': {'$gte': month_start}})
+    
+    return {
+        'message': 'Contador resetado com sucesso',
+        'deleted_count': result.deleted_count
+    }
+
 app.include_router(api_router)
 
 app.add_middleware(
