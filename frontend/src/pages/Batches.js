@@ -8,7 +8,7 @@ import { Label } from '../components/ui/label';
 import { Badge } from '../components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { toast } from 'sonner';
-import { Edit, Package, Boxes, Calendar } from 'lucide-react';
+import { Edit, Package, Boxes, Calendar, Trash2 } from 'lucide-react';
 
 export const Batches = () => {
   const [productBatches, setProductBatches] = useState([]);
