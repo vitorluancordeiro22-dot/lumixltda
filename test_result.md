@@ -115,6 +115,9 @@ backend:
       - working: true
         agent: "main"
         comment: "Endpoint /api/archive/auto-archive-month criado e testado via curl com sucesso. Arquiva lotes finalizados de meses anteriores"
+      - working: true
+        agent: "testing"
+        comment: "✅ TESTADO: Sistema de arquivamento completo funcionando. Teste criou lote de produto com data antiga (45 dias atrás), finalizou via contagem, executou auto-archive e verificou que 1 produto foi arquivado. Endpoint retornou: archived_products: 1, archived_materials: 0."
         
   - task: "Sistema de arquivamento - Endpoint para listar meses"
     implemented: true
