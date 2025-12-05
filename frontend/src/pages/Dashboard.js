@@ -1,26 +1,48 @@
 import React, { useEffect, useState } from 'react';
 import api from '../lib/api';
 import { Card } from '../components/ui/card';
-import { Package, ClipboardList, Droplets } from 'lucide-react';
+import { Button } from '../components/ui/button';
+import { Package, ClipboardList, Droplets, RotateCcw } from 'lucide-react';
 import { Skeleton } from '../components/ui/skeleton';
+import { toast } from 'sonner';
 
 export const Dashboard = () => {
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [resetting, setResetting] = useState(false);
+
+  const fetchSummary = async () => {
+    try {
+      const response = await api.get('/dashboard/summary');
+      setSummary(response.data);
+    } catch (error) {
+      console.error('Error fetching summary:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchSummary = async () => {
-      try {
-        const response = await api.get('/dashboard/summary');
-        setSummary(response.data);
-      } catch (error) {
-        console.error('Error fetching summary:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchSummary();
   }, []);
+
+  const handleResetLiters = async () => {
+    if (!window.confirm('Tem certeza que deseja resetar o contador de litros envasados do mês? Esta ação não pode ser desfeita.')) {
+      return;
+    }
+
+    setResetting(true);
+    try {
+      const response = await api.post('/dashboard/reset-liters');
+      toast.success(`Contador resetado! ${response.data.deleted_count} registros removidos.`);
+      await fetchSummary();
+    } catch (error) {
+      console.error('Error resetting counter:', error);
+      toast.error('Erro ao resetar contador');
+    } finally {
+      setResetting(false);
+    }
+  };
 
   const stats = [
     {
@@ -49,9 +71,20 @@ export const Dashboard = () => {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div>
-        <h1 className="text-4xl md:text-5xl font-bold text-white mb-2">Dashboard</h1>
-        <p className="text-lg text-slate-300">Visão geral da produção</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-4xl md:text-5xl font-bold text-white mb-2">Dashboard</h1>
+          <p className="text-lg text-slate-300">Visão geral da produção</p>
+        </div>
+        <Button
+          onClick={handleResetLiters}
+          disabled={resetting}
+          variant="outline"
+          className="border-slate-700 text-white hover:bg-slate-800"
+        >
+          <RotateCcw className="w-4 h-4 mr-2" />
+          {resetting ? 'Resetando...' : 'Resetar Litros'}
+        </Button>
       </div>
 
       {/* Stats Grid */}
