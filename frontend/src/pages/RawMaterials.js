@@ -176,15 +176,25 @@ export const RawMaterials = () => {
     setFormData({
       name: material.name,
       type: material.type,
-      total_stock: material.total_stock.toString()
+      total_stock: material.total_stock.toString(),
+      supplier_id: material.supplier_id || '',
+      received_date: material.received_date || new Date().toISOString().split('T')[0]
     });
     setDialogOpen(true);
   };
 
   const resetForm = () => {
     setSelectedMaterial(null);
-    setFormData({ name: '', type: 'Litros', total_stock: '0' });
+    setFormData({ 
+      name: '', 
+      type: 'Litros', 
+      total_stock: '0',
+      supplier_id: '',
+      received_date: new Date().toISOString().split('T')[0]
+    });
   };
+
+  const getSupplierName = (id) => suppliers.find(s => s.id === id)?.name || 'Sem fornecedor';
 
   return (
     <div className="space-y-8">
