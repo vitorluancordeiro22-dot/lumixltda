@@ -945,15 +945,6 @@ async def auto_archive_finished_items(current_user = Depends(get_current_user)):
     """
     now = datetime.now(timezone.utc)
     
-    # Verificar se já passou para um novo mês
-    # Arquivar lotes finalizados do mês anterior
-    if now.month == 1:
-        archive_year = now.year - 1
-        archive_month = 12
-    else:
-        archive_year = now.year
-        archive_month = now.month - 1
-    
     # Mover lotes de produtos finalizados
     product_batches = await db.product_batches.find({
         'status': 'finalizado',
@@ -1003,14 +994,6 @@ async def get_archive_months(current_user = Depends(get_current_user)):
     """
     Retorna lista de meses que possuem itens arquivados.
     """
-    # Buscar meses únicos de produtos arquivados
-    product_months = await db.archived_product_batches.distinct('archived_month')
-    product_years = await db.archived_product_batches.distinct('archived_year')
-    
-    # Buscar meses únicos de matérias-primas arquivadas
-    rm_months = await db.archived_raw_material_batches.distinct('archived_month')
-    rm_years = await db.archived_raw_material_batches.distinct('archived_year')
-    
     # Combinar e criar lista única
     months_set = set()
     
