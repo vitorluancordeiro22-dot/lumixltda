@@ -563,12 +563,19 @@ def main():
         tester.test_get_raw_materials,
         tester.test_create_product,
         tester.test_get_products,
+        tester.test_product_with_kg_recipe,  # NEW: Test Kg unit in recipes
         tester.test_create_product_batch,
         tester.test_create_raw_material_batch,
         tester.test_create_team_member,
         tester.test_create_production_order,
         tester.test_counting_system,
         tester.test_dashboard_summary,
+        tester.test_dashboard_reset_liters,  # NEW: Test reset functionality
+        tester.test_finalize_batches_for_archive,  # NEW: Prepare for archiving
+        tester.test_auto_archive_month,  # NEW: Test archiving
+        tester.test_get_archive_months,  # NEW: Test archive months list
+        tester.test_get_archived_products,  # NEW: Test archived products
+        tester.test_get_archived_raw_materials,  # NEW: Test archived raw materials
         tester.test_trash_system
     ]
     
