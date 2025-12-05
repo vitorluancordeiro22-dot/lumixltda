@@ -78,6 +78,27 @@ export const Batches = () => {
     setDialogOpen(true);
   };
 
+  const handleDelete = async (batch, type) => {
+    if (!window.confirm('Deseja mover este lote para a lixeira?')) return;
+    
+    try {
+      if (type === 'product') {
+        await api.delete(`/product-batches/${batch.id}`);
+      } else {
+        await api.delete(`/raw-material-batches/${batch.id}`);
+      }
+      
+      if (isMountedRef.current) {
+        await fetchAllData();
+        toast.success('Lote movido para lixeira');
+      }
+    } catch (error) {
+      if (isMountedRef.current) {
+        toast.error('Erro ao excluir lote');
+      }
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (submitting) return;
