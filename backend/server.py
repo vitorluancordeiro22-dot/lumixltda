@@ -1102,6 +1102,10 @@ async def reset_liters_counter(current_user = Depends(get_current_user)):
         'deleted_count': result.deleted_count
     }
 
+# ========== INDUSTRIAL OP ROUTES ==========
+from industrial_op_routes import setup_industrial_op_routes
+setup_industrial_op_routes(api_router, db, fs, get_current_user)
+
 app.include_router(api_router)
 
 app.add_middleware(
