@@ -934,6 +934,137 @@ async def delete_from_trash_permanently(item_id: str, current_user = Depends(get
         raise HTTPException(status_code=404, detail='Item not found')
     return {'message': 'Item permanently deleted'}
 
+# ========== MONTHLY ARCHIVE ==========
+
+@api_router.post('/archive/auto-archive-month')
+async def auto_archive_finished_items(current_user = Depends(get_current_user)):
+    """
+    Arquiva automaticamente itens finalizados do mês anterior.
+    Apenas move lotes com status 'finalizado' para o arquivo.
+    """
+    now = datetime.now(timezone.utc)
+    
+    # Verificar se já passou para um novo mês
+    # Arquivar lotes finalizados do mês anterior
+    if now.month == 1:
+        archive_year = now.year - 1
+        archive_month = 12
+    else:
+        archive_year = now.year
+        archive_month = now.month - 1
+    
+    # Mover lotes de produtos finalizados
+    product_batches = await db.product_batches.find({
+        'status': 'finalizado',
+        'deleted': False
+    }, {'_id': 0}).to_list(10000)
+    
+    archived_products = 0
+    for batch in product_batches:
+        # Verificar se é do mês anterior ou anterior
+        batch_date = datetime.fromisoformat(batch['date'])
+        if batch_date.year < now.year or (batch_date.year == now.year and batch_date.month < now.month):
+            # Adicionar info de arquivo
+            batch['archived_year'] = batch_date.year
+            batch['archived_month'] = batch_date.month
+            batch['archived_at'] = now.isoformat()
+            
+            await db.archived_product_batches.insert_one(batch)
+            await db.product_batches.delete_one({'id': batch['id']})
+            archived_products += 1
+    
+    # Mover lotes de matérias-primas finalizados
+    rm_batches = await db.raw_material_batches.find({
+        'status': 'finalizado',
+        'deleted': False
+    }, {'_id': 0}).to_list(10000)
+    
+    archived_materials = 0
+    for batch in rm_batches:
+        batch_date = datetime.fromisoformat(batch['date'])
+        if batch_date.year < now.year or (batch_date.year == now.year and batch_date.month < now.month):
+            batch['archived_year'] = batch_date.year
+            batch['archived_month'] = batch_date.month
+            batch['archived_at'] = now.isoformat()
+            
+            await db.archived_raw_material_batches.insert_one(batch)
+            await db.raw_material_batches.delete_one({'id': batch['id']})
+            archived_materials += 1
+    
+    return {
+        'message': 'Auto-archive completed',
+        'archived_products': archived_products,
+        'archived_materials': archived_materials
+    }
+
+@api_router.get('/archive/months')
+async def get_archive_months(current_user = Depends(get_current_user)):
+    """
+    Retorna lista de meses que possuem itens arquivados.
+    """
+    # Buscar meses únicos de produtos arquivados
+    product_months = await db.archived_product_batches.distinct('archived_month')
+    product_years = await db.archived_product_batches.distinct('archived_year')
+    
+    # Buscar meses únicos de matérias-primas arquivadas
+    rm_months = await db.archived_raw_material_batches.distinct('archived_month')
+    rm_years = await db.archived_raw_material_batches.distinct('archived_year')
+    
+    # Combinar e criar lista única
+    months_set = set()
+    
+    prod_archives = await db.archived_product_batches.find({}, {'_id': 0, 'archived_year': 1, 'archived_month': 1}).to_list(10000)
+    for item in prod_archives:
+        months_set.add((item['archived_year'], item['archived_month']))
+    
+    rm_archives = await db.archived_raw_material_batches.find({}, {'_id': 0, 'archived_year': 1, 'archived_month': 1}).to_list(10000)
+    for item in rm_archives:
+        months_set.add((item['archived_year'], item['archived_month']))
+    
+    # Converter para lista e ordenar
+    months_list = sorted(list(months_set), reverse=True)
+    
+    month_names = {
+        1: 'Janeiro', 2: 'Fevereiro', 3: 'Março', 4: 'Abril',
+        5: 'Maio', 6: 'Junho', 7: 'Julho', 8: 'Agosto',
+        9: 'Setembro', 10: 'Outubro', 11: 'Novembro', 12: 'Dezembro'
+    }
+    
+    result = [
+        {
+            'year': year,
+            'month': month,
+            'month_name': f'{month_names[month]} de {year}'
+        }
+        for year, month in months_list
+    ]
+    
+    return result
+
+@api_router.get('/archive/products/{year}/{month}')
+async def get_archived_products(year: int, month: int, current_user = Depends(get_current_user)):
+    """
+    Retorna lotes de produtos arquivados de um mês específico.
+    """
+    batches = await db.archived_product_batches.find({
+        'archived_year': year,
+        'archived_month': month
+    }, {'_id': 0}).to_list(10000)
+    
+    return batches
+
+@api_router.get('/archive/raw-materials/{year}/{month}')
+async def get_archived_raw_materials(year: int, month: int, current_user = Depends(get_current_user)):
+    """
+    Retorna lotes de matérias-primas arquivados de um mês específico.
+    """
+    batches = await db.archived_raw_material_batches.find({
+        'archived_year': year,
+        'archived_month': month
+    }, {'_id': 0}).to_list(10000)
+    
+    return batches
+
 # ========== DASHBOARD ==========
 
 @api_router.get('/dashboard/summary', response_model=DashboardSummary)
