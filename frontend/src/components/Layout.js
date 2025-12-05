@@ -26,6 +26,7 @@ const menuItems = [
   { path: '/production-orders', icon: ClipboardList, label: 'Ordens de Produção' },
   { path: '/counting', icon: Calculator, label: 'Contagem' },
   { path: '/batches', icon: ListChecks, label: 'Gerenciar Lotes' },
+  { path: '/suppliers', icon: Truck, label: 'Fornecedores' },
   { path: '/team', icon: Users, label: 'Equipe' },
   { path: '/trash', icon: Trash2, label: 'Lixeira' },
   { path: '/settings', icon: Settings, label: 'Configurações' },
