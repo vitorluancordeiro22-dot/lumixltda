@@ -193,6 +193,65 @@ export const Team = () => {
           ))}
         </div>
       )}
+
+      {/* History Dialog */}
+      <Dialog open={historyDialogOpen} onOpenChange={setHistoryDialogOpen}>
+        <DialogContent className="bg-card border-white/10 max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-white">
+              Histórico de Envasamento - {selectedMember?.name}
+            </DialogTitle>
+          </DialogHeader>
+          
+          {loadingHistory ? (
+            <div className="text-white p-8 text-center">Carregando histórico...</div>
+          ) : memberHistory ? (
+            <div className="space-y-6">
+              {/* Summary */}
+              <div className="grid grid-cols-2 gap-4">
+                <Card className="p-4 glass-effect border-white/5">
+                  <p className="text-sm text-slate-400 mb-1">Total Envasado</p>
+                  <p className="text-3xl font-bold text-primary">{memberHistory.total_liters_bottled.toFixed(1)}L</p>
+                </Card>
+                <Card className="p-4 glass-effect border-white/5">
+                  <p className="text-sm text-slate-400 mb-1">Operações</p>
+                  <p className="text-3xl font-bold text-white">{memberHistory.total_operations}</p>
+                </Card>
+              </div>
+
+              {/* History List */}
+              <div className="space-y-3">
+                <h3 className="text-lg font-semibold text-white">Histórico Detalhado</h3>
+                {memberHistory.history.length === 0 ? (
+                  <p className="text-slate-400 text-center py-8">Nenhuma operação de envasamento registrada</p>
+                ) : (
+                  memberHistory.history.map((item) => (
+                    <Card key={item.id} className="p-4 glass-effect border-white/5">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <p className="text-white font-semibold">{item.product_name}</p>
+                          <p className="text-sm text-slate-400">Lote: {item.batch_number}</p>
+                          <p className="text-xs text-slate-500">
+                            {new Date(item.date).toLocaleString('pt-BR')}
+                          </p>
+                          <div className="mt-2 flex gap-4 text-sm text-slate-300">
+                            <span>1L: {item.one_liter}</span>
+                            <span>2L: {item.two_liter}</span>
+                            <span>5L: {item.five_liter}</span>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-2xl font-bold text-primary">{item.total_liters}L</p>
+                        </div>
+                      </div>
+                    </Card>
+                  ))
+                )}
+              </div>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
