@@ -138,7 +138,7 @@ export const Archives = () => {
           <Archive className="w-16 h-16 text-slate-600 mx-auto mb-4" />
           <p className="text-slate-400 text-lg mb-2">Nenhum arquivo mensal disponível</p>
           <p className="text-slate-500 text-sm">
-            Clique em "Arquivar Finalizados" para arquivar lotes concluídos
+            Clique em &ldquo;Arquivar Finalizados&rdquo; para arquivar lotes concluídos
           </p>
         </Card>
       ) : (
