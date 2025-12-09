@@ -60,154 +60,204 @@ def fill_docx_template(template_content: bytes, data: Dict[str, Any]) -> bytes:
     return output_buffer.getvalue()
 
 
-def generate_op_pdf(product_data, batch_data, raw_materials_data):
+def fill_excel_template(template_content: bytes, data: Dict[str, Any]) -> bytes:
     """
-    Gera PDF da ORDEM DE PRODUÇÃO preenchida
+    Preenche template .xls/.xlsx com dados da produção
+    
+    Args:
+        template_content: Conteúdo do arquivo Excel em bytes
+        data: Dicionário com os dados para preencher os placeholders
+        
+    Returns:
+        bytes: Arquivo Excel preenchido
     """
-    buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4,
-                           topMargin=1*cm, bottomMargin=1*cm,
-                           leftMargin=1.5*cm, rightMargin=1.5*cm)
+    # Salvar template temporariamente
+    with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as temp_input:
+        temp_input.write(template_content)
+        temp_input_path = temp_input.name
     
-    elements = []
-    styles = getSampleStyleSheet()
-    
-    title_style = ParagraphStyle(
-        'CustomTitle',
-        parent=styles['Heading1'],
-        fontSize=16,
-        textColor=colors.HexColor('#000000'),
-        spaceAfter=12,
-        alignment=TA_CENTER,
-        fontName='Helvetica-Bold'
-    )
-    
-    # Título
-    elements.append(Paragraph("ORDEM DE PRODUÇÃO", title_style))
-    elements.append(Spacer(1, 0.5*cm))
-    
-    # Cabeçalho
-    header_data = [
-        ['OP Nº:', batch_data.get('op_number', ''), '', ''],
-        ['PRODUTO:', product_data.get('name', ''), 'QUANT (Lts):', batch_data.get('planned_quantity', '')],
-        ['LOTE:', batch_data.get('batch_number', ''), 'DATA:', batch_data.get('date', '')],
-        ['', '', 'Hora I:', '__:__', 'Hora F:', '__:__']
-    ]
-    
-    header_table = Table(header_data, colWidths=[3*cm, 6*cm, 3*cm, 4*cm])
-    header_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#DDDDDD')),
-        ('BACKGROUND', (2, 0), (2, -1), colors.HexColor('#DDDDDD')),
-        ('GRID', (0, 0), (-1, -1), 1, colors.black),
-        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, -1), 10),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-    ]))
-    elements.append(header_table)
-    elements.append(Spacer(1, 0.7*cm))
-    
-    # Tabela de Matérias-Primas
-    mp_data = [['CÓD', 'MATÉRIAS-PRIMAS', 'LOTE', 'VALIDADE', '%', 'QUANT. (kg)', 'CORREÇÃO', 'TOTAL', 'OBS']]
-    
-    if raw_materials_data:
-        total_percentage = 0
-        total_quantity = 0
+    try:
+        # Carregar o workbook
+        wb = load_workbook(temp_input_path)
         
-        for rm in raw_materials_data:
-            quantity = rm.get('quantity', 0)
-            percentage = (quantity / float(batch_data.get('planned_quantity', 1))) * 100
-            
-            mp_data.append([
-                rm.get('code', ''),
-                rm.get('name', ''),
-                rm.get('supplier_batch', ''),
-                rm.get('expiry_date', ''),
-                f"{percentage:.2f}",
-                str(quantity),
-                '',  # Correção
-                '',  # Total
-                ''   # OBS
-            ])
-            
-            total_percentage += percentage
-            total_quantity += quantity
+        # Criar mapeamento de placeholders
+        placeholders = {
+            'LOTE': data.get('batch_number', ''),
+            'PRODUTO': data.get('product_name', ''),
+            'DATA': data.get('date', ''),
+            'MATERIA_PRIMA': data.get('raw_materials_text', ''),
+            'LOTE_MATERIA_PRIMA': data.get('raw_materials_batches', '')
+        }
         
-        # Linha de total
-        mp_data.append(['', '', '', '', f"{total_percentage:.2f}", str(total_quantity), '', '', ''])
+        # Iterar por todas as sheets
+        for sheet in wb.worksheets:
+            for row in sheet.iter_rows():
+                for cell in row:
+                    if cell.value and isinstance(cell.value, str):
+                        for key, value in placeholders.items():
+                            # Suportar vários formatos de placeholder
+                            for pattern in [f'{{{{{key}}}}}', f'{{{key}}}', key]:
+                                if pattern in cell.value:
+                                    cell.value = cell.value.replace(pattern, str(value))
+        
+        # Salvar o workbook preenchido
+        output_buffer = io.BytesIO()
+        wb.save(output_buffer)
+        output_buffer.seek(0)
+        
+        return output_buffer.getvalue()
     
-    mp_table = Table(mp_data, colWidths=[1.5*cm, 4*cm, 2*cm, 2*cm, 1.5*cm, 2*cm, 1.8*cm, 1.5*cm, 1.2*cm])
-    mp_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#AAAAAA')),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, -1), 7),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('ALIGN', (4, 1), (7, -1), 'CENTER'),
-    ]))
-    elements.append(mp_table)
-    elements.append(Spacer(1, 0.8*cm))
+    finally:
+        # Limpar arquivo temporário
+        if os.path.exists(temp_input_path):
+            os.remove(temp_input_path)
+
+
+def convert_docx_to_pdf(docx_content: bytes) -> bytes:
+    """
+    Converte arquivo .docx para PDF usando LibreOffice
     
-    # Seção de Embalagens
-    elements.append(Paragraph("<b>EMBALAGENS</b>", styles['Heading2']))
-    elements.append(Spacer(1, 0.3*cm))
+    Args:
+        docx_content: Conteúdo do arquivo .docx em bytes
+        
+    Returns:
+        bytes: Arquivo PDF
+    """
+    # Criar arquivos temporários
+    with tempfile.NamedTemporaryFile(delete=False, suffix='.docx') as temp_docx:
+        temp_docx.write(docx_content)
+        temp_docx_path = temp_docx.name
     
-    emb_data = [
-        ['EMBALAGENS', '2LTS', '5 LTS', '20 LTS', '50 LTS', 'TB', 'SOBRA', 'PERDA'],
-        ['Peso Bruto', '', '', '', '', '', '', '%'],
-        ['Tara', '', '', '', '', '', '', ''],
-        ['Peso Líquido', '', '', '', '', '', '', ''],
-        ['Quantidade', '', '', '', '', '', '', 'Litros'],
-        ['Total (Litros)', '', '', '', '', '', '', '']
-    ]
+    temp_dir = tempfile.mkdtemp()
     
-    emb_table = Table(emb_data, colWidths=[3*cm, 2*cm, 2*cm, 2*cm, 2*cm, 1.5*cm, 2*cm, 2*cm])
-    emb_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#DDDDDD')),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
-        ('FONTSIZE', (0, 0), (-1, -1), 8),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('ALIGN', (1, 0), (-1, -1), 'CENTER'),
-    ]))
-    elements.append(emb_table)
-    elements.append(Spacer(1, 1*cm))
+    try:
+        # Converter usando LibreOffice (headless)
+        subprocess.run([
+            'libreoffice',
+            '--headless',
+            '--convert-to', 'pdf',
+            '--outdir', temp_dir,
+            temp_docx_path
+        ], check=True, capture_output=True, timeout=30)
+        
+        # Ler o PDF gerado
+        pdf_filename = os.path.splitext(os.path.basename(temp_docx_path))[0] + '.pdf'
+        pdf_path = os.path.join(temp_dir, pdf_filename)
+        
+        with open(pdf_path, 'rb') as pdf_file:
+            pdf_content = pdf_file.read()
+        
+        return pdf_content
     
-    # Responsáveis e Assinaturas
-    resp_data = [
-        ['Responsável pela pesagem', '', 'Responsável pela preparação', '', 'Responsável pelo envase', ''],
-        ['Ass.', '', 'Ass.', '', 'Ass.', ''],
-        ['Nome', '', 'Nome', '', 'Nome', ''],
-        ['H Inicio', '', 'H Inicio', '', 'H Inicio', ''],
-        ['H Térm', '', 'H Térm', '', 'H Térm', '']
-    ]
+    finally:
+        # Limpar arquivos temporários
+        if os.path.exists(temp_docx_path):
+            os.remove(temp_docx_path)
+        if os.path.exists(temp_dir):
+            import shutil
+            shutil.rmtree(temp_dir)
+
+
+def convert_excel_to_pdf(excel_content: bytes) -> bytes:
+    """
+    Converte arquivo Excel para PDF usando LibreOffice
     
-    resp_table = Table(resp_data, colWidths=[4*cm, 1*cm, 4*cm, 1*cm, 4*cm, 1*cm])
-    resp_table.setStyle(TableStyle([
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
-        ('FONTSIZE', (0, 0), (-1, -1), 8),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-    ]))
-    elements.append(resp_table)
-    elements.append(Spacer(1, 0.5*cm))
+    Args:
+        excel_content: Conteúdo do arquivo Excel em bytes
+        
+    Returns:
+        bytes: Arquivo PDF
+    """
+    # Criar arquivos temporários
+    with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as temp_excel:
+        temp_excel.write(excel_content)
+        temp_excel_path = temp_excel.name
     
-    # Conferente/Analista
-    conf_data = [
-        ['Conferente / Analista', 'Ass.:', '________________', '', 'Ass.:', '________________'],
-        ['', 'Nome:', '________________', '', 'Nome:', '________________']
-    ]
+    temp_dir = tempfile.mkdtemp()
     
-    conf_table = Table(conf_data, colWidths=[4*cm, 2*cm, 3*cm, 1*cm, 2*cm, 3*cm])
-    conf_table.setStyle(TableStyle([
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
-        ('FONTSIZE', (0, 0), (-1, -1), 8),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-    ]))
-    elements.append(conf_table)
+    try:
+        # Converter usando LibreOffice (headless)
+        subprocess.run([
+            'libreoffice',
+            '--headless',
+            '--convert-to', 'pdf',
+            '--outdir', temp_dir,
+            temp_excel_path
+        ], check=True, capture_output=True, timeout=30)
+        
+        # Ler o PDF gerado
+        pdf_filename = os.path.splitext(os.path.basename(temp_excel_path))[0] + '.pdf'
+        pdf_path = os.path.join(temp_dir, pdf_filename)
+        
+        with open(pdf_path, 'rb') as pdf_file:
+            pdf_content = pdf_file.read()
+        
+        return pdf_content
     
-    # Rodapé
-    elements.append(Spacer(1, 0.5*cm))
-    footer_style = ParagraphStyle('Footer', parent=styles['Normal'], fontSize=8, alignment=TA_CENTER)
-    elements.append(Paragraph(f"Documento gerado em: {datetime.now().strftime('%d/%m/%Y %H:%M')}", footer_style))
+    finally:
+        # Limpar arquivos temporários
+        if os.path.exists(temp_excel_path):
+            os.remove(temp_excel_path)
+        if os.path.exists(temp_dir):
+            import shutil
+            shutil.rmtree(temp_dir)
+
+
+async def generate_documents_from_templates(
+    op_data: Dict[str, Any],
+    product_data: Dict[str, Any],
+    raw_materials_data: List[Dict[str, Any]],
+    docx_template_content: bytes = None,
+    excel_template_content: bytes = None
+) -> Dict[str, bytes]:
+    """
+    Gera documentos PDF preenchidos a partir dos templates
     
-    doc.build(elements)
-    buffer.seek(0)
-    return buffer
+    Args:
+        op_data: Dados da Ordem de Produção
+        product_data: Dados do produto
+        raw_materials_data: Lista de matérias-primas
+        docx_template_content: Conteúdo do template .docx (opcional)
+        excel_template_content: Conteúdo do template Excel (opcional)
+        
+    Returns:
+        Dict com os PDFs gerados: {'docx_pdf': bytes, 'excel_pdf': bytes}
+    """
+    # Preparar dados para substituição
+    raw_materials_text = '\n'.join([
+        f"{rm.get('name', '')} - {rm.get('quantity', '')} {rm.get('unit', '')}"
+        for rm in raw_materials_data
+    ])
+    
+    raw_materials_batches = '\n'.join([
+        f"{rm.get('name', '')}: Lote {rm.get('batch_number', '')}"
+        for rm in raw_materials_data
+    ])
+    
+    data = {
+        'batch_number': op_data.get('batch_number', ''),
+        'product_name': product_data.get('name', ''),
+        'date': op_data.get('date', datetime.now().strftime('%d/%m/%Y')),
+        'raw_materials_text': raw_materials_text,
+        'raw_materials_batches': raw_materials_batches
+    }
+    
+    result = {}
+    
+    # Processar template .docx
+    if docx_template_content:
+        try:
+            filled_docx = fill_docx_template(docx_template_content, data)
+            result['docx_pdf'] = convert_docx_to_pdf(filled_docx)
+        except Exception as e:
+            raise Exception(f"Erro ao processar template .docx: {str(e)}")
+    
+    # Processar template Excel
+    if excel_template_content:
+        try:
+            filled_excel = fill_excel_template(excel_template_content, data)
+            result['excel_pdf'] = convert_excel_to_pdf(filled_excel)
+        except Exception as e:
+            raise Exception(f"Erro ao processar template Excel: {str(e)}")
+    
+    return result
