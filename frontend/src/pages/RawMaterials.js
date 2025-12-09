@@ -29,7 +29,9 @@ export const RawMaterials = () => {
   const [batchFormData, setBatchFormData] = useState({
     raw_material_id: '',
     date: new Date().toISOString().split('T')[0],
-    quantity: ''
+    quantity: '',
+    supplier_batch_number: '',
+    expiry_date: ''
   });
   const [nextBatchNumber, setNextBatchNumber] = useState('');
 
