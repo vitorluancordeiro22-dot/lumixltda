@@ -1292,95 +1292,127 @@ async def delete_laudo_file(
 
 # ========== DOCUMENT GENERATION ROUTES ==========
 
-@api_router.post('/products/{product_id}/generate-documents')
-async def generate_product_documents(
-    product_id: str,
-    batch_number: str,
-    planned_quantity: float,
+@api_router.post('/industrial-ops/{op_id}/generate-documents')
+async def generate_op_documents(
+    op_id: str,
     current_user = Depends(get_current_user)
 ):
-    """Gerar PDFs de FICHA e OP preenchidos"""
-    from document_generator import generate_ficha_pdf, generate_op_pdf
+    """Gerar PDFs preenchidos a partir dos templates do produto"""
+    from document_generator import generate_documents_from_templates
+    
+    # Buscar OP
+    op = await db.industrial_ops.find_one({'id': op_id}, {'_id': 0})
+    if not op:
+        raise HTTPException(status_code=404, detail='OP não encontrada')
     
     # Buscar produto
-    product = await db.products.find_one({'id': product_id, 'deleted': False}, {'_id': 0})
+    product = await db.products.find_one({'id': op['product_id'], 'deleted': False}, {'_id': 0})
     if not product:
         raise HTTPException(status_code=404, detail='Produto não encontrado')
     
-    # Buscar matérias-primas
-    raw_materials_list = []
-    for recipe in product.get('recipes', []):
-        rm = await db.raw_materials.find_one(
-            {'id': recipe['raw_material_id'], 'deleted': False},
-            {'_id': 0}
+    # Verificar se produto tem templates
+    file_models = product.get('file_models', {})
+    if not file_models.get('op_model') and not file_models.get('ficha_analise'):
+        raise HTTPException(
+            status_code=400,
+            detail='Produto não possui templates cadastrados. Faça upload dos templates .docx e .xls primeiro.'
         )
-        if rm:
-            # Buscar lote mais recente com estoque
-            rm_batch = await db.raw_material_batches.find_one(
-                {'raw_material_id': rm['id'], 'deleted': False, 'quantity': {'$gt': 0}},
-                {'_id': 0},
-                sort=[('date', -1)]
-            )
-            
-            quantity_needed = recipe['quantity_per_liter'] * planned_quantity
-            
-            raw_materials_list.append({
-                'code': rm.get('code', ''),
-                'name': rm['name'],
-                'quantity': quantity_needed,
-                'unit': recipe.get('unit', 'L'),
-                'supplier_batch': rm_batch.get('supplier_batch_number', '') if rm_batch else '',
-                'expiry_date': rm_batch.get('expiry_date', '') if rm_batch else '',
-                'action': 'Adicionar e homogeneizar'
-            })
     
-    # Dados do produto
+    # Preparar dados das matérias-primas
+    raw_materials_list = []
+    for rm_usage in op.get('raw_materials', []):
+        raw_materials_list.append({
+            'name': rm_usage.get('raw_material_name', ''),
+            'quantity': rm_usage.get('quantity_used', 0),
+            'unit': rm_usage.get('unit', 'L'),
+            'batch_number': rm_usage.get('batch_number', '')
+        })
+    
+    # Baixar templates do GridFS
+    docx_template_content = None
+    excel_template_content = None
+    
+    if file_models.get('ficha_analise'):
+        try:
+            file_id = file_models['ficha_analise']['file_id']
+            grid_out = await fs.open_download_stream(ObjectId(file_id))
+            docx_template_content = await grid_out.read()
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f'Erro ao baixar template .docx: {str(e)}')
+    
+    if file_models.get('op_model'):
+        try:
+            file_id = file_models['op_model']['file_id']
+            grid_out = await fs.open_download_stream(ObjectId(file_id))
+            excel_template_content = await grid_out.read()
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f'Erro ao baixar template Excel: {str(e)}')
+    
+    # Preparar dados
+    op_data = {
+        'batch_number': op.get('batch_number', ''),
+        'date': datetime.now(timezone.utc).strftime('%d/%m/%Y')
+    }
+    
     product_data = {
-        'name': product['name'],
-        'code': product.get('code', '')
+        'name': product['name']
     }
     
-    # Dados do lote/OP
-    batch_data = {
-        'op_number': f"OP-{datetime.now(timezone.utc).strftime('%Y%m%d')}-001",
-        'batch_number': batch_number,
-        'date': datetime.now(timezone.utc).strftime('%d/%m/%Y'),
-        'planned_quantity': planned_quantity
-    }
-    
-    # Gerar PDFs
-    ficha_pdf = generate_ficha_pdf(product_data, batch_data, raw_materials_list)
-    op_pdf = generate_op_pdf(product_data, batch_data, raw_materials_list)
+    # Gerar documentos
+    try:
+        documents = await generate_documents_from_templates(
+            op_data,
+            product_data,
+            raw_materials_list,
+            docx_template_content,
+            excel_template_content
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f'Erro ao gerar documentos: {str(e)}')
     
     # Salvar PDFs no GridFS
-    ficha_file_id = await fs.upload_from_stream(
-        f"FICHA_{product['name']}_{batch_number}.pdf",
-        ficha_pdf,
-        metadata={
-            'type': 'ficha',
-            'product_id': product_id,
-            'batch_number': batch_number,
-            'generated_at': datetime.now(timezone.utc).isoformat()
-        }
-    )
-    
-    op_pdf.seek(0)  # Reset pointer
-    op_file_id = await fs.upload_from_stream(
-        f"OP_{product['name']}_{batch_number}.pdf",
-        op_pdf,
-        metadata={
-            'type': 'op',
-            'product_id': product_id,
-            'batch_number': batch_number,
-            'generated_at': datetime.now(timezone.utc).isoformat()
-        }
-    )
-    
-    return {
+    result = {
         'message': 'Documentos gerados com sucesso',
-        'ficha_file_id': str(ficha_file_id),
-        'op_file_id': str(op_file_id)
+        'documents': []
     }
+    
+    if 'docx_pdf' in documents:
+        file_id = await fs.upload_from_stream(
+            f"FICHA_{product['name']}_{op['batch_number']}.pdf",
+            io.BytesIO(documents['docx_pdf']),
+            metadata={
+                'type': 'ficha',
+                'op_id': op_id,
+                'product_id': op['product_id'],
+                'batch_number': op['batch_number'],
+                'generated_at': datetime.now(timezone.utc).isoformat()
+            }
+        )
+        result['documents'].append({
+            'type': 'ficha',
+            'file_id': str(file_id),
+            'filename': f"FICHA_{product['name']}_{op['batch_number']}.pdf"
+        })
+    
+    if 'excel_pdf' in documents:
+        file_id = await fs.upload_from_stream(
+            f"OP_{product['name']}_{op['batch_number']}.pdf",
+            io.BytesIO(documents['excel_pdf']),
+            metadata={
+                'type': 'op',
+                'op_id': op_id,
+                'product_id': op['product_id'],
+                'batch_number': op['batch_number'],
+                'generated_at': datetime.now(timezone.utc).isoformat()
+            }
+        )
+        result['documents'].append({
+            'type': 'op',
+            'file_id': str(file_id),
+            'filename': f"OP_{product['name']}_{op['batch_number']}.pdf"
+        })
+    
+    return result
 
 @api_router.get('/documents/download/{file_id}')
 async def download_generated_document(
