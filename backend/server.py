@@ -72,6 +72,7 @@ class Product(BaseModel):
     unit: str  # Litros ou Kg
     expected_liters: float
     recipes: List[ProductRecipe]
+    file_models: Optional[Dict] = None  # Arquivos modelo (OP, Ficha Análise)
     created_at: str
     deleted: bool = False
 
