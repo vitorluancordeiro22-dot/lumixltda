@@ -225,8 +225,8 @@ export const IndustrialOPs = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-4xl md:text-5xl font-bold text-white mb-2">Ordens de Produção</h1>
-          <p className="text-lg text-slate-300">Controle Industrial Completo de OP</p>
+          <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-2">Ordens de Produção</h1>
+          <p className="text-lg text-muted-foreground">Controle Industrial Completo de OP</p>
         </div>
         
         <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
