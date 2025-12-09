@@ -344,56 +344,56 @@ export const IndustrialOPs = () => {
 
       {/* Lista de OPs */}
       {loading ? (
-        <div className="text-white text-center py-12">Carregando...</div>
+        <div className="text-foreground text-center py-12">Carregando...</div>
       ) : ops.length === 0 ? (
-        <Card className="p-12 glass-effect border-white/5 text-center">
-          <FileText className="w-16 h-16 text-slate-600 mx-auto mb-4" />
-          <p className="text-slate-400 text-lg mb-2">Nenhuma OP cadastrada</p>
-          <p className="text-slate-500 text-sm">
+        <Card className="p-12 text-center border shadow-sm">
+          <FileText className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+          <p className="text-foreground text-lg mb-2">Nenhuma OP cadastrada</p>
+          <p className="text-muted-foreground text-sm">
             Crie sua primeira Ordem de Produção Industrial
           </p>
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {ops.map(op => (
-            <Card key={op.id} className="p-6 glass-effect border-white/5 hover:border-primary/50 transition-all">
+            <Card key={op.id} className="p-6 border shadow-sm hover:border-primary/50 hover:shadow-md transition-all">
               <div className="flex items-start justify-between mb-4">
                 <div>
                   <div className="flex items-center gap-2 mb-1">
                     <FileText className="w-5 h-5 text-primary" />
-                    <h3 className="text-xl font-bold text-white">{op.op_number}</h3>
+                    <h3 className="text-xl font-bold text-foreground">{op.op_number}</h3>
                   </div>
-                  <p className="text-sm text-slate-400">{op.product_name}</p>
-                  <p className="text-xs text-slate-500">Lote: {op.batch_number}</p>
+                  <p className="text-sm text-muted-foreground">{op.product_name}</p>
+                  <p className="text-xs text-muted-foreground">Lote: {op.batch_number}</p>
                 </div>
                 {getStatusBadge(op.status)}
               </div>
 
               <div className="space-y-2 mb-4">
                 <div className="flex justify-between text-sm">
-                  <span className="text-slate-400">Planejado:</span>
-                  <span className="text-white font-semibold">{op.planned_quantity} {op.unit}</span>
+                  <span className="text-muted-foreground">Planejado:</span>
+                  <span className="text-foreground font-semibold">{op.planned_quantity} {op.unit}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-slate-400">Produzido:</span>
-                  <span className="text-emerald-400 font-semibold">{op.produced_quantity} {op.unit}</span>
+                  <span className="text-muted-foreground">Produzido:</span>
+                  <span className="text-emerald-600 font-semibold">{op.produced_quantity} {op.unit}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-slate-400">Responsável:</span>
-                  <span className="text-white">{op.responsible_name}</span>
+                  <span className="text-muted-foreground">Responsável:</span>
+                  <span className="text-foreground">{op.responsible_name}</span>
                 </div>
               </div>
 
               {/* Atualização de Quantidade */}
               {op.status === 'em_producao' && op.is_editable && (
                 <div className="mb-3">
-                  <Label className="text-white text-xs">Atualizar Quantidade</Label>
+                  <Label className="text-xs">Atualizar Quantidade</Label>
                   <div className="flex gap-2">
                     <Input
                       type="number"
                       step="0.01"
                       defaultValue={op.produced_quantity}
-                      className="bg-slate-900/50 border-slate-700 text-white text-sm"
+                      className="text-sm"
                       onBlur={(e) => {
                         if (e.target.value && parseFloat(e.target.value) !== op.produced_quantity) {
                           updateQuantity(op.id, e.target.value);
@@ -409,7 +409,7 @@ export const IndustrialOPs = () => {
                 <Button
                   size="sm"
                   variant="outline"
-                  className="border-slate-700 text-white hover:bg-slate-800 flex-1"
+                  className="flex-1"
                   onClick={() => viewDetails(op.id)}
                 >
                   <Eye className="w-3 h-3 mr-1" />
@@ -419,7 +419,7 @@ export const IndustrialOPs = () => {
                 {op.status === 'aguardando_envase' && (
                   <Button
                     size="sm"
-                    className="bg-blue-600 hover:bg-blue-700 flex-1"
+                    className="bg-blue-600 hover:bg-blue-700 text-white flex-1"
                     onClick={() => changeStatus(op.id, 'em_producao')}
                   >
                     <Play className="w-3 h-3 mr-1" />
@@ -430,7 +430,7 @@ export const IndustrialOPs = () => {
                 {op.status === 'em_producao' && (
                   <Button
                     size="sm"
-                    className="bg-green-600 hover:bg-green-700 flex-1"
+                    className="bg-green-600 hover:bg-green-700 text-white flex-1"
                     onClick={() => changeStatus(op.id, 'finalizada')}
                     disabled={op.produced_quantity <= 0}
                   >
@@ -442,7 +442,7 @@ export const IndustrialOPs = () => {
                 {op.is_printable && (
                   <Button
                     size="sm"
-                    className="bg-amber-600 hover:bg-amber-700 flex-1"
+                    className="bg-amber-600 hover:bg-amber-700 text-white flex-1"
                     onClick={() => generateDocuments(op.id)}
                   >
                     <Printer className="w-3 h-3 mr-1" />
@@ -452,7 +452,7 @@ export const IndustrialOPs = () => {
               </div>
 
               {!op.is_editable && (
-                <div className="mt-3 text-xs text-slate-500 flex items-center gap-1">
+                <div className="mt-3 text-xs text-muted-foreground flex items-center gap-1">
                   <AlertCircle className="w-3 h-3" />
                   Bloqueada para edição
                 </div>
