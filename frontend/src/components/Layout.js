@@ -18,7 +18,8 @@ import {
   ListChecks,
   Truck,
   Archive,
-  FileText
+  FileText,
+  FileCheck
 } from 'lucide-react';
 
 const menuItems = [
@@ -30,6 +31,7 @@ const menuItems = [
   { path: '/counting', icon: Calculator, label: 'Contagem' },
   { path: '/batches', icon: ListChecks, label: 'Gerenciar Lotes' },
   { path: '/suppliers', icon: Truck, label: 'Fornecedores' },
+  { path: '/laudos', icon: FileCheck, label: 'Laudos' },
   { path: '/archives', icon: Archive, label: 'Arquivos' },
   { path: '/team', icon: Users, label: 'Equipe' },
   { path: '/trash', icon: Trash2, label: 'Lixeira' },
