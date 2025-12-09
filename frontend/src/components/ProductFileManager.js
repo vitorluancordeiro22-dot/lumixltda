@@ -20,8 +20,7 @@ export const ProductFileManager = ({ product, onUpdate }) => {
 
   const fileTypes = [
     { key: 'op_model', label: 'Modelo de OP', required: true },
-    { key: 'ficha_analise', label: 'Ficha de Análise', required: false },
-    { key: 'impressao_model', label: 'Modelo de Impressão', required: false }
+    { key: 'ficha_analise', label: 'Ficha de Análise', required: false }
   ];
 
   const hasFile = (fileType) => {
