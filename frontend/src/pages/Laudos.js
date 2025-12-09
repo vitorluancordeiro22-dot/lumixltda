@@ -32,7 +32,6 @@ export const Laudos = () => {
     return () => {
       isMountedRef.current = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -41,7 +40,7 @@ export const Laudos = () => {
     }
   }, [selectedFolder]);
 
-  const fetchFolders = async () => {
+  const fetchFolders = React.useCallback(async () => {
     try {
       const response = await api.get('/laudos/folders');
       if (isMountedRef.current) {
@@ -60,7 +59,7 @@ export const Laudos = () => {
         setLoading(false);
       }
     }
-  };
+  }, [selectedFolder]);
 
   const fetchFiles = async (folderId) => {
     try {
