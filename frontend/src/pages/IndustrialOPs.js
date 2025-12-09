@@ -444,14 +444,14 @@ export const IndustrialOPs = () => {
                   </Button>
                 )}
 
-                {op.status === 'finalizada' && op.is_printable && (
+                {op.is_printable && (
                   <Button
                     size="sm"
                     className="bg-amber-600 hover:bg-amber-700 flex-1"
-                    onClick={() => printOP(op.id)}
+                    onClick={() => generateDocuments(op.id)}
                   >
                     <Printer className="w-3 h-3 mr-1" />
-                    Imprimir
+                    Gerar PDFs
                   </Button>
                 )}
               </div>
