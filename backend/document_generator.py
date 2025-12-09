@@ -11,157 +11,53 @@ import tempfile
 import subprocess
 from typing import Dict, List, Any
 
-def generate_ficha_pdf(product_data, batch_data, raw_materials_data):
+def fill_docx_template(template_content: bytes, data: Dict[str, Any]) -> bytes:
     """
-    Gera PDF da FICHA DE FABRICAÇÃO preenchida
+    Preenche template .docx com dados da produção
+    
+    Args:
+        template_content: Conteúdo do arquivo .docx em bytes
+        data: Dicionário com os dados para preencher os placeholders
+        
+    Returns:
+        bytes: Arquivo .docx preenchido
     """
-    buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4, 
-                           topMargin=1*cm, bottomMargin=1*cm,
-                           leftMargin=1.5*cm, rightMargin=1.5*cm)
+    # Carregar o template do buffer
+    doc = Document(io.BytesIO(template_content))
     
-    elements = []
-    styles = getSampleStyleSheet()
+    # Criar mapeamento de placeholders
+    # Os placeholders podem estar em vários formatos: {{LOTE}}, {LOTE}, LOTE, etc.
+    placeholders = {
+        'LOTE': data.get('batch_number', ''),
+        'PRODUTO': data.get('product_name', ''),
+        'DATA': data.get('date', ''),
+        'MATERIA_PRIMA': data.get('raw_materials_text', ''),
+        'LOTE_MATERIA_PRIMA': data.get('raw_materials_batches', '')
+    }
     
-    # Estilo customizado
-    title_style = ParagraphStyle(
-        'CustomTitle',
-        parent=styles['Heading1'],
-        fontSize=14,
-        textColor=colors.HexColor('#000000'),
-        spaceAfter=10,
-        alignment=TA_CENTER,
-        fontName='Helvetica-Bold'
-    )
+    # Substituir em parágrafos
+    for paragraph in doc.paragraphs:
+        for key, value in placeholders.items():
+            # Suportar vários formatos de placeholder
+            for pattern in [f'{{{{{key}}}}}', f'{{{key}}}', key]:
+                if pattern in paragraph.text:
+                    paragraph.text = paragraph.text.replace(pattern, str(value))
     
-    # Título
-    elements.append(Paragraph("FICHA DE FABRICAÇÃO – PROCESSO/ CONTROLE DA QUALIDADE", title_style))
-    elements.append(Spacer(1, 0.3*cm))
+    # Substituir em tabelas
+    for table in doc.tables:
+        for row in table.rows:
+            for cell in row.cells:
+                for paragraph in cell.paragraphs:
+                    for key, value in placeholders.items():
+                        for pattern in [f'{{{{{key}}}}}', f'{{{key}}}', key]:
+                            if pattern in paragraph.text:
+                                paragraph.text = paragraph.text.replace(pattern, str(value))
     
-    # Cabeçalho com dados principais
-    header_data = [
-        ['ORDEM DE PRODUÇÃO Nº:', batch_data.get('op_number', ''), 'DATA:', batch_data.get('date', '')],
-        ['PRODUTO:', product_data.get('name', ''), 'LOTE Nº:', batch_data.get('batch_number', '')]
-    ]
-    
-    header_table = Table(header_data, colWidths=[4.5*cm, 5*cm, 3*cm, 4*cm])
-    header_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#CCCCCC')),
-        ('BACKGROUND', (2, 0), (2, -1), colors.HexColor('#CCCCCC')),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
-        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, -1), 9),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-    ]))
-    elements.append(header_table)
-    elements.append(Spacer(1, 0.5*cm))
-    
-    # Controle de Qualidade Interoperacional
-    elements.append(Paragraph("<b>CONTROLE DE QUALIDADE INTEROPERACIONAL</b>", styles['Heading2']))
-    elements.append(Spacer(1, 0.3*cm))
-    
-    qc_data = [
-        ['AMOSTRA', '', '', ''],
-        ['HORA:', '_______', 'DATA:', '_______'],
-        ['', 'ESPECIFICAÇÃO', 'RESULTADO', ''],
-        ['ASPECTO', 'Gel', '___________', ''],
-        ['COR', 'Incolor', '___________', ''],
-        ['ODOR', 'Característico', '___________', ''],
-        ['pH', 'ATÉ 11,40', '___________', ''],
-        ['VISCOSIDADE a 10%', '10,00 a 11,00', '___________', ''],
-    ]
-    
-    qc_table = Table(qc_data, colWidths=[4*cm, 4*cm, 4*cm, 4*cm])
-    qc_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#DDDDDD')),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
-        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
-        ('FONTSIZE', (0, 0), (-1, -1), 8),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-    ]))
-    elements.append(qc_table)
-    elements.append(Spacer(1, 0.5*cm))
-    
-    # Autorização do Envase
-    auth_data = [
-        ['AUTORIZADO O ENVASE', '', ''],
-        ['HORA:', '__________', 'DATA: __________'],
-        ['Assinatura do Analista:', '________________________', '']
-    ]
-    
-    auth_table = Table(auth_data, colWidths=[5*cm, 6*cm, 5*cm])
-    auth_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#AAAAAA')),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
-        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, -1), 8),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-    ]))
-    elements.append(auth_table)
-    elements.append(Spacer(1, 0.5*cm))
-    
-    # Análise Final
-    elements.append(Paragraph("<b>ANÁLISE FINAL – APÓS 24H DA FABRICAÇÃO</b>", styles['Heading2']))
-    elements.append(Spacer(1, 0.3*cm))
-    
-    final_data = [
-        ['HORA:', '__________', 'DATA:', '__________'],
-        ['', 'ESPECIFICAÇÃO', 'RESULTADO', ''],
-        ['ASPECTO', 'Gel', '___________', ''],
-        ['COR', 'Incolor', '___________', ''],
-        ['pH', 'ATÉ 11,40', '___________', ''],
-        ['VISCOSIDADE a 10%', '10,00 a 11,00', '___________', ''],
-        ['MASSA ESPECÍFICA', '0,990 a 1,010', '___________', ''],
-        ['Observações:', '', '', ''],
-        ['', '________________________________________________', '', ''],
-        ['Resp. Técnico:', '________________________', '', '']
-    ]
-    
-    final_table = Table(final_data, colWidths=[4*cm, 4*cm, 4*cm, 4*cm])
-    final_table.setStyle(TableStyle([
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
-        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
-        ('FONTSIZE', (0, 0), (-1, -1), 8),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-    ]))
-    elements.append(final_table)
-    
-    # Nova página - Processo de Fabricação
-    elements.append(PageBreak())
-    elements.append(Paragraph("<b>PROCESSO DE FABRICAÇÃO</b>", title_style))
-    elements.append(Spacer(1, 0.5*cm))
-    
-    # Matérias-primas da receita
-    if raw_materials_data:
-        process_data = [['ETAPA', 'MATÉRIA-PRIMA', 'QUANTIDADE', 'AÇÃO']]
-        
-        for idx, rm in enumerate(raw_materials_data, 1):
-            process_data.append([
-                str(idx),
-                rm.get('name', ''),
-                f"{rm.get('quantity', '')} {rm.get('unit', '')}",
-                rm.get('action', 'Adicionar e homogeneizar')
-            ])
-        
-        process_table = Table(process_data, colWidths=[1.5*cm, 5*cm, 3*cm, 7*cm])
-        process_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#CCCCCC')),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, -1), 8),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ]))
-        elements.append(process_table)
-    
-    # Rodapé
-    elements.append(Spacer(1, 1*cm))
-    footer_style = ParagraphStyle('Footer', parent=styles['Normal'], fontSize=8, alignment=TA_CENTER)
-    elements.append(Paragraph(f"Documento gerado em: {datetime.now().strftime('%d/%m/%Y %H:%M')}", footer_style))
-    
-    doc.build(elements)
-    buffer.seek(0)
-    return buffer
+    # Salvar o documento preenchido em um buffer
+    output_buffer = io.BytesIO()
+    doc.save(output_buffer)
+    output_buffer.seek(0)
+    return output_buffer.getvalue()
 
 
 def generate_op_pdf(product_data, batch_data, raw_materials_data):
