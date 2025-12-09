@@ -57,6 +57,7 @@ export const WhatsAppSender = ({ batch, product, trigger }) => {
     if (dialogOpen && !customMessage) {
       setCustomMessage(generateMessage());
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dialogOpen]);
 
   return (
