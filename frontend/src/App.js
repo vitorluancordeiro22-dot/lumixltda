@@ -16,6 +16,7 @@ import { Batches } from './pages/Batches';
 import { Suppliers } from './pages/Suppliers';
 import { Archives } from './pages/Archives';
 import { IndustrialOPs } from './pages/IndustrialOPs';
+import { Laudos } from './pages/Laudos';
 import './App.css';
 
 const PrivateRoute = ({ children }) => {
@@ -49,6 +50,7 @@ function App() {
             <Route path="suppliers" element={<Suppliers />} />
             <Route path="archives" element={<Archives />} />
             <Route path="industrial-ops" element={<IndustrialOPs />} />
+            <Route path="laudos" element={<Laudos />} />
             <Route path="team" element={<Team />} />
             <Route path="trash" element={<Trash />} />
             <Route path="settings" element={<Settings />} />
