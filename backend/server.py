@@ -217,6 +217,36 @@ class SupplierCreate(BaseModel):
     email: str = ''
     address: str = ''
 
+# ========== LAUDOS MODELS ==========
+class LaudoFolder(BaseModel):
+    id: str
+    name: str
+    parent_id: Optional[str] = None  # Para subpastas
+    created_at: str
+    created_by: str
+    deleted: bool = False
+
+class LaudoFolderCreate(BaseModel):
+    name: str
+    parent_id: Optional[str] = None
+
+class LaudoFile(BaseModel):
+    id: str
+    folder_id: str
+    file_id: str  # GridFS file_id
+    filename: str
+    content_type: str
+    size: int
+    uploaded_at: str
+    uploaded_by: str
+    uploaded_by_name: str
+    notes: str = ''
+    deleted: bool = False
+
+class LaudoFileUpload(BaseModel):
+    folder_id: str
+    notes: str = ''
+
 class TrashItem(BaseModel):
     id: str
     item_type: str
