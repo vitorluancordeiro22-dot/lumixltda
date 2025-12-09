@@ -243,8 +243,22 @@ test_plan:
   test_all: false
   test_priority: "high_first"
 
+  - task: "Sistema de geração de documentos PDF"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py, /app/backend/document_generator.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ SISTEMA PDF COMPLETO FUNCIONANDO: 1) Login com credenciais teste@teste.com/password ✅ 2) Produto 'Produto Teste Final' (ID: 0b9ded25-0fd2-478a-9305-42a50e645689) possui templates op_model e ficha_analise ✅ 3) OP-2025-0002 encontrada e documentos gerados com sucesso ✅ 4) Gerados 2 PDFs: FICHA (20.4 KB) e OP (13.7 KB), ambos > 10KB ✅ 5) Downloads funcionando, PDFs válidos com header %PDF ✅ 6) Testes de erro: OP inexistente retorna 404 ✅, arquivo inexistente retorna 404 ✅. Placeholders {{LOTE}}, {{PRODUTO}}, {{DATA}}, {{MATERIA_PRIMA}}, {{LOTE_MATERIA_PRIMA}} sendo substituídos corretamente nos templates .docx e .xlsx. Sistema suporta templates .docx e .xlsx/.xls conforme especificado."
+
 agent_communication:
   - agent: "main"
     message: "Implementei as 3 features solicitadas. Testes via curl confirmam que os endpoints de backend funcionam. Screenshots confirmam que a UI está carregando. O botão de reset no Dashboard existe no DOM mas não aparece claramente nos screenshots - pode ser problema de layout responsivo. Preciso do testing agent para: 1) Testar fluxo completo de arquivamento (criar lotes, finalizar, arquivar), 2) Testar criação de produto com receita usando Kg, 3) Testar visibilidade e funcionalidade do botão de reset no dashboard. Credenciais: teste@teste.com / password"
   - agent: "testing"
     message: "✅ BACKEND TESTING COMPLETO - TODAS AS 3 FEATURES FUNCIONANDO PERFEITAMENTE: 1) Sistema de arquivamento: Testado fluxo completo (criar lote, finalizar via contagem, arquivar, listar meses, recuperar dados). Arquivou 1 produto com sucesso. 2) Receita com Kg: Testado criação de produto com receita usando unidade Kg. Campo unit salvo corretamente no banco. 3) Reset litros: Testado reset do contador de 205.0 para 0.0 litros com sucesso. Todos os endpoints de backend estão funcionais e retornando dados corretos. Credenciais teste@teste.com/password funcionando. Backend logs sem erros."
+  - agent: "testing"
+    message: "✅ SISTEMA PDF GENERATION TESTADO COMPLETAMENTE: Executei o fluxo completo solicitado na review request. Login funcionando, produto alvo encontrado com templates, OP-2025-0002 localizada, documentos PDF gerados com sucesso (2 arquivos: FICHA 20.4KB + OP 13.7KB), downloads validados, testes de erro passaram. Sistema de geração de PDFs está 100% funcional. Placeholders sendo substituídos corretamente. Suporte a .docx e .xlsx confirmado. Todos os 31 testes passaram (100% success rate)."
