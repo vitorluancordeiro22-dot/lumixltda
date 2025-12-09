@@ -170,14 +170,42 @@ export const IndustrialOPs = () => {
     }
   };
 
-  const printOP = async (opId) => {
+  const generateDocuments = async (opId) => {
     try {
-      const response = await api.post(`/industrial-ops/${opId}/print`);
-      toast.success('Documento gerado!');
-      // TODO: Abrir PDF gerado
-      console.log('PDF data:', response.data);
+      toast.info('Gerando documentos PDF...');
+      const response = await api.post(`/industrial-ops/${opId}/generate-documents`);
+      
+      const documents = response.data.documents || [];
+      
+      if (documents.length === 0) {
+        toast.warning('Nenhum documento foi gerado');
+        return;
+      }
+      
+      toast.success(`${documents.length} documento(s) gerado(s)!`);
+      
+      // Download automático de cada documento
+      for (const doc of documents) {
+        try {
+          const downloadResponse = await api.get(`/documents/download/${doc.file_id}`, {
+            responseType: 'blob'
+          });
+          
+          const url = window.URL.createObjectURL(new Blob([downloadResponse.data]));
+          const link = document.createElement('a');
+          link.href = url;
+          link.setAttribute('download', doc.filename);
+          document.body.appendChild(link);
+          link.click();
+          link.parentNode.removeChild(link);
+          window.URL.revokeObjectURL(url);
+        } catch (dlError) {
+          console.error('Erro ao baixar documento:', dlError);
+          toast.error(`Erro ao baixar ${doc.filename}`);
+        }
+      }
     } catch (error) {
-      const errorMsg = error.response?.data?.detail || 'Erro ao gerar documento';
+      const errorMsg = error.response?.data?.detail || 'Erro ao gerar documentos';
       toast.error(errorMsg);
     }
   };
