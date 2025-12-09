@@ -199,9 +199,8 @@ def setup_industrial_op_routes(api_router: APIRouter, db, fs, get_current_user, 
         
         # Gerar lote do produto (usar sistema existente)
         now = datetime.now(timezone.utc)
-        date_str = now.strftime('%Y-%m-%d')
-        batch_response = await generate_batch_number_fn(date_str)
-        batch_number = batch_response['batch_number']
+        date_str = now.isoformat()
+        batch_number = await generate_batch_number_fn(date_str)
         
         # Auto-selecionar matérias-primas (LIFO - mais recentes com estoque)
         raw_materials_usage = []
