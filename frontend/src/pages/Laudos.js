@@ -32,6 +32,7 @@ export const Laudos = () => {
     return () => {
       isMountedRef.current = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -375,7 +376,7 @@ export const Laudos = () => {
                 <div className="text-center py-12">
                   <FileText className="w-16 h-16 text-slate-600 mx-auto mb-4" />
                   <p className="text-slate-400">Nenhum arquivo nesta pasta</p>
-                  <p className="text-slate-500 text-sm mt-2">Use o botão "Upload PDF" para adicionar arquivos</p>
+                  <p className="text-slate-500 text-sm mt-2">Use o botão &ldquo;Upload PDF&rdquo; para adicionar arquivos</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
