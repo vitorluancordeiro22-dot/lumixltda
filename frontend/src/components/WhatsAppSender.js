@@ -12,7 +12,7 @@ export const WhatsAppSender = ({ batch, product, trigger }) => {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [customMessage, setCustomMessage] = useState('');
 
-  const generateMessage = () => {
+  const generateMessage = React.useCallback(() => {
     if (!batch || !product) return '';
 
     return `🏭 *Novo Lote Liberado!*
@@ -23,7 +23,7 @@ export const WhatsAppSender = ({ batch, product, trigger }) => {
 📅 *Data:* ${new Date(batch.date).toLocaleDateString('pt-BR')}
 
 ✅ Lote pronto para produção!`;
-  };
+  }, [batch, product]);
 
   const handleSendWhatsApp = () => {
     if (!phoneNumber.trim()) {
@@ -57,7 +57,7 @@ export const WhatsAppSender = ({ batch, product, trigger }) => {
     if (dialogOpen && !customMessage) {
       setCustomMessage(generateMessage());
     }
-  }, [dialogOpen, customMessage]);
+  }, [dialogOpen, customMessage, generateMessage]);
 
   return (
     <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
