@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import { Plus, Edit, Trash2, Package, MessageCircle } from 'lucide-react';
 import { ProductFileManager } from '../components/ProductFileManager';
 import { WhatsAppSender } from '../components/WhatsAppSender';
+import { ProductPrintButton } from '../components/ProductPrintButton';
 
 export const Products = () => {
   const [products, setProducts] = useState([]);
