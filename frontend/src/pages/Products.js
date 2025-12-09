@@ -229,6 +229,19 @@ export const Products = () => {
           <p className="text-lg text-slate-300">Gerencie seus produtos e receitas</p>
         </div>
         <div className="flex gap-3">
+          {createdBatch && batchProduct && (
+            <WhatsAppSender
+              batch={createdBatch}
+              product={batchProduct}
+              trigger={
+                <Button className="bg-green-600 hover:bg-green-700">
+                  <MessageCircle className="w-4 h-4 mr-2" />
+                  Enviar WhatsApp
+                </Button>
+              }
+            />
+          )}
+
           <Dialog open={batchDialogOpen} onOpenChange={setBatchDialogOpen}>
             <DialogTrigger asChild>
               <Button data-testid="release-batch-button" className="bg-amber-600 hover:bg-amber-700">
