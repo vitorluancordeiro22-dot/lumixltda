@@ -605,6 +605,8 @@ async def create_raw_material_batch(data: RawMaterialBatchCreate, current_user =
         'batch_number': batch_number,
         'date': data.date,
         'quantity': data.quantity,
+        'supplier_batch_number': data.supplier_batch_number,
+        'expiry_date': data.expiry_date,
         'status': 'em_aberto',
         'created_at': datetime.now(timezone.utc).isoformat(),
         'deleted': False
