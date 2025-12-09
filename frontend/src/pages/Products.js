@@ -134,12 +134,17 @@ export const Products = () => {
     
     setSubmitting(true);
     try {
-      await api.post('/product-batches', {
+      const response = await api.post('/product-batches', {
         ...batchFormData,
         planned_liters: parseFloat(batchFormData.planned_liters)
       });
       
       if (isMountedRef.current) {
+        // Salvar lote e produto para WhatsApp
+        const product = products.find(p => p.id === batchFormData.product_id);
+        setCreatedBatch(response.data);
+        setBatchProduct(product);
+        
         setBatchDialogOpen(false);
         setBatchFormData({
           product_id: '',
@@ -147,7 +152,7 @@ export const Products = () => {
           unit: 'Litros',
           planned_liters: ''
         });
-        toast.success('Lote criado!');
+        toast.success('Lote criado! Use o botão WhatsApp para enviar notificação.');
       }
     } catch (error) {
       if (isMountedRef.current) {
