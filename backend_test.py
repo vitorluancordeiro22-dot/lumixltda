@@ -753,8 +753,9 @@ def main():
     
     tester = LumixAPITester()
     
-    # Test sequence
+    # Test sequence - PDF Generation System (as requested in review)
     tests = [
+        tester.test_pdf_generation_system,  # PRIMARY TEST: PDF Document Generation System
         tester.test_root_endpoint,
         tester.test_user_registration,
         tester.test_user_login,
