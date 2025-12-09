@@ -244,6 +244,26 @@ export const RawMaterials = () => {
                   <Label className="text-white">Data</Label>
                   <Input type="date" value={batchFormData.date} onChange={(e) => setBatchFormData({...batchFormData, date: e.target.value})} className="bg-slate-900/50 border-slate-700 text-white" />
                 </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-white">Lote do Fornecedor</Label>
+                    <Input 
+                      value={batchFormData.supplier_batch_number} 
+                      onChange={(e) => setBatchFormData({...batchFormData, supplier_batch_number: e.target.value})} 
+                      className="bg-slate-900/50 border-slate-700 text-white"
+                      placeholder="Ex: F20241205"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-white">Validade</Label>
+                    <Input 
+                      type="date" 
+                      value={batchFormData.expiry_date} 
+                      onChange={(e) => setBatchFormData({...batchFormData, expiry_date: e.target.value})} 
+                      className="bg-slate-900/50 border-slate-700 text-white"
+                    />
+                  </div>
+                </div>
                 <div>
                   <Label className="text-white">Quantidade Recebida</Label>
                   <Input type="number" step="0.01" value={batchFormData.quantity} onChange={(e) => setBatchFormData({...batchFormData, quantity: e.target.value})} className="bg-slate-900/50 border-slate-700 text-white" required />
