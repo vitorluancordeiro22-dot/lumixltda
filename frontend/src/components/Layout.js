@@ -120,12 +120,12 @@ export const Layout = () => {
             variant="ghost"
             size="icon"
             data-testid="mobile-menu-button"
-            className="md:hidden fixed top-4 left-4 z-50 text-white hover:bg-slate-800"
+            className="md:hidden fixed top-4 left-4 z-50"
           >
             <Menu className="h-6 w-6" />
           </Button>
         </SheetTrigger>
-        <SheetContent side="left" className="p-0 w-64 bg-[#0B1120] border-r border-white/5">
+        <SheetContent side="left" className="p-0 w-64 bg-card border-r border-border">
           <Sidebar mobile onItemClick={() => setMobileOpen(false)} />
         </SheetContent>
       </Sheet>
