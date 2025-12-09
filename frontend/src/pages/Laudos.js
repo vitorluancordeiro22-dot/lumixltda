@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import api from '../lib/api';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
@@ -32,7 +32,7 @@ export const Laudos = () => {
     return () => {
       isMountedRef.current = false;
     };
-  }, [fetchFolders]);
+  }, []);
 
   useEffect(() => {
     if (selectedFolder) {
@@ -40,7 +40,7 @@ export const Laudos = () => {
     }
   }, [selectedFolder]);
 
-  const fetchFolders = useCallback(async () => {
+  const fetchFolders = async () => {
     try {
       const response = await api.get('/laudos/folders');
       if (isMountedRef.current) {
@@ -59,7 +59,7 @@ export const Laudos = () => {
         setLoading(false);
       }
     }
-  }, [selectedFolder]);
+  };
 
   const fetchFiles = async (folderId) => {
     try {
