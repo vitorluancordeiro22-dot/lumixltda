@@ -34,6 +34,8 @@ export const Products = () => {
     planned_liters: ''
   });
   const [nextBatchNumber, setNextBatchNumber] = useState('');
+  const [createdBatch, setCreatedBatch] = useState(null);
+  const [batchProduct, setBatchProduct] = useState(null);
 
   useEffect(() => {
     isMountedRef.current = true;
