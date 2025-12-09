@@ -127,7 +127,7 @@ export const Team = () => {
     <div className="space-y-8">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-4xl md:text-5xl font-bold text-white mb-2">Equipe</h1>
+          <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-2">Equipe</h1>
           <p className="text-lg text-slate-300">Gerencie os membros da equipe</p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
@@ -139,16 +139,16 @@ export const Team = () => {
           </DialogTrigger>
           <DialogContent className="bg-card border-white/10">
             <DialogHeader>
-              <DialogTitle className="text-white">{selectedMember ? 'Editar' : 'Novo'} Membro</DialogTitle>
+              <DialogTitle className="text-foreground">{selectedMember ? 'Editar' : 'Novo'} Membro</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <Label className="text-white">Nome</Label>
-                <Input value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="bg-slate-900/50 border-slate-700 text-white" required />
+                <Label className="text-foreground">Nome</Label>
+                <Input value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="bg-slate-900/50 border-slate-700 text-foreground" required />
               </div>
               <div>
-                <Label className="text-white">Cargo/Função</Label>
-                <Input value={formData.role} onChange={(e) => setFormData({...formData, role: e.target.value})} className="bg-slate-900/50 border-slate-700 text-white" required placeholder="Ex: Operador, Pesador, Envasador" />
+                <Label className="text-foreground">Cargo/Função</Label>
+                <Input value={formData.role} onChange={(e) => setFormData({...formData, role: e.target.value})} className="bg-slate-900/50 border-slate-700 text-foreground" required placeholder="Ex: Operador, Pesador, Envasador" />
               </div>
               <Button type="submit" disabled={submitting} className="w-full bg-primary hover:bg-primary/90">Salvar</Button>
             </form>
@@ -168,12 +168,12 @@ export const Team = () => {
                     <Users className="w-6 h-6 text-primary" />
                   </div>
                   <div>
-                    <h3 className="text-xl font-bold text-white mb-1 hover:text-primary transition-colors">{member.name}</h3>
+                    <h3 className="text-xl font-bold text-foreground mb-1 hover:text-primary transition-colors">{member.name}</h3>
                     <p className="text-sm text-slate-400">{member.role}</p>
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  <Button size="icon" variant="ghost" onClick={() => handleEdit(member)} className="text-slate-300 hover:text-white">
+                  <Button size="icon" variant="ghost" onClick={() => handleEdit(member)} className="text-slate-300 hover:text-foreground">
                     <Edit className="w-4 h-4" />
                   </Button>
                   <Button size="icon" variant="ghost" onClick={() => handleDelete(member.id)} className="text-red-400 hover:text-red-300">
@@ -185,7 +185,7 @@ export const Team = () => {
                 variant="outline" 
                 size="sm" 
                 onClick={() => handleViewHistory(member)}
-                className="w-full border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800"
+                className="w-full border-slate-700 text-slate-300 hover:text-foreground hover:bg-slate-800"
               >
                 Ver Histórico de Envasamento
               </Button>
@@ -198,13 +198,13 @@ export const Team = () => {
       <Dialog open={historyDialogOpen} onOpenChange={setHistoryDialogOpen}>
         <DialogContent className="bg-card border-white/10 max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-white">
+            <DialogTitle className="text-foreground">
               Histórico de Envasamento - {selectedMember?.name}
             </DialogTitle>
           </DialogHeader>
           
           {loadingHistory ? (
-            <div className="text-white p-8 text-center">Carregando histórico...</div>
+            <div className="text-foreground p-8 text-center">Carregando histórico...</div>
           ) : memberHistory ? (
             <div className="space-y-6">
               {/* Summary */}
@@ -215,13 +215,13 @@ export const Team = () => {
                 </Card>
                 <Card className="p-4 glass-effect border-white/5">
                   <p className="text-sm text-slate-400 mb-1">Operações</p>
-                  <p className="text-3xl font-bold text-white">{memberHistory.total_operations}</p>
+                  <p className="text-3xl font-bold text-foreground">{memberHistory.total_operations}</p>
                 </Card>
               </div>
 
               {/* History List */}
               <div className="space-y-3">
-                <h3 className="text-lg font-semibold text-white">Histórico Detalhado</h3>
+                <h3 className="text-lg font-semibold text-foreground">Histórico Detalhado</h3>
                 {memberHistory.history.length === 0 ? (
                   <p className="text-slate-400 text-center py-8">Nenhuma operação de envasamento registrada</p>
                 ) : (
@@ -229,7 +229,7 @@ export const Team = () => {
                     <Card key={item.id} className="p-4 glass-effect border-white/5">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
-                          <p className="text-white font-semibold">{item.product_name}</p>
+                          <p className="text-foreground font-semibold">{item.product_name}</p>
                           <p className="text-sm text-slate-400">Lote: {item.batch_number}</p>
                           <p className="text-xs text-slate-500">
                             {new Date(item.date).toLocaleString('pt-BR')}

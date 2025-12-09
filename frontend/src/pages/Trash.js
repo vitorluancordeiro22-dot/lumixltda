@@ -66,7 +66,7 @@ export const Trash = () => {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-4xl md:text-5xl font-bold text-white mb-2">Lixeira</h1>
+        <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-2">Lixeira</h1>
         <p className="text-lg text-slate-300">Restaure ou apague itens permanentemente</p>
       </div>
 
@@ -89,7 +89,7 @@ export const Trash = () => {
                     <Badge variant="outline" className="border-slate-700 text-slate-300">
                       {getItemLabel(item.item_type)}
                     </Badge>
-                    <h3 className="text-xl font-bold text-white">{getItemName(item)}</h3>
+                    <h3 className="text-xl font-bold text-foreground">{getItemName(item)}</h3>
                   </div>
                   <p className="text-sm text-slate-400">
                     Excluído em: {new Date(item.deleted_at).toLocaleString('pt-BR')}

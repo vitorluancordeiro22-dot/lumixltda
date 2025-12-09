@@ -233,7 +233,7 @@ export const ProductPrintButton = ({ product }) => {
     <Button
       size="sm"
       variant="outline"
-      className="border-slate-700 text-white hover:bg-slate-800"
+      className="border-slate-700 text-foreground hover:bg-slate-800"
       onClick={handlePrint}
       disabled={!hasOpModel}
     >

@@ -149,7 +149,7 @@ export const Batches = () => {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-4xl md:text-5xl font-bold text-white mb-2">Gerenciar Lotes</h1>
+        <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-2">Gerenciar Lotes</h1>
         <p className="text-lg text-slate-300">Visualize e edite todos os lotes de produtos e matérias-primas</p>
       </div>
 
@@ -167,7 +167,7 @@ export const Batches = () => {
 
         <TabsContent value="products" className="space-y-4">
           {loading ? (
-            <div className="text-white">Carregando...</div>
+            <div className="text-foreground">Carregando...</div>
           ) : productBatches.length === 0 ? (
             <Card className="p-12 glass-effect border-white/5 text-center">
               <Package className="w-16 h-16 text-slate-600 mx-auto mb-4" />
@@ -184,7 +184,7 @@ export const Batches = () => {
                           {batch.status === 'em_aberto' ? 'Em Aberto' : 'Finalizado'}
                         </Badge>
                       </div>
-                      <h3 className="text-xl font-bold text-white mb-1">{getProductName(batch.product_id)}</h3>
+                      <h3 className="text-xl font-bold text-foreground mb-1">{getProductName(batch.product_id)}</h3>
                       <p className="text-sm text-slate-400">Lote: {batch.batch_number}</p>
                       <p className="text-xs text-slate-500">{formatBatchNumber(batch.batch_number)}</p>
                     </div>
@@ -193,7 +193,7 @@ export const Batches = () => {
                         size="icon" 
                         variant="ghost" 
                         onClick={() => handleEdit(batch, 'product')}
-                        className="text-slate-300 hover:text-white"
+                        className="text-slate-300 hover:text-foreground"
                       >
                         <Edit className="w-4 h-4" />
                       </Button>
@@ -214,7 +214,7 @@ export const Batches = () => {
                     </div>
                     <div className="p-3 rounded-lg bg-slate-800/50">
                       <p className="text-xs text-slate-400">Planejado / Envasado</p>
-                      <p className="text-lg font-bold text-white">
+                      <p className="text-lg font-bold text-foreground">
                         {batch.planned_liters}L / {batch.total_bottled}L
                       </p>
                     </div>
@@ -227,7 +227,7 @@ export const Batches = () => {
 
         <TabsContent value="materials" className="space-y-4">
           {loading ? (
-            <div className="text-white">Carregando...</div>
+            <div className="text-foreground">Carregando...</div>
           ) : rawMaterialBatches.length === 0 ? (
             <Card className="p-12 glass-effect border-white/5 text-center">
               <Boxes className="w-16 h-16 text-slate-600 mx-auto mb-4" />
@@ -244,7 +244,7 @@ export const Batches = () => {
                           {batch.status === 'em_aberto' ? 'Em Aberto' : 'Finalizado'}
                         </Badge>
                       </div>
-                      <h3 className="text-xl font-bold text-white mb-1">{getRawMaterialName(batch.raw_material_id)}</h3>
+                      <h3 className="text-xl font-bold text-foreground mb-1">{getRawMaterialName(batch.raw_material_id)}</h3>
                       <p className="text-sm text-slate-400">Lote: {batch.batch_number}</p>
                       <p className="text-xs text-slate-500">{formatBatchNumber(batch.batch_number)}</p>
                     </div>
@@ -253,7 +253,7 @@ export const Batches = () => {
                         size="icon" 
                         variant="ghost" 
                         onClick={() => handleEdit(batch, 'material')}
-                        className="text-slate-300 hover:text-white"
+                        className="text-slate-300 hover:text-foreground"
                       >
                         <Edit className="w-4 h-4" />
                       </Button>
@@ -274,7 +274,7 @@ export const Batches = () => {
                     </div>
                     <div className="p-3 rounded-lg bg-slate-800/50">
                       <p className="text-xs text-slate-400">Quantidade</p>
-                      <p className="text-lg font-bold text-white">{batch.quantity}</p>
+                      <p className="text-lg font-bold text-foreground">{batch.quantity}</p>
                     </div>
                   </div>
                 </Card>
@@ -288,15 +288,15 @@ export const Batches = () => {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="bg-card border-white/10">
           <DialogHeader>
-            <DialogTitle className="text-white">Editar Lote</DialogTitle>
+            <DialogTitle className="text-foreground">Editar Lote</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <Label className="text-white">Número do Lote</Label>
+              <Label className="text-foreground">Número do Lote</Label>
               <Input
                 value={formData.batch_number}
                 onChange={(e) => setFormData({...formData, batch_number: e.target.value})}
-                className="bg-slate-900/50 border-slate-700 text-white font-mono text-lg"
+                className="bg-slate-900/50 border-slate-700 text-foreground font-mono text-lg"
                 placeholder="AAMMCCC"
                 maxLength={7}
                 required
@@ -307,12 +307,12 @@ export const Batches = () => {
             </div>
 
             <div>
-              <Label className="text-white">Data</Label>
+              <Label className="text-foreground">Data</Label>
               <Input
                 type="date"
                 value={formData.date}
                 onChange={(e) => setFormData({...formData, date: e.target.value})}
-                className="bg-slate-900/50 border-slate-700 text-white"
+                className="bg-slate-900/50 border-slate-700 text-foreground"
                 required
               />
             </div>
@@ -320,35 +320,35 @@ export const Batches = () => {
             {batchType === 'product' ? (
               <>
                 <div>
-                  <Label className="text-white">Unidade</Label>
+                  <Label className="text-foreground">Unidade</Label>
                   <Input
                     value={formData.unit}
                     onChange={(e) => setFormData({...formData, unit: e.target.value})}
-                    className="bg-slate-900/50 border-slate-700 text-white"
+                    className="bg-slate-900/50 border-slate-700 text-foreground"
                     required
                   />
                 </div>
                 <div>
-                  <Label className="text-white">Litros Planejados</Label>
+                  <Label className="text-foreground">Litros Planejados</Label>
                   <Input
                     type="number"
                     step="0.01"
                     value={formData.planned_liters}
                     onChange={(e) => setFormData({...formData, planned_liters: e.target.value})}
-                    className="bg-slate-900/50 border-slate-700 text-white"
+                    className="bg-slate-900/50 border-slate-700 text-foreground"
                     required
                   />
                 </div>
               </>
             ) : (
               <div>
-                <Label className="text-white">Quantidade</Label>
+                <Label className="text-foreground">Quantidade</Label>
                 <Input
                   type="number"
                   step="0.01"
                   value={formData.quantity}
                   onChange={(e) => setFormData({...formData, quantity: e.target.value})}
-                  className="bg-slate-900/50 border-slate-700 text-white"
+                  className="bg-slate-900/50 border-slate-700 text-foreground"
                   required
                 />
               </div>

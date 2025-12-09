@@ -10,7 +10,7 @@ export const Settings = () => {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-4xl md:text-5xl font-bold text-white mb-2">Configurações</h1>
+        <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-2">Configurações</h1>
         <p className="text-lg text-slate-300">Gerencie suas preferências</p>
       </div>
 
@@ -20,7 +20,7 @@ export const Settings = () => {
             <User className="w-8 h-8 text-primary" />
           </div>
           <div>
-            <h2 className="text-2xl font-bold text-white">{user?.name}</h2>
+            <h2 className="text-2xl font-bold text-foreground">{user?.name}</h2>
             <p className="text-slate-400">{user?.email}</p>
           </div>
         </div>
@@ -32,7 +32,7 @@ export const Settings = () => {
             <Zap className="w-6 h-6 text-primary" />
           </div>
           <div className="flex-1">
-            <h3 className="text-xl font-bold text-white mb-2">Sobre o Lumix</h3>
+            <h3 className="text-xl font-bold text-foreground mb-2">Sobre o Lumix</h3>
             <p className="text-slate-300 leading-relaxed mb-4">
               Sistema de Gestão Inteligente de Produção desenvolvido por Vitor.
             </p>

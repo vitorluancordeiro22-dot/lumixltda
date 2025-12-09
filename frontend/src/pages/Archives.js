@@ -118,7 +118,7 @@ export const Archives = () => {
     <div className="space-y-8">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-4xl md:text-5xl font-bold text-white mb-2">Arquivos Mensais</h1>
+          <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-2">Arquivos Mensais</h1>
           <p className="text-lg text-slate-300">Histórico de lotes finalizados por mês</p>
         </div>
         <Button 
@@ -132,7 +132,7 @@ export const Archives = () => {
       </div>
 
       {loading ? (
-        <div className="text-white">Carregando...</div>
+        <div className="text-foreground">Carregando...</div>
       ) : months.length === 0 ? (
         <Card className="p-12 glass-effect border-white/5 text-center">
           <Archive className="w-16 h-16 text-slate-600 mx-auto mb-4" />
@@ -156,12 +156,12 @@ export const Archives = () => {
                     setSelectedMonth({ year: parseInt(year), month: parseInt(month), month_name: months.find(m => m.year === parseInt(year) && m.month === parseInt(month))?.month_name });
                   }}
                 >
-                  <SelectTrigger className="bg-slate-900/50 border-slate-700 text-white h-12 text-lg">
+                  <SelectTrigger className="bg-slate-900/50 border-slate-700 text-foreground h-12 text-lg">
                     <SelectValue placeholder="Selecione o mês" />
                   </SelectTrigger>
                   <SelectContent className="bg-slate-900 border-slate-700">
                     {months.map((m) => (
-                      <SelectItem key={`${m.year}-${m.month}`} value={`${m.year}-${m.month}`} className="text-white">
+                      <SelectItem key={`${m.year}-${m.month}`} value={`${m.year}-${m.month}`} className="text-foreground">
                         {m.month_name}
                       </SelectItem>
                     ))}
@@ -196,7 +196,7 @@ export const Archives = () => {
                       <Card key={batch.id} className="p-6 glass-effect border-white/5">
                         <div className="mb-4">
                           <Badge className="bg-emerald-600 mb-2">Finalizado</Badge>
-                          <h3 className="text-xl font-bold text-white mb-1">{getProductName(batch.product_id)}</h3>
+                          <h3 className="text-xl font-bold text-foreground mb-1">{getProductName(batch.product_id)}</h3>
                           <p className="text-sm text-slate-400">Lote: {batch.batch_number}</p>
                           <p className="text-xs text-slate-500">{formatBatchNumber(batch.batch_number)}</p>
                         </div>
@@ -207,7 +207,7 @@ export const Archives = () => {
                           </div>
                           <div className="p-3 rounded-lg bg-slate-800/50">
                             <p className="text-xs text-slate-400">Planejado / Envasado</p>
-                            <p className="text-lg font-bold text-white">
+                            <p className="text-lg font-bold text-foreground">
                               {batch.planned_liters}L / {batch.total_bottled}L
                             </p>
                           </div>
@@ -230,7 +230,7 @@ export const Archives = () => {
                       <Card key={batch.id} className="p-6 glass-effect border-white/5">
                         <div className="mb-4">
                           <Badge className="bg-emerald-600 mb-2">Finalizado</Badge>
-                          <h3 className="text-xl font-bold text-white mb-1">{getRawMaterialName(batch.raw_material_id)}</h3>
+                          <h3 className="text-xl font-bold text-foreground mb-1">{getRawMaterialName(batch.raw_material_id)}</h3>
                           <p className="text-sm text-slate-400">Lote: {batch.batch_number}</p>
                           <p className="text-xs text-slate-500">{formatBatchNumber(batch.batch_number)}</p>
                         </div>
@@ -241,7 +241,7 @@ export const Archives = () => {
                           </div>
                           <div className="p-3 rounded-lg bg-slate-800/50">
                             <p className="text-xs text-slate-400">Quantidade</p>
-                            <p className="text-lg font-bold text-white">{batch.quantity}</p>
+                            <p className="text-lg font-bold text-foreground">{batch.quantity}</p>
                           </div>
                         </div>
                       </Card>

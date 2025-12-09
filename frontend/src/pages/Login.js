@@ -66,14 +66,14 @@ export const Login = () => {
       {/* Login Card */}
       <Card data-testid="login-card" className="relative z-10 w-full max-w-md mx-4 p-8 glass-effect border border-white/10">
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-white mb-2">Lumix</h1>
+          <h1 className="text-4xl font-bold text-foreground mb-2">Lumix</h1>
           <p className="text-slate-400 text-sm">Gestão Inteligente de Produção</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {!isLogin && (
             <div className="space-y-2">
-              <Label htmlFor="name" className="text-white">Nome</Label>
+              <Label htmlFor="name" className="text-foreground">Nome</Label>
               <Input
                 id="name"
                 data-testid="name-input"
@@ -81,14 +81,14 @@ export const Login = () => {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required={!isLogin}
-                className="h-12 bg-slate-900/50 border-slate-700 text-white placeholder:text-slate-500"
+                className="h-12 bg-slate-900/50 border-slate-700 text-foreground placeholder:text-slate-500"
                 placeholder="Seu nome"
               />
             </div>
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="email" className="text-white">Email</Label>
+            <Label htmlFor="email" className="text-foreground">Email</Label>
             <Input
               id="email"
               data-testid="email-input"
@@ -96,13 +96,13 @@ export const Login = () => {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="h-12 bg-slate-900/50 border-slate-700 text-white placeholder:text-slate-500"
+              className="h-12 bg-slate-900/50 border-slate-700 text-foreground placeholder:text-slate-500"
               placeholder="seu@email.com"
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="password" className="text-white">Senha</Label>
+            <Label htmlFor="password" className="text-foreground">Senha</Label>
             <Input
               id="password"
               data-testid="password-input"
@@ -110,7 +110,7 @@ export const Login = () => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              className="h-12 bg-slate-900/50 border-slate-700 text-white placeholder:text-slate-500"
+              className="h-12 bg-slate-900/50 border-slate-700 text-foreground placeholder:text-slate-500"
               placeholder="••••••••"
             />
           </div>

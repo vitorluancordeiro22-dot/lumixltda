@@ -226,7 +226,7 @@ export const Products = () => {
     <div className="space-y-8">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-4xl md:text-5xl font-bold text-white mb-2">Produtos</h1>
+          <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-2">Produtos</h1>
           <p className="text-lg text-slate-300">Gerencie seus produtos e receitas</p>
         </div>
         <div className="flex gap-3">
@@ -252,7 +252,7 @@ export const Products = () => {
             </DialogTrigger>
             <DialogContent className="bg-card border-white/10">
               <DialogHeader>
-                <DialogTitle className="text-white">Soltar Lote de Produto</DialogTitle>
+                <DialogTitle className="text-foreground">Soltar Lote de Produto</DialogTitle>
               </DialogHeader>
               {nextBatchNumber && (
                 <div className="p-4 rounded-lg bg-primary/10 border border-primary/30">
@@ -265,37 +265,37 @@ export const Products = () => {
               )}
               <form onSubmit={handleBatchSubmit} className="space-y-4">
                 <div>
-                  <Label className="text-white">Produto</Label>
+                  <Label className="text-foreground">Produto</Label>
                   <Select value={batchFormData.product_id} onValueChange={(v) => setBatchFormData({...batchFormData, product_id: v})}>
-                    <SelectTrigger className="bg-slate-900/50 border-slate-700 text-white">
+                    <SelectTrigger className="bg-slate-900/50 border-slate-700 text-foreground">
                       <SelectValue placeholder="Selecione o produto" />
                     </SelectTrigger>
                     <SelectContent className="bg-slate-900 border-slate-700">
                       {products.map(p => (
-                        <SelectItem key={p.id} value={p.id} className="text-white">{p.name}</SelectItem>
+                        <SelectItem key={p.id} value={p.id} className="text-foreground">{p.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
                 <div>
-                  <Label className="text-white">Data</Label>
-                  <Input type="date" value={batchFormData.date} onChange={(e) => setBatchFormData({...batchFormData, date: e.target.value})} className="bg-slate-900/50 border-slate-700 text-white" />
+                  <Label className="text-foreground">Data</Label>
+                  <Input type="date" value={batchFormData.date} onChange={(e) => setBatchFormData({...batchFormData, date: e.target.value})} className="bg-slate-900/50 border-slate-700 text-foreground" />
                 </div>
                 <div>
-                  <Label className="text-white">Unidade</Label>
+                  <Label className="text-foreground">Unidade</Label>
                   <Select value={batchFormData.unit} onValueChange={(v) => setBatchFormData({...batchFormData, unit: v})}>
-                    <SelectTrigger className="bg-slate-900/50 border-slate-700 text-white">
+                    <SelectTrigger className="bg-slate-900/50 border-slate-700 text-foreground">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="bg-slate-900 border-slate-700">
-                      <SelectItem value="Litros" className="text-white">Litros</SelectItem>
-                      <SelectItem value="Kg" className="text-white">Kg</SelectItem>
+                      <SelectItem value="Litros" className="text-foreground">Litros</SelectItem>
+                      <SelectItem value="Kg" className="text-foreground">Kg</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div>
-                  <Label className="text-white">Litragem Planejada</Label>
-                  <Input type="number" step="0.01" value={batchFormData.planned_liters} onChange={(e) => setBatchFormData({...batchFormData, planned_liters: e.target.value})} className="bg-slate-900/50 border-slate-700 text-white" required />
+                  <Label className="text-foreground">Litragem Planejada</Label>
+                  <Input type="number" step="0.01" value={batchFormData.planned_liters} onChange={(e) => setBatchFormData({...batchFormData, planned_liters: e.target.value})} className="bg-slate-900/50 border-slate-700 text-foreground" required />
                 </div>
                 <Button type="submit" disabled={submitting} className="w-full bg-primary hover:bg-primary/90">Criar Lote</Button>
               </form>
@@ -311,68 +311,68 @@ export const Products = () => {
             </DialogTrigger>
             <DialogContent className="bg-card border-white/10 max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle className="text-white">{selectedProduct ? 'Editar' : 'Novo'} Produto</DialogTitle>
+                <DialogTitle className="text-foreground">{selectedProduct ? 'Editar' : 'Novo'} Produto</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                  <Label className="text-white">Nome</Label>
-                  <Input value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="bg-slate-900/50 border-slate-700 text-white" required />
+                  <Label className="text-foreground">Nome</Label>
+                  <Input value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="bg-slate-900/50 border-slate-700 text-foreground" required />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label className="text-white">Unidade</Label>
+                    <Label className="text-foreground">Unidade</Label>
                     <Select value={formData.unit} onValueChange={(v) => setFormData({...formData, unit: v})}>
-                      <SelectTrigger className="bg-slate-900/50 border-slate-700 text-white">
+                      <SelectTrigger className="bg-slate-900/50 border-slate-700 text-foreground">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className="bg-slate-900 border-slate-700">
-                        <SelectItem value="Litros" className="text-white">Litros</SelectItem>
-                        <SelectItem value="Kg" className="text-white">Kg</SelectItem>
+                        <SelectItem value="Litros" className="text-foreground">Litros</SelectItem>
+                        <SelectItem value="Kg" className="text-foreground">Kg</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   <div>
-                    <Label className="text-white">Litros Esperados</Label>
-                    <Input type="number" step="0.01" value={formData.expected_liters} onChange={(e) => setFormData({...formData, expected_liters: e.target.value})} className="bg-slate-900/50 border-slate-700 text-white" required />
+                    <Label className="text-foreground">Litros Esperados</Label>
+                    <Input type="number" step="0.01" value={formData.expected_liters} onChange={(e) => setFormData({...formData, expected_liters: e.target.value})} className="bg-slate-900/50 border-slate-700 text-foreground" required />
                   </div>
                 </div>
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <Label className="text-white">Receita (Matérias-Primas)</Label>
-                    <Button type="button" onClick={addRecipe} size="sm" variant="outline" className="border-slate-700 text-white">
+                    <Label className="text-foreground">Receita (Matérias-Primas)</Label>
+                    <Button type="button" onClick={addRecipe} size="sm" variant="outline" className="border-slate-700 text-foreground">
                       <Plus className="w-4 h-4 mr-1" /> Adicionar
                     </Button>
                   </div>
                   {formData.recipes.map((recipe, index) => (
                     <div key={`recipe-${index}-${recipe.raw_material_id}`} className="flex gap-2 items-end">
                       <div className="flex-1">
-                        <Label className="text-white text-xs">Matéria-Prima</Label>
+                        <Label className="text-foreground text-xs">Matéria-Prima</Label>
                         <Select value={recipe.raw_material_id} onValueChange={(v) => updateRecipe(index, 'raw_material_id', v)}>
-                          <SelectTrigger className="bg-slate-900/50 border-slate-700 text-white">
+                          <SelectTrigger className="bg-slate-900/50 border-slate-700 text-foreground">
                             <SelectValue placeholder="Selecione" />
                           </SelectTrigger>
                           <SelectContent className="bg-slate-900 border-slate-700">
                             {rawMaterials.map(rm => (
-                              <SelectItem key={rm.id} value={rm.id} className="text-white">{rm.name}</SelectItem>
+                              <SelectItem key={rm.id} value={rm.id} className="text-foreground">{rm.name}</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
                       </div>
                       <div className="w-24">
-                        <Label className="text-white text-xs">Unidade</Label>
+                        <Label className="text-foreground text-xs">Unidade</Label>
                         <Select value={recipe.unit || 'L'} onValueChange={(v) => updateRecipe(index, 'unit', v)}>
-                          <SelectTrigger className="bg-slate-900/50 border-slate-700 text-white">
+                          <SelectTrigger className="bg-slate-900/50 border-slate-700 text-foreground">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent className="bg-slate-900 border-slate-700">
-                            <SelectItem value="L" className="text-white">L</SelectItem>
-                            <SelectItem value="Kg" className="text-white">Kg</SelectItem>
+                            <SelectItem value="L" className="text-foreground">L</SelectItem>
+                            <SelectItem value="Kg" className="text-foreground">Kg</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
                       <div className="w-28">
-                        <Label className="text-white text-xs">Quantidade</Label>
-                        <Input type="number" step="0.001" value={recipe.quantity_per_liter} onChange={(e) => updateRecipe(index, 'quantity_per_liter', e.target.value)} className="bg-slate-900/50 border-slate-700 text-white" placeholder="Ex: 0.5" />
+                        <Label className="text-foreground text-xs">Quantidade</Label>
+                        <Input type="number" step="0.001" value={recipe.quantity_per_liter} onChange={(e) => updateRecipe(index, 'quantity_per_liter', e.target.value)} className="bg-slate-900/50 border-slate-700 text-foreground" placeholder="Ex: 0.5" />
                       </div>
                       <Button type="button" onClick={() => removeRecipe(index)} size="icon" variant="destructive">
                         <Trash2 className="w-4 h-4" />
@@ -395,11 +395,11 @@ export const Products = () => {
             <Card key={product.id} data-testid={`product-card-${product.id}`} className="p-6 glass-effect border-white/5 hover:border-primary/50 transition-smooth">
               <div className="flex items-start justify-between mb-4">
                 <div>
-                  <h3 className="text-xl font-bold text-white mb-1">{product.name}</h3>
+                  <h3 className="text-xl font-bold text-foreground mb-1">{product.name}</h3>
                   <p className="text-sm text-slate-400">{product.unit} • {product.expected_liters}L esperados</p>
                 </div>
                 <div className="flex gap-2">
-                  <Button size="icon" variant="ghost" onClick={() => handleEdit(product)} className="text-slate-300 hover:text-white">
+                  <Button size="icon" variant="ghost" onClick={() => handleEdit(product)} className="text-slate-300 hover:text-foreground">
                     <Edit className="w-4 h-4" />
                   </Button>
                   <Button size="icon" variant="ghost" onClick={() => handleDelete(product.id)} className="text-red-400 hover:text-red-300">

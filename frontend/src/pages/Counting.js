@@ -113,13 +113,13 @@ export const Counting = () => {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-4xl md:text-5xl font-bold text-white mb-2">Contagem / Envase</h1>
+        <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-2">Contagem / Envase</h1>
         <p className="text-lg text-slate-300">Registre as quantidades envasadas</p>
       </div>
 
       {/* Batch Selection */}
       <Card className="p-6 glass-effect border-white/5">
-        <Label className="text-white text-lg mb-3 block">Selecione o Lote em Aberto</Label>
+        <Label className="text-foreground text-lg mb-3 block">Selecione o Lote em Aberto</Label>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {batches.map(batch => (
             <button
@@ -132,7 +132,7 @@ export const Counting = () => {
                   : 'border-slate-700 hover:border-slate-600 bg-slate-900/30'
               }`}
             >
-              <p className="text-white font-bold mb-1">{getProductName(batch.product_id)}</p>
+              <p className="text-foreground font-bold mb-1">{getProductName(batch.product_id)}</p>
               <p className="text-sm text-slate-400">Lote: {batch.batch_number}</p>
               <p className="text-sm text-slate-400">Planejado: {batch.planned_liters}L</p>
               <p className="text-sm text-slate-400">Envasado: {batch.total_bottled}L</p>
@@ -148,7 +148,7 @@ export const Counting = () => {
             <div className="mb-4">
               <div className="flex items-center justify-between mb-2">
                 <p className="text-slate-400">Progresso do Lote</p>
-                <p className="text-white font-bold">
+                <p className="text-foreground font-bold">
                   {selectedBatch.total_bottled.toFixed(1)} / {selectedBatch.planned_liters} L
                 </p>
               </div>
@@ -166,41 +166,41 @@ export const Counting = () => {
 
           {/* Counting Form */}
           <Card className="p-6 glass-effect border-white/5">
-            <h2 className="text-2xl font-bold text-white mb-6">Registrar Contagem</h2>
+            <h2 className="text-2xl font-bold text-foreground mb-6">Registrar Contagem</h2>
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="space-y-2">
-                  <Label className="text-white text-lg">1 Litro</Label>
+                  <Label className="text-foreground text-lg">1 Litro</Label>
                   <Input
                     type="number"
                     data-testid="one-liter-input"
                     value={formData.one_liter}
                     onChange={(e) => setFormData({...formData, one_liter: parseInt(e.target.value) || 0})}
-                    className="h-14 text-xl bg-slate-900/50 border-slate-700 text-white text-center"
+                    className="h-14 text-xl bg-slate-900/50 border-slate-700 text-foreground text-center"
                     min="0"
                   />
                   <p className="text-center text-slate-400 text-sm">Total: {formData.one_liter * 1}L</p>
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-white text-lg">2 Litros</Label>
+                  <Label className="text-foreground text-lg">2 Litros</Label>
                   <Input
                     type="number"
                     data-testid="two-liter-input"
                     value={formData.two_liter}
                     onChange={(e) => setFormData({...formData, two_liter: parseInt(e.target.value) || 0})}
-                    className="h-14 text-xl bg-slate-900/50 border-slate-700 text-white text-center"
+                    className="h-14 text-xl bg-slate-900/50 border-slate-700 text-foreground text-center"
                     min="0"
                   />
                   <p className="text-center text-slate-400 text-sm">Total: {formData.two_liter * 2}L</p>
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-white text-lg">5 Litros</Label>
+                  <Label className="text-foreground text-lg">5 Litros</Label>
                   <Input
                     type="number"
                     data-testid="five-liter-input"
                     value={formData.five_liter}
                     onChange={(e) => setFormData({...formData, five_liter: parseInt(e.target.value) || 0})}
-                    className="h-14 text-xl bg-slate-900/50 border-slate-700 text-white text-center"
+                    className="h-14 text-xl bg-slate-900/50 border-slate-700 text-foreground text-center"
                     min="0"
                   />
                   <p className="text-center text-slate-400 text-sm">Total: {formData.five_liter * 5}L</p>
@@ -208,20 +208,20 @@ export const Counting = () => {
               </div>
               
               <div className="p-4 rounded-lg bg-primary/10 border border-primary/30">
-                <p className="text-center text-white text-2xl font-bold">
+                <p className="text-center text-foreground text-2xl font-bold">
                   Total desta Contagem: {(formData.one_liter * 1) + (formData.two_liter * 2) + (formData.five_liter * 5)}L
                 </p>
               </div>
 
               <div>
-                <Label className="text-white">Operador</Label>
+                <Label className="text-foreground">Operador</Label>
                 <Select value={formData.operator} onValueChange={(v) => setFormData({...formData, operator: v})}>
-                  <SelectTrigger className="bg-slate-900/50 border-slate-700 text-white h-12">
+                  <SelectTrigger className="bg-slate-900/50 border-slate-700 text-foreground h-12">
                     <SelectValue placeholder="Quem fez o envase?" />
                   </SelectTrigger>
                   <SelectContent className="bg-slate-900 border-slate-700">
                     {teamMembers.map(m => (
-                      <SelectItem key={m.id} value={m.name} className="text-white">{m.name}</SelectItem>
+                      <SelectItem key={m.id} value={m.name} className="text-foreground">{m.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -237,21 +237,21 @@ export const Counting = () => {
           {/* History */}
           {countings.length > 0 && (
             <Card className="p-6 glass-effect border-white/5">
-              <h3 className="text-xl font-bold text-white mb-4">Histórico de Contagens</h3>
+              <h3 className="text-xl font-bold text-foreground mb-4">Histórico de Contagens</h3>
               <div className="space-y-3">
                 {countings.map((count) => (
                   <div key={count.id} className="p-4 rounded-lg bg-slate-900/30 border border-slate-700">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-white">1L: {count.one_liter} | 2L: {count.two_liter} | 5L: {count.five_liter}</p>
+                        <p className="text-foreground">1L: {count.one_liter} | 2L: {count.two_liter} | 5L: {count.five_liter}</p>
                         <p className="text-sm text-slate-400">Operador: {count.operator}</p>
                       </div>
-                      <p className="text-white font-bold">{count.total}L</p>
+                      <p className="text-foreground font-bold">{count.total}L</p>
                     </div>
                   </div>
                 ))}
                 <div className="p-4 rounded-lg bg-primary/10 border border-primary/30">
-                  <p className="text-white font-bold text-lg">Total Acumulado: {totalCount}L</p>
+                  <p className="text-foreground font-bold text-lg">Total Acumulado: {totalCount}L</p>
                 </div>
               </div>
             </Card>

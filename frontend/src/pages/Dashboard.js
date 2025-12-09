@@ -73,14 +73,14 @@ export const Dashboard = () => {
       {/* Header */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-4xl md:text-5xl font-bold text-white mb-2">Dashboard</h1>
+          <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-2">Dashboard</h1>
           <p className="text-lg text-slate-300">Visão geral da produção</p>
         </div>
         <Button
           onClick={handleResetLiters}
           disabled={resetting}
           variant="outline"
-          className="border-slate-700 text-white hover:bg-slate-800 shrink-0"
+          className="border-slate-700 text-foreground hover:bg-slate-800 shrink-0"
         >
           <RotateCcw className="w-4 h-4 mr-2" />
           {resetting ? 'Resetando...' : 'Resetar Litros'}
@@ -109,7 +109,7 @@ export const Dashboard = () => {
                     <p className="text-sm text-slate-400 uppercase tracking-wider mb-2">
                       {stat.label}
                     </p>
-                    <p className="text-3xl font-bold text-white">{stat.value}</p>
+                    <p className="text-3xl font-bold text-foreground">{stat.value}</p>
                   </div>
                   <div className={`p-3 rounded-lg ${stat.bg}`}>
                     <Icon className={`w-6 h-6 ${stat.color}`} strokeWidth={1.5} />
@@ -123,7 +123,7 @@ export const Dashboard = () => {
 
       {/* Quick Info */}
       <Card className="p-6 glass-effect border-white/5">
-        <h2 className="text-2xl font-semibold text-white mb-4">Bem-vindo ao Lumix</h2>
+        <h2 className="text-2xl font-semibold text-foreground mb-4">Bem-vindo ao Lumix</h2>
         <p className="text-slate-300 leading-relaxed">
           Sistema completo de gestão de produção industrial. Gerencie produtos, matérias-primas, 
           ordens de produção e contagens de forma eficiente e organizada.

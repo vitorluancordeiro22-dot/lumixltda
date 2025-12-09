@@ -100,7 +100,7 @@ export const ProductFileManager = ({ product, onUpdate }) => {
       <Button
         size="sm"
         variant="outline"
-        className="border-slate-700 text-white hover:bg-slate-800"
+        className="border-slate-700 text-foreground hover:bg-slate-800"
         onClick={() => setDialogOpen(true)}
       >
         <FileText className="w-3 h-3 mr-1" />
@@ -110,7 +110,7 @@ export const ProductFileManager = ({ product, onUpdate }) => {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="bg-card border-white/10 max-w-2xl">
           <DialogHeader>
-            <DialogTitle className="text-white">
+            <DialogTitle className="text-foreground">
               Arquivos Modelo - {product.name}
             </DialogTitle>
           </DialogHeader>
@@ -124,7 +124,7 @@ export const ProductFileManager = ({ product, onUpdate }) => {
                 <div className="flex items-start justify-between mb-3">
                   <div>
                     <div className="flex items-center gap-2">
-                      <Label className="text-white font-medium">{type.label}</Label>
+                      <Label className="text-foreground font-medium">{type.label}</Label>
                       {type.required && (
                         <span className="text-red-400 text-xs">* Obrigatório</span>
                       )}
@@ -164,7 +164,7 @@ export const ProductFileManager = ({ product, onUpdate }) => {
                     <Button
                       type="button"
                       variant="outline"
-                      className="w-full border-slate-700 text-white hover:bg-slate-800"
+                      className="w-full border-slate-700 text-foreground hover:bg-slate-800"
                       disabled={uploading}
                       onClick={(e) => {
                         e.preventDefault();
@@ -179,7 +179,7 @@ export const ProductFileManager = ({ product, onUpdate }) => {
                   {hasFile(type.key) && (
                     <Button
                       variant="outline"
-                      className="border-slate-700 text-white hover:bg-slate-800"
+                      className="border-slate-700 text-foreground hover:bg-slate-800"
                       onClick={() => handleFileDownload(type.key)}
                     >
                       <Download className="w-4 h-4" />

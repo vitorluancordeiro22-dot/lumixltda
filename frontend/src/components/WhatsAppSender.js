@@ -65,7 +65,7 @@ export const WhatsAppSender = ({ batch, product, trigger }) => {
       
       <DialogContent className="bg-card border-white/10 max-w-lg">
         <DialogHeader>
-          <DialogTitle className="text-white flex items-center gap-2">
+          <DialogTitle className="text-foreground flex items-center gap-2">
             <MessageCircle className="w-5 h-5 text-green-500" />
             Enviar Mensagem WhatsApp
           </DialogTitle>
@@ -73,11 +73,11 @@ export const WhatsAppSender = ({ batch, product, trigger }) => {
 
         <div className="space-y-4">
           <div>
-            <Label className="text-white">Número ou Nome do Grupo *</Label>
+            <Label className="text-foreground">Número ou Nome do Grupo *</Label>
             <Input
               value={phoneNumber}
               onChange={(e) => setPhoneNumber(e.target.value)}
-              className="bg-slate-900/50 border-slate-700 text-white"
+              className="bg-slate-900/50 border-slate-700 text-foreground"
               placeholder="Ex: 5511999999999 ou Nome do Grupo"
             />
             <p className="text-xs text-slate-400 mt-1">
@@ -89,11 +89,11 @@ export const WhatsAppSender = ({ batch, product, trigger }) => {
           </div>
 
           <div>
-            <Label className="text-white">Mensagem</Label>
+            <Label className="text-foreground">Mensagem</Label>
             <Textarea
               value={customMessage}
               onChange={(e) => setCustomMessage(e.target.value)}
-              className="bg-slate-900/50 border-slate-700 text-white"
+              className="bg-slate-900/50 border-slate-700 text-foreground"
               rows={10}
               placeholder="Edite a mensagem se desejar..."
             />
@@ -110,7 +110,7 @@ export const WhatsAppSender = ({ batch, product, trigger }) => {
                 setCustomMessage('');
               }}
               variant="outline"
-              className="flex-1 border-slate-700 text-white hover:bg-slate-800"
+              className="flex-1 border-slate-700 text-foreground hover:bg-slate-800"
             >
               Cancelar
             </Button>

@@ -419,7 +419,7 @@ export const IndustrialOPs = () => {
                 {op.status === 'aguardando_envase' && (
                   <Button
                     size="sm"
-                    className="bg-blue-600 hover:bg-blue-700 text-white flex-1"
+                    className="bg-blue-600 hover:bg-blue-700 text-foreground flex-1"
                     onClick={() => changeStatus(op.id, 'em_producao')}
                   >
                     <Play className="w-3 h-3 mr-1" />
@@ -430,7 +430,7 @@ export const IndustrialOPs = () => {
                 {op.status === 'em_producao' && (
                   <Button
                     size="sm"
-                    className="bg-green-600 hover:bg-green-700 text-white flex-1"
+                    className="bg-green-600 hover:bg-green-700 text-foreground flex-1"
                     onClick={() => changeStatus(op.id, 'finalizada')}
                     disabled={op.produced_quantity <= 0}
                   >
@@ -442,7 +442,7 @@ export const IndustrialOPs = () => {
                 {op.is_printable && (
                   <Button
                     size="sm"
-                    className="bg-amber-600 hover:bg-amber-700 text-white flex-1"
+                    className="bg-amber-600 hover:bg-amber-700 text-foreground flex-1"
                     onClick={() => generateDocuments(op.id)}
                   >
                     <Printer className="w-3 h-3 mr-1" />

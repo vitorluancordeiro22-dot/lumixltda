@@ -122,7 +122,7 @@ export const Suppliers = () => {
     <div className="space-y-8">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-4xl md:text-5xl font-bold text-white mb-2">Fornecedores</h1>
+          <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-2">Fornecedores</h1>
           <p className="text-lg text-slate-300">Gerencie seus fornecedores de matérias-primas</p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
@@ -134,55 +134,55 @@ export const Suppliers = () => {
           </DialogTrigger>
           <DialogContent className="bg-card border-white/10">
             <DialogHeader>
-              <DialogTitle className="text-white">{selectedSupplier ? 'Editar' : 'Novo'} Fornecedor</DialogTitle>
+              <DialogTitle className="text-foreground">{selectedSupplier ? 'Editar' : 'Novo'} Fornecedor</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <Label className="text-white">Nome da Empresa *</Label>
+                <Label className="text-foreground">Nome da Empresa *</Label>
                 <Input 
                   value={formData.name} 
                   onChange={(e) => setFormData({...formData, name: e.target.value})} 
-                  className="bg-slate-900/50 border-slate-700 text-white" 
+                  className="bg-slate-900/50 border-slate-700 text-foreground" 
                   required 
                   placeholder="Ex: Distribuidora ABC"
                 />
               </div>
               <div>
-                <Label className="text-white">Pessoa de Contato</Label>
+                <Label className="text-foreground">Pessoa de Contato</Label>
                 <Input 
                   value={formData.contact} 
                   onChange={(e) => setFormData({...formData, contact: e.target.value})} 
-                  className="bg-slate-900/50 border-slate-700 text-white"
+                  className="bg-slate-900/50 border-slate-700 text-foreground"
                   placeholder="Ex: João Silva"
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label className="text-white">Telefone</Label>
+                  <Label className="text-foreground">Telefone</Label>
                   <Input 
                     value={formData.phone} 
                     onChange={(e) => setFormData({...formData, phone: e.target.value})} 
-                    className="bg-slate-900/50 border-slate-700 text-white"
+                    className="bg-slate-900/50 border-slate-700 text-foreground"
                     placeholder="(00) 00000-0000"
                   />
                 </div>
                 <div>
-                  <Label className="text-white">Email</Label>
+                  <Label className="text-foreground">Email</Label>
                   <Input 
                     type="email"
                     value={formData.email} 
                     onChange={(e) => setFormData({...formData, email: e.target.value})} 
-                    className="bg-slate-900/50 border-slate-700 text-white"
+                    className="bg-slate-900/50 border-slate-700 text-foreground"
                     placeholder="contato@empresa.com"
                   />
                 </div>
               </div>
               <div>
-                <Label className="text-white">Endereço</Label>
+                <Label className="text-foreground">Endereço</Label>
                 <Input 
                   value={formData.address} 
                   onChange={(e) => setFormData({...formData, address: e.target.value})} 
-                  className="bg-slate-900/50 border-slate-700 text-white"
+                  className="bg-slate-900/50 border-slate-700 text-foreground"
                   placeholder="Rua, número, cidade"
                 />
               </div>
@@ -195,7 +195,7 @@ export const Suppliers = () => {
       </div>
 
       {loading ? (
-        <div className="text-white">Carregando...</div>
+        <div className="text-foreground">Carregando...</div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {suppliers.map(supplier => (
@@ -206,14 +206,14 @@ export const Suppliers = () => {
                     <Truck className="w-6 h-6 text-primary" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-xl font-bold text-white mb-1 truncate">{supplier.name}</h3>
+                    <h3 className="text-xl font-bold text-foreground mb-1 truncate">{supplier.name}</h3>
                     {supplier.contact && (
                       <p className="text-sm text-slate-400 truncate">{supplier.contact}</p>
                     )}
                   </div>
                 </div>
                 <div className="flex gap-2 flex-shrink-0">
-                  <Button size="icon" variant="ghost" onClick={() => handleEdit(supplier)} className="text-slate-300 hover:text-white">
+                  <Button size="icon" variant="ghost" onClick={() => handleEdit(supplier)} className="text-slate-300 hover:text-foreground">
                     <Edit className="w-4 h-4" />
                   </Button>
                   <Button size="icon" variant="ghost" onClick={() => handleDelete(supplier.id)} className="text-red-400 hover:text-red-300">

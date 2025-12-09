@@ -207,7 +207,7 @@ export const Laudos = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-4xl md:text-5xl font-bold text-white mb-2">Laudos</h1>
+          <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-2">Laudos</h1>
           <p className="text-lg text-slate-300">Gerenciamento de documentos e laudos</p>
         </div>
 
@@ -221,15 +221,15 @@ export const Laudos = () => {
             </DialogTrigger>
             <DialogContent className="bg-card border-white/10">
               <DialogHeader>
-                <DialogTitle className="text-white">Criar Nova Pasta</DialogTitle>
+                <DialogTitle className="text-foreground">Criar Nova Pasta</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleCreateFolder} className="space-y-4">
                 <div>
-                  <Label className="text-white">Nome da Pasta</Label>
+                  <Label className="text-foreground">Nome da Pasta</Label>
                   <Input
                     value={newFolderName}
                     onChange={(e) => setNewFolderName(e.target.value)}
-                    className="bg-slate-900/50 border-slate-700 text-white"
+                    className="bg-slate-900/50 border-slate-700 text-foreground"
                     placeholder="Ex: Laudos 2024"
                     required
                   />
@@ -257,35 +257,35 @@ export const Laudos = () => {
               </DialogTrigger>
               <DialogContent className="bg-card border-white/10">
                 <DialogHeader>
-                  <DialogTitle className="text-white">Upload de Laudo</DialogTitle>
+                  <DialogTitle className="text-foreground">Upload de Laudo</DialogTitle>
                 </DialogHeader>
                 <form onSubmit={handleUploadFile} className="space-y-4">
                   <div>
-                    <Label className="text-white">Pasta Destino</Label>
+                    <Label className="text-foreground">Pasta Destino</Label>
                     <Input
                       value={selectedFolder.name}
                       disabled
-                      className="bg-slate-900/50 border-slate-700 text-white"
+                      className="bg-slate-900/50 border-slate-700 text-foreground"
                     />
                   </div>
 
                   <div>
-                    <Label className="text-white">Arquivo PDF *</Label>
+                    <Label className="text-foreground">Arquivo PDF *</Label>
                     <input
                       type="file"
                       accept=".pdf"
                       onChange={(e) => setSelectedFile(e.target.files[0])}
-                      className="block w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-white hover:file:bg-primary/90"
+                      className="block w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-foreground hover:file:bg-primary/90"
                       required
                     />
                   </div>
 
                   <div>
-                    <Label className="text-white">Observações</Label>
+                    <Label className="text-foreground">Observações</Label>
                     <Textarea
                       value={uploadNotes}
                       onChange={(e) => setUploadNotes(e.target.value)}
-                      className="bg-slate-900/50 border-slate-700 text-white"
+                      className="bg-slate-900/50 border-slate-700 text-foreground"
                       placeholder="Notas sobre o arquivo..."
                       rows={3}
                     />
@@ -309,7 +309,7 @@ export const Laudos = () => {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         {/* Folders Sidebar */}
         <Card className="md:col-span-1 p-6 glass-effect border-white/5">
-          <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+          <h3 className="text-foreground font-semibold mb-4 flex items-center gap-2">
             <Folder className="w-5 h-5 text-primary" />
             Pastas
           </h3>
@@ -336,7 +336,7 @@ export const Laudos = () => {
                     ) : (
                       <Folder className="w-4 h-4 text-slate-400 shrink-0" />
                     )}
-                    <span className="text-white text-sm truncate">{folder.name}</span>
+                    <span className="text-foreground text-sm truncate">{folder.name}</span>
                   </div>
                   <Button
                     size="sm"
@@ -367,7 +367,7 @@ export const Laudos = () => {
               <div className="flex items-center gap-2 mb-6">
                 <Folder className="w-5 h-5 text-primary" />
                 <ChevronRight className="w-4 h-4 text-slate-500" />
-                <h3 className="text-white font-semibold">{selectedFolder.name}</h3>
+                <h3 className="text-foreground font-semibold">{selectedFolder.name}</h3>
                 <span className="text-slate-500 text-sm">({files.length} arquivo{files.length !== 1 ? 's' : ''})</span>
               </div>
 
@@ -384,7 +384,7 @@ export const Laudos = () => {
                       <div className="flex items-start gap-3 mb-3">
                         <FileCheck className="w-10 h-10 text-red-400 shrink-0" />
                         <div className="flex-1 min-w-0">
-                          <p className="text-white font-medium text-sm truncate mb-1">{file.filename}</p>
+                          <p className="text-foreground font-medium text-sm truncate mb-1">{file.filename}</p>
                           <p className="text-slate-400 text-xs">
                             {(file.size / 1024).toFixed(1)} KB
                           </p>
@@ -404,7 +404,7 @@ export const Laudos = () => {
                         <Button
                           size="sm"
                           variant="outline"
-                          className="flex-1 border-slate-700 text-white hover:bg-slate-700"
+                          className="flex-1 border-slate-700 text-foreground hover:bg-slate-700"
                           onClick={() => handleDownloadFile(file)}
                         >
                           <Download className="w-3 h-3 mr-1" />
