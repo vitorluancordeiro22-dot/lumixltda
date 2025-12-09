@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import api from '../lib/api';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
@@ -40,7 +40,7 @@ export const Laudos = () => {
     }
   }, [selectedFolder]);
 
-  const fetchFolders = React.useCallback(async () => {
+  const fetchFolders = useCallback(async () => {
     try {
       const response = await api.get('/laudos/folders');
       if (isMountedRef.current) {
