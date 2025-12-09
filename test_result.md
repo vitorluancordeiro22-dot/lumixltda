@@ -236,6 +236,7 @@ metadata:
 
 test_plan:
   current_focus:
+    - "Sistema de geração de documentos PDF (COMPLETO ✅)"
     - "Sistema de arquivamento completo (backend + frontend)"
     - "Criação de produto com receita usando unidade Kg"
     - "Botão de reset no Dashboard (visibilidade e funcionalidade)"
