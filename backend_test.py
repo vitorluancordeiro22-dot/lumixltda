@@ -546,6 +546,207 @@ class LumixAPITester:
         
         return success
 
+    def test_pdf_generation_system(self):
+        """Test complete PDF document generation system for Industrial OPs"""
+        print("\n🔍 Testing PDF Document Generation System...")
+        
+        # Step 1: Login with provided credentials
+        login_success = self.test_user_login()
+        if not login_success:
+            print("❌ Login failed - cannot proceed with PDF tests")
+            return False
+        
+        # Step 2: Check if specific product exists with templates
+        success, products = self.run_test(
+            "Get Products for Template Check",
+            "GET",
+            "products",
+            200
+        )
+        
+        target_product = None
+        target_product_id = "0b9ded25-0fd2-478a-9305-42a50e645689"
+        
+        if success:
+            for product in products:
+                if product.get('id') == target_product_id:
+                    target_product = product
+                    break
+            
+            if target_product:
+                file_models = target_product.get('file_models', {})
+                print(f"   ✅ Found target product: {target_product.get('name')}")
+                print(f"   Templates available: {list(file_models.keys())}")
+                
+                if not file_models:
+                    print("   ❌ Product has no templates - PDF generation will fail")
+                    return False
+            else:
+                print(f"   ❌ Target product {target_product_id} not found")
+                return False
+        else:
+            print("   ❌ Failed to get products")
+            return False
+        
+        # Step 3: List existing Industrial OPs
+        success, ops = self.run_test(
+            "List Industrial OPs",
+            "GET",
+            "industrial-ops",
+            200
+        )
+        
+        target_op = None
+        if success:
+            print(f"   ✅ Found {len(ops)} Industrial OPs")
+            
+            # Look for OP-2025-0002 specifically
+            for op in ops:
+                if op.get('op_number') == 'OP-2025-0002':
+                    target_op = op
+                    break
+            
+            if target_op:
+                print(f"   ✅ Found target OP: {target_op.get('op_number')}")
+            else:
+                print("   ⚠️  OP-2025-0002 not found, will use first available OP")
+                if ops:
+                    target_op = ops[0]
+                    print(f"   Using OP: {target_op.get('op_number')}")
+        else:
+            print("   ❌ Failed to get Industrial OPs")
+            return False
+        
+        if not target_op:
+            print("   ❌ No Industrial OPs available for testing")
+            return False
+        
+        # Step 4: Generate documents for the OP
+        op_id = target_op.get('id')
+        success, response = self.run_test(
+            f"Generate Documents for OP {target_op.get('op_number')}",
+            "POST",
+            f"industrial-ops/{op_id}/generate-documents",
+            200
+        )
+        
+        generated_files = []
+        if success:
+            documents = response.get('documents', [])
+            print(f"   ✅ Generated {len(documents)} documents")
+            
+            for doc in documents:
+                print(f"   - {doc.get('type')}: {doc.get('filename')}")
+                generated_files.append(doc.get('file_id'))
+            
+            if len(documents) != 2:
+                print(f"   ⚠️  Expected 2 documents (FICHA + OP), got {len(documents)}")
+        else:
+            print("   ❌ Failed to generate documents")
+            return False
+        
+        # Step 5: Download and validate PDFs
+        pdf_validation_success = True
+        for file_id in generated_files:
+            success, pdf_content = self.download_and_validate_pdf(file_id)
+            if not success:
+                pdf_validation_success = False
+        
+        # Step 6: Test error scenarios
+        error_tests_success = self.test_pdf_generation_errors()
+        
+        return pdf_validation_success and error_tests_success
+
+    def download_and_validate_pdf(self, file_id):
+        """Download and validate a PDF file"""
+        import requests
+        
+        url = f"{self.base_url}/api/documents/download/{file_id}"
+        headers = {'Authorization': f'Bearer {self.token}'}
+        
+        try:
+            response = requests.get(url, headers=headers, timeout=30)
+            
+            if response.status_code == 200:
+                content = response.content
+                
+                # Validate PDF header
+                if content.startswith(b'%PDF'):
+                    size_kb = len(content) / 1024
+                    print(f"   ✅ PDF {file_id}: Valid PDF, {size_kb:.1f} KB")
+                    
+                    if size_kb > 10:
+                        print(f"   ✅ PDF size > 10KB requirement met")
+                        return True, content
+                    else:
+                        print(f"   ❌ PDF size {size_kb:.1f} KB < 10KB minimum")
+                        return False, None
+                else:
+                    print(f"   ❌ PDF {file_id}: Invalid PDF format")
+                    return False, None
+            else:
+                print(f"   ❌ PDF {file_id}: Download failed with status {response.status_code}")
+                return False, None
+                
+        except Exception as e:
+            print(f"   ❌ PDF {file_id}: Download error - {str(e)}")
+            return False, None
+
+    def test_pdf_generation_errors(self):
+        """Test error scenarios for PDF generation"""
+        print("\n🔍 Testing PDF Generation Error Scenarios...")
+        
+        # Test 1: OP without templates (if we can find one)
+        success, products = self.run_test(
+            "Get Products for Error Test",
+            "GET",
+            "products",
+            200
+        )
+        
+        product_without_templates = None
+        if success:
+            for product in products:
+                file_models = product.get('file_models', {})
+                if not file_models or (not file_models.get('op_model') and not file_models.get('ficha_analise')):
+                    product_without_templates = product
+                    break
+        
+        if product_without_templates:
+            # We would need to create an OP for this product first
+            # For now, we'll skip this test as it requires more setup
+            print("   ⚠️  Skipping 'OP without templates' test - requires additional setup")
+        
+        # Test 2: Invalid OP ID
+        success, response = self.run_test(
+            "Generate Documents for Invalid OP",
+            "POST",
+            "industrial-ops/invalid-op-id/generate-documents",
+            404
+        )
+        
+        if success:
+            print("   ✅ Invalid OP ID correctly returns 404")
+        else:
+            print("   ❌ Invalid OP ID test failed")
+            return False
+        
+        # Test 3: Invalid file download
+        success, response = self.run_test(
+            "Download Invalid Document",
+            "GET",
+            "documents/download/invalid-file-id",
+            404
+        )
+        
+        if success:
+            print("   ✅ Invalid file ID correctly returns 404")
+        else:
+            print("   ❌ Invalid file ID test failed")
+            return False
+        
+        return True
+
 def main():
     print("🚀 Starting Lumix API Testing...")
     print("=" * 50)
