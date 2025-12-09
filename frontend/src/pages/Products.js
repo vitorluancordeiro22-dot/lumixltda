@@ -413,11 +413,14 @@ export const Products = () => {
                 </div>
               )}
               
-              <div className="mt-4 pt-4 border-t border-slate-700">
-                <ProductFileManager 
-                  product={product} 
-                  onUpdate={fetchProducts}
-                />
+              <div className="mt-4 pt-4 border-t border-slate-700 space-y-2">
+                <div className="flex gap-2">
+                  <ProductFileManager 
+                    product={product} 
+                    onUpdate={fetchProducts}
+                  />
+                  <ProductPrintButton product={product} />
+                </div>
               </div>
             </Card>
           ))}
