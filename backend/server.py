@@ -1138,6 +1138,149 @@ async def reset_liters_counter(current_user = Depends(get_current_user)):
         'deleted_count': result.deleted_count
     }
 
+# ========== LAUDOS ROUTES ==========
+
+@api_router.get('/laudos/folders')
+async def list_laudo_folders(current_user = Depends(get_current_user)):
+    """Lista todas as pastas de laudos"""
+    folders = await db.laudo_folders.find({'deleted': False}, {'_id': 0}).to_list(1000)
+    return folders
+
+@api_router.post('/laudos/folders')
+async def create_laudo_folder(
+    folder_data: LaudoFolderCreate,
+    current_user = Depends(get_current_user)
+):
+    """Criar nova pasta de laudos"""
+    folder = LaudoFolder(
+        id=str(uuid4()),
+        name=folder_data.name,
+        parent_id=folder_data.parent_id,
+        created_at=datetime.now(timezone.utc).isoformat(),
+        created_by=current_user['id'],
+        deleted=False
+    )
+    
+    await db.laudo_folders.insert_one(folder.dict())
+    return folder
+
+@api_router.delete('/laudos/folders/{folder_id}')
+async def delete_laudo_folder(
+    folder_id: str,
+    current_user = Depends(get_current_user)
+):
+    """Deletar pasta de laudos"""
+    # Verificar se tem arquivos
+    files_count = await db.laudo_files.count_documents({'folder_id': folder_id, 'deleted': False})
+    if files_count > 0:
+        raise HTTPException(status_code=400, detail='Pasta contém arquivos. Remova os arquivos primeiro.')
+    
+    await db.laudo_folders.update_one(
+        {'id': folder_id},
+        {'$set': {'deleted': True}}
+    )
+    
+    return {'message': 'Pasta deletada com sucesso'}
+
+@api_router.post('/laudos/upload')
+async def upload_laudo(
+    folder_id: str,
+    notes: str = '',
+    file: UploadFile = File(...),
+    current_user = Depends(get_current_user)
+):
+    """Upload de arquivo PDF de laudo"""
+    
+    # Validar extensão
+    if not file.filename.lower().endswith('.pdf'):
+        raise HTTPException(status_code=400, detail='Apenas arquivos PDF são permitidos')
+    
+    # Upload para GridFS
+    file_content = await file.read()
+    file_id = await fs.upload_from_stream(
+        file.filename,
+        io.BytesIO(file_content),
+        metadata={
+            'content_type': file.content_type,
+            'uploaded_by': current_user['id'],
+            'uploaded_at': datetime.now(timezone.utc).isoformat(),
+            'folder_id': folder_id
+        }
+    )
+    
+    # Criar registro
+    laudo_file = LaudoFile(
+        id=str(uuid4()),
+        folder_id=folder_id,
+        file_id=str(file_id),
+        filename=file.filename,
+        content_type=file.content_type,
+        size=len(file_content),
+        uploaded_at=datetime.now(timezone.utc).isoformat(),
+        uploaded_by=current_user['id'],
+        uploaded_by_name=current_user['name'],
+        notes=notes,
+        deleted=False
+    )
+    
+    await db.laudo_files.insert_one(laudo_file.dict())
+    
+    return laudo_file
+
+@api_router.get('/laudos/files/{folder_id}')
+async def list_laudo_files(
+    folder_id: str,
+    current_user = Depends(get_current_user)
+):
+    """Listar arquivos de uma pasta"""
+    files = await db.laudo_files.find(
+        {'folder_id': folder_id, 'deleted': False},
+        {'_id': 0}
+    ).sort('uploaded_at', -1).to_list(1000)
+    
+    return files
+
+@api_router.get('/laudos/download/{file_id}')
+async def download_laudo(
+    file_id: str,
+    current_user = Depends(get_current_user)
+):
+    """Download de arquivo de laudo"""
+    
+    # Buscar metadata
+    laudo = await db.laudo_files.find_one({'id': file_id, 'deleted': False}, {'_id': 0})
+    if not laudo:
+        raise HTTPException(status_code=404, detail='Arquivo não encontrado')
+    
+    # Download do GridFS
+    try:
+        from bson import ObjectId
+        grid_out = await fs.open_download_stream(ObjectId(laudo['file_id']))
+        content = await grid_out.read()
+        
+        return StreamingResponse(
+            io.BytesIO(content),
+            media_type=laudo['content_type'],
+            headers={
+                'Content-Disposition': f'attachment; filename="{laudo["filename"]}"'
+            }
+        )
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=f'Erro ao baixar arquivo: {str(e)}')
+
+@api_router.delete('/laudos/files/{file_id}')
+async def delete_laudo_file(
+    file_id: str,
+    current_user = Depends(get_current_user)
+):
+    """Deletar arquivo de laudo"""
+    await db.laudo_files.update_one(
+        {'id': file_id},
+        {'$set': {'deleted': True}}
+    )
+    
+    return {'message': 'Arquivo deletado com sucesso'}
+
 # ========== INDUSTRIAL OP ROUTES ==========
 from industrial_op_routes import setup_industrial_op_routes
 setup_industrial_op_routes(api_router, db, fs, get_current_user, generate_batch_number)
