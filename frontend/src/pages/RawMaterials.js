@@ -142,7 +142,9 @@ export const RawMaterials = () => {
         setBatchFormData({
           raw_material_id: '',
           date: new Date().toISOString().split('T')[0],
-          quantity: ''
+          quantity: '',
+          supplier_batch_number: '',
+          expiry_date: ''
         });
         await fetchMaterials();
         toast.success('Lote criado e estoque atualizado!');
