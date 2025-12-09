@@ -129,6 +129,8 @@ class RawMaterialBatch(BaseModel):
     date: str
     quantity: float
     status: str
+    supplier_batch_number: str = ''  # Lote do fornecedor
+    expiry_date: str = ''  # Validade
     created_at: str
     deleted: bool = False
 
@@ -136,11 +138,15 @@ class RawMaterialBatchCreate(BaseModel):
     raw_material_id: str
     date: str
     quantity: float
+    supplier_batch_number: str = ''
+    expiry_date: str = ''
 
 class RawMaterialBatchUpdate(BaseModel):
     batch_number: Optional[str] = None
     date: Optional[str] = None
     quantity: Optional[float] = None
+    supplier_batch_number: Optional[str] = None
+    expiry_date: Optional[str] = None
 
 class MaterialUsed(BaseModel):
     raw_material_id: str
