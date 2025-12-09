@@ -45,14 +45,14 @@ const Sidebar = ({ mobile = false, onItemClick }) => {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="p-6 border-b border-white/5">
+      <div className="p-6 border-b border-border">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center">
+          <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
             <Zap className="w-6 h-6 text-primary" />
           </div>
           <div>
-            <h2 className="text-xl font-bold text-white">Lumix</h2>
-            <p className="text-xs text-slate-400">By Vitor</p>
+            <h2 className="text-xl font-bold text-foreground">Lumix</h2>
+            <p className="text-xs text-muted-foreground">By Vitor</p>
           </div>
         </div>
       </div>
@@ -70,8 +70,8 @@ const Sidebar = ({ mobile = false, onItemClick }) => {
               onClick={onItemClick}
               className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-smooth ${
                 isActive
-                  ? 'bg-primary text-primary-foreground glow-primary'
-                  : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                  ? 'bg-primary text-primary-foreground shadow-md'
+                  : 'text-foreground hover:bg-muted hover:text-foreground'
               }`}
             >
               <Icon className="w-5 h-5" strokeWidth={1.5} />
@@ -82,18 +82,18 @@ const Sidebar = ({ mobile = false, onItemClick }) => {
       </nav>
 
       {/* User Section */}
-      <div className="p-4 border-t border-white/5">
+      <div className="p-4 border-t border-border">
         <div className="flex items-center justify-between mb-3">
           <div>
-            <p className="text-sm font-medium text-white">{user?.name}</p>
-            <p className="text-xs text-slate-400">{user?.email}</p>
+            <p className="text-sm font-medium text-foreground">{user?.name}</p>
+            <p className="text-xs text-muted-foreground">{user?.email}</p>
           </div>
         </div>
         <Button
           onClick={logout}
           data-testid="logout-button"
           variant="outline"
-          className="w-full justify-start text-slate-300 hover:text-white border-slate-700"
+          className="w-full justify-start"
         >
           <LogOut className="w-4 h-4 mr-2" />
           Sair
