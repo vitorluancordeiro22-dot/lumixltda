@@ -1,14 +1,15 @@
 """
 Gerador de Documentos Preenchidos (FICHA e OP)
+Sistema que preenche templates .docx e .xls/.xlsx com dados da produção
 """
-from reportlab.lib.pagesizes import A4
-from reportlab.lib import colors
-from reportlab.lib.units import cm
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.enums import TA_CENTER, TA_LEFT
+from docx import Document
+from openpyxl import load_workbook
 from datetime import datetime
 import io
+import os
+import tempfile
+import subprocess
+from typing import Dict, List, Any
 
 def generate_ficha_pdf(product_data, batch_data, raw_materials_data):
     """
