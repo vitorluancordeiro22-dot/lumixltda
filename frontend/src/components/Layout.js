@@ -109,7 +109,7 @@ export const Layout = () => {
   return (
     <div className="min-h-screen bg-background">
       {/* Desktop Sidebar */}
-      <aside className="hidden md:fixed md:inset-y-0 md:flex md:w-64 md:flex-col bg-[#0B1120] border-r border-white/5 z-50">
+      <aside className="hidden md:fixed md:inset-y-0 md:flex md:w-64 md:flex-col bg-card border-r border-border z-50 shadow-sm">
         <Sidebar />
       </aside>
 
