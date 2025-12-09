@@ -16,7 +16,7 @@ module.exports = {
         secondary: '#F1F5F9',
         'secondary-foreground': '#1E293B',
         muted: '#F8FAFC',
-        'muted-foreground': '#475569',
+        'muted-foreground': '#64748B',
         accent: '#0EA5E9',
         'accent-foreground': '#FFFFFF',
         destructive: '#EF4444',
