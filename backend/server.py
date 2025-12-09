@@ -648,6 +648,12 @@ async def update_raw_material_batch(batch_id: str, data: RawMaterialBatchUpdate,
     if data.date is not None:
         update_fields['date'] = data.date
     
+    if data.supplier_batch_number is not None:
+        update_fields['supplier_batch_number'] = data.supplier_batch_number
+    
+    if data.expiry_date is not None:
+        update_fields['expiry_date'] = data.expiry_date
+    
     # Se a quantidade mudou, ajustar o estoque
     if data.quantity is not None and data.quantity != batch.get('quantity', 0):
         old_quantity = batch.get('quantity', 0)
