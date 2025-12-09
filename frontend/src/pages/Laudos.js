@@ -32,7 +32,7 @@ export const Laudos = () => {
     return () => {
       isMountedRef.current = false;
     };
-  }, []);
+  }, [fetchFolders]);
 
   useEffect(() => {
     if (selectedFolder) {
