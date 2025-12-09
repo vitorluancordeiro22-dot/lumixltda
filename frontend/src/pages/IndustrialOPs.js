@@ -464,57 +464,57 @@ export const IndustrialOPs = () => {
 
       {/* Modal de Detalhes */}
       <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
-        <DialogContent className="bg-card border-white/10 max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="bg-card border-border max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-white">Detalhes da OP</DialogTitle>
+            <DialogTitle>Detalhes da OP</DialogTitle>
           </DialogHeader>
           {selectedOP && (
             <div className="space-y-6">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label className="text-slate-400 text-sm">Número da OP</Label>
-                  <p className="text-white font-bold text-lg">{selectedOP.op_number}</p>
+                  <Label className="text-muted-foreground text-sm">Número da OP</Label>
+                  <p className="text-foreground font-bold text-lg">{selectedOP.op_number}</p>
                 </div>
                 <div>
-                  <Label className="text-slate-400 text-sm">Status</Label>
+                  <Label className="text-muted-foreground text-sm">Status</Label>
                   <div className="mt-1">{getStatusBadge(selectedOP.status)}</div>
                 </div>
               </div>
 
               <div>
-                <Label className="text-slate-400 text-sm">Produto</Label>
-                <p className="text-white">{selectedOP.product_name}</p>
-                <p className="text-slate-500 text-sm">Lote: {selectedOP.batch_number}</p>
+                <Label className="text-muted-foreground text-sm">Produto</Label>
+                <p className="text-foreground">{selectedOP.product_name}</p>
+                <p className="text-muted-foreground text-sm">Lote: {selectedOP.batch_number}</p>
               </div>
 
               <div className="grid grid-cols-3 gap-4">
                 <div>
-                  <Label className="text-slate-400 text-sm">Planejado</Label>
-                  <p className="text-white font-semibold">{selectedOP.planned_quantity} {selectedOP.unit}</p>
+                  <Label className="text-muted-foreground text-sm">Planejado</Label>
+                  <p className="text-foreground font-semibold">{selectedOP.planned_quantity} {selectedOP.unit}</p>
                 </div>
                 <div>
-                  <Label className="text-slate-400 text-sm">Produzido</Label>
-                  <p className="text-emerald-400 font-semibold">{selectedOP.produced_quantity} {selectedOP.unit}</p>
+                  <Label className="text-muted-foreground text-sm">Produzido</Label>
+                  <p className="text-emerald-600 font-semibold">{selectedOP.produced_quantity} {selectedOP.unit}</p>
                 </div>
                 <div>
-                  <Label className="text-slate-400 text-sm">Eficiência</Label>
-                  <p className="text-white font-semibold">
+                  <Label className="text-muted-foreground text-sm">Eficiência</Label>
+                  <p className="text-foreground font-semibold">
                     {((selectedOP.produced_quantity / selectedOP.planned_quantity) * 100).toFixed(1)}%
                   </p>
                 </div>
               </div>
 
               <div>
-                <Label className="text-white mb-2 block">Matérias-Primas Utilizadas</Label>
+                <Label className="mb-2 block">Matérias-Primas Utilizadas</Label>
                 <div className="space-y-2">
                   {selectedOP.raw_materials.map((rm, idx) => (
-                    <div key={idx} className="p-3 bg-slate-800/50 rounded-lg border border-slate-700">
+                    <div key={idx} className="p-3 bg-muted rounded-lg border border-border">
                       <div className="flex justify-between items-start">
                         <div>
-                          <p className="text-white font-medium">{rm.raw_material_name}</p>
-                          <p className="text-slate-400 text-sm">Lote: {rm.batch_number}</p>
+                          <p className="text-foreground font-medium">{rm.raw_material_name}</p>
+                          <p className="text-muted-foreground text-sm">Lote: {rm.batch_number}</p>
                         </div>
-                        <p className="text-emerald-400 font-semibold">
+                        <p className="text-emerald-600 font-semibold">
                           {rm.quantity_used.toFixed(2)} {rm.unit}
                         </p>
                       </div>
@@ -525,25 +525,25 @@ export const IndustrialOPs = () => {
 
               {selectedOP.observations && (
                 <div>
-                  <Label className="text-white mb-2 block">Observações</Label>
-                  <p className="text-slate-300">{selectedOP.observations}</p>
+                  <Label className="mb-2 block">Observações</Label>
+                  <p className="text-foreground">{selectedOP.observations}</p>
                 </div>
               )}
 
               {selectedOP.history && selectedOP.history.length > 0 && (
                 <div>
-                  <Label className="text-white mb-2 block">Histórico</Label>
+                  <Label className="mb-2 block">Histórico</Label>
                   <div className="space-y-2 max-h-64 overflow-y-auto">
                     {selectedOP.history.slice().reverse().map((entry, idx) => (
-                      <div key={idx} className="p-3 bg-slate-800/50 rounded-lg border border-slate-700 text-sm">
+                      <div key={idx} className="p-3 bg-muted rounded-lg border border-border text-sm">
                         <div className="flex justify-between items-start mb-1">
-                          <span className="text-slate-400">{entry.action}</span>
-                          <span className="text-slate-500 text-xs">
+                          <span className="text-muted-foreground">{entry.action}</span>
+                          <span className="text-muted-foreground text-xs">
                             {new Date(entry.timestamp).toLocaleString('pt-BR')}
                           </span>
                         </div>
-                        <p className="text-white">{entry.user_name}</p>
-                        {entry.notes && <p className="text-slate-400 mt-1">{entry.notes}</p>}
+                        <p className="text-foreground">{entry.user_name}</p>
+                        {entry.notes && <p className="text-muted-foreground mt-1">{entry.notes}</p>}
                       </div>
                     ))}
                   </div>
