@@ -1290,6 +1290,119 @@ async def delete_laudo_file(
     
     return {'message': 'Arquivo deletado com sucesso'}
 
+# ========== DOCUMENT GENERATION ROUTES ==========
+
+@api_router.post('/products/{product_id}/generate-documents')
+async def generate_product_documents(
+    product_id: str,
+    batch_number: str,
+    planned_quantity: float,
+    current_user = Depends(get_current_user)
+):
+    """Gerar PDFs de FICHA e OP preenchidos"""
+    from document_generator import generate_ficha_pdf, generate_op_pdf
+    
+    # Buscar produto
+    product = await db.products.find_one({'id': product_id, 'deleted': False}, {'_id': 0})
+    if not product:
+        raise HTTPException(status_code=404, detail='Produto não encontrado')
+    
+    # Buscar matérias-primas
+    raw_materials_list = []
+    for recipe in product.get('recipes', []):
+        rm = await db.raw_materials.find_one(
+            {'id': recipe['raw_material_id'], 'deleted': False},
+            {'_id': 0}
+        )
+        if rm:
+            # Buscar lote mais recente com estoque
+            rm_batch = await db.raw_material_batches.find_one(
+                {'raw_material_id': rm['id'], 'deleted': False, 'quantity': {'$gt': 0}},
+                {'_id': 0},
+                sort=[('date', -1)]
+            )
+            
+            quantity_needed = recipe['quantity_per_liter'] * planned_quantity
+            
+            raw_materials_list.append({
+                'code': rm.get('code', ''),
+                'name': rm['name'],
+                'quantity': quantity_needed,
+                'unit': recipe.get('unit', 'L'),
+                'supplier_batch': rm_batch.get('supplier_batch_number', '') if rm_batch else '',
+                'expiry_date': rm_batch.get('expiry_date', '') if rm_batch else '',
+                'action': 'Adicionar e homogeneizar'
+            })
+    
+    # Dados do produto
+    product_data = {
+        'name': product['name'],
+        'code': product.get('code', '')
+    }
+    
+    # Dados do lote/OP
+    batch_data = {
+        'op_number': f"OP-{datetime.now(timezone.utc).strftime('%Y%m%d')}-001",
+        'batch_number': batch_number,
+        'date': datetime.now(timezone.utc).strftime('%d/%m/%Y'),
+        'planned_quantity': planned_quantity
+    }
+    
+    # Gerar PDFs
+    ficha_pdf = generate_ficha_pdf(product_data, batch_data, raw_materials_list)
+    op_pdf = generate_op_pdf(product_data, batch_data, raw_materials_list)
+    
+    # Salvar PDFs no GridFS
+    ficha_file_id = await fs.upload_from_stream(
+        f"FICHA_{product['name']}_{batch_number}.pdf",
+        ficha_pdf,
+        metadata={
+            'type': 'ficha',
+            'product_id': product_id,
+            'batch_number': batch_number,
+            'generated_at': datetime.now(timezone.utc).isoformat()
+        }
+    )
+    
+    op_pdf.seek(0)  # Reset pointer
+    op_file_id = await fs.upload_from_stream(
+        f"OP_{product['name']}_{batch_number}.pdf",
+        op_pdf,
+        metadata={
+            'type': 'op',
+            'product_id': product_id,
+            'batch_number': batch_number,
+            'generated_at': datetime.now(timezone.utc).isoformat()
+        }
+    )
+    
+    return {
+        'message': 'Documentos gerados com sucesso',
+        'ficha_file_id': str(ficha_file_id),
+        'op_file_id': str(op_file_id)
+    }
+
+@api_router.get('/documents/download/{file_id}')
+async def download_generated_document(
+    file_id: str,
+    current_user = Depends(get_current_user)
+):
+    """Download de documento gerado"""
+    try:
+        from bson import ObjectId
+        grid_out = await fs.open_download_stream(ObjectId(file_id))
+        content = await grid_out.read()
+        
+        return StreamingResponse(
+            io.BytesIO(content),
+            media_type='application/pdf',
+            headers={
+                'Content-Disposition': f'attachment; filename="{grid_out.filename}"'
+            }
+        )
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=f'Arquivo não encontrado: {str(e)}')
+
 # ========== INDUSTRIAL OP ROUTES ==========
 from industrial_op_routes import setup_industrial_op_routes
 setup_industrial_op_routes(api_router, db, fs, get_current_user, generate_batch_number)
