@@ -236,13 +236,13 @@ export const IndustrialOPs = () => {
               Nova OP
             </Button>
           </DialogTrigger>
-          <DialogContent className="bg-card border-white/10 max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="bg-card border-border max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle className="text-white">Nova Ordem de Produção</DialogTitle>
+              <DialogTitle>Nova Ordem de Produção</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <Label className="text-white">Produto *</Label>
+                <Label>Produto *</Label>
                 <Select 
                   value={formData.product_id} 
                   onValueChange={(v) => {
@@ -255,12 +255,12 @@ export const IndustrialOPs = () => {
                   }}
                   required
                 >
-                  <SelectTrigger className="bg-slate-900/50 border-slate-700 text-white">
+                  <SelectTrigger>
                     <SelectValue placeholder="Selecione o produto" />
                   </SelectTrigger>
-                  <SelectContent className="bg-slate-900 border-slate-700">
+                  <SelectContent position="popper">
                     {products.map(p => (
-                      <SelectItem key={p.id} value={p.id} className="text-white">
+                      <SelectItem key={p.id} value={p.id}>
                         {p.name} {p.code ? `(${p.code})` : ''}
                       </SelectItem>
                     ))}
@@ -270,32 +270,29 @@ export const IndustrialOPs = () => {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label className="text-white">Quantidade Planejada *</Label>
+                  <Label>Quantidade Planejada *</Label>
                   <Input 
                     type="number" 
                     step="0.01"
                     value={formData.planned_quantity} 
                     onChange={(e) => setFormData({...formData, planned_quantity: e.target.value})}
-                    className="bg-slate-900/50 border-slate-700 text-white"
                     required
                   />
                 </div>
                 <div>
-                  <Label className="text-white">Unidade</Label>
+                  <Label>Unidade</Label>
                   <Input 
                     value={formData.unit}
                     disabled
-                    className="bg-slate-900/50 border-slate-700 text-white"
                   />
                 </div>
               </div>
 
               <div>
-                <Label className="text-white">Responsável *</Label>
+                <Label>Responsável *</Label>
                 <Input 
                   value={formData.responsible_name} 
                   onChange={(e) => setFormData({...formData, responsible_name: e.target.value})}
-                  className="bg-slate-900/50 border-slate-700 text-white"
                   placeholder="Nome do responsável"
                   required
                 />
@@ -303,38 +300,36 @@ export const IndustrialOPs = () => {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label className="text-white">Turno</Label>
+                  <Label>Turno</Label>
                   <Select 
                     value={formData.shift} 
                     onValueChange={(v) => setFormData({...formData, shift: v})}
                   >
-                    <SelectTrigger className="bg-slate-900/50 border-slate-700 text-white">
+                    <SelectTrigger>
                       <SelectValue placeholder="Selecione" />
                     </SelectTrigger>
-                    <SelectContent className="bg-slate-900 border-slate-700">
-                      <SelectItem value="Manhã" className="text-white">Manhã</SelectItem>
-                      <SelectItem value="Tarde" className="text-white">Tarde</SelectItem>
-                      <SelectItem value="Noite" className="text-white">Noite</SelectItem>
+                    <SelectContent position="popper">
+                      <SelectItem value="Manhã">Manhã</SelectItem>
+                      <SelectItem value="Tarde">Tarde</SelectItem>
+                      <SelectItem value="Noite">Noite</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div>
-                  <Label className="text-white">Equipamento</Label>
+                  <Label>Equipamento</Label>
                   <Input 
                     value={formData.equipment} 
                     onChange={(e) => setFormData({...formData, equipment: e.target.value})}
-                    className="bg-slate-900/50 border-slate-700 text-white"
                     placeholder="Ex: Tanque 01"
                   />
                 </div>
               </div>
 
               <div>
-                <Label className="text-white">Observações</Label>
+                <Label>Observações</Label>
                 <Textarea 
                   value={formData.observations} 
                   onChange={(e) => setFormData({...formData, observations: e.target.value})}
-                  className="bg-slate-900/50 border-slate-700 text-white"
                   rows={3}
                 />
               </div>
