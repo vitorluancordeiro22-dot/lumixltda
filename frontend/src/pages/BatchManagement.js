@@ -128,10 +128,12 @@ export const BatchManagement = () => {
 
       const payload = batchType === 'product'
         ? {
+            batch_number: editFormData.batch_number,
             date: editFormData.date,
             planned_liters: parseFloat(editFormData.planned_liters)
           }
         : {
+            batch_number: editFormData.batch_number,
             date: editFormData.date,
             quantity: parseFloat(editFormData.quantity),
             supplier_batch_number: editFormData.supplier_batch_number,
@@ -152,6 +154,29 @@ export const BatchManagement = () => {
     } finally {
       if (isMountedRef.current) {
         setSubmitting(false);
+      }
+    }
+  };
+
+  const handleDelete = async (batch, type) => {
+    if (!window.confirm(`Tem certeza que deseja excluir o lote ${batch.batch_number}?`)) {
+      return;
+    }
+
+    try {
+      const endpoint = type === 'product' 
+        ? `/product-batches/${batch.id}`
+        : `/raw-material-batches/${batch.id}`;
+
+      await api.delete(endpoint);
+      
+      if (isMountedRef.current) {
+        toast.success('Lote excluído com sucesso!');
+        await fetchData();
+      }
+    } catch (error) {
+      if (isMountedRef.current) {
+        toast.error(error.response?.data?.detail || 'Erro ao excluir lote');
       }
     }
   };
