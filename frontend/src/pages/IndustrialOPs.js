@@ -244,29 +244,24 @@ export const IndustrialOPs = () => {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <Label>Produto *</Label>
-                <Select 
-                  value={formData.product_id} 
-                  onValueChange={(v) => {
+                <Combobox
+                  options={products.map(p => ({
+                    value: p.id,
+                    label: `${p.name}${p.code ? ` (${p.code})` : ''}`
+                  }))}
+                  value={formData.product_id}
+                  onChange={(v) => {
                     const product = products.find(p => p.id === v);
                     setFormData({
-                      ...formData, 
+                      ...formData,
                       product_id: v,
                       unit: product?.unit || 'Litros'
                     });
                   }}
-                  required
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o produto" />
-                  </SelectTrigger>
-                  <SelectContent position="popper">
-                    {products.map(p => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.name} {p.code ? `(${p.code})` : ''}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  placeholder="Selecione o produto"
+                  searchPlaceholder="Digite para pesquisar..."
+                  emptyText="Nenhum produto encontrado"
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
