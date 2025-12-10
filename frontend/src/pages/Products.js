@@ -32,9 +32,11 @@ export const Products = () => {
     product_id: '',
     date: new Date().toISOString().split('T')[0],
     unit: 'Litros',
-    planned_liters: ''
+    planned_liters: '',
+    custom_batch_number: ''
   });
   const [nextBatchNumber, setNextBatchNumber] = useState('');
+  const [editingBatchNumber, setEditingBatchNumber] = useState(false);
   const [createdBatch, setCreatedBatch] = useState(null);
   const [batchProduct, setBatchProduct] = useState(null);
 
