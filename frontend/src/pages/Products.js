@@ -360,15 +360,16 @@ export const Products = () => {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label className="text-foreground">Unidade</Label>
-                    <Select value={formData.unit} onValueChange={(v) => setFormData({...formData, unit: v})}>
-                      <SelectTrigger className="bg-slate-900/50 border-slate-700 text-foreground">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="bg-slate-900 border-slate-700">
-                        <SelectItem value="Litros" className="text-foreground">Litros</SelectItem>
-                        <SelectItem value="Kg" className="text-foreground">Kg</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <Combobox
+                      options={[
+                        { value: 'Litros', label: 'Litros' },
+                        { value: 'Kg', label: 'Kg' }
+                      ]}
+                      value={formData.unit}
+                      onChange={(v) => setFormData({...formData, unit: v})}
+                      placeholder="Selecione unidade"
+                      searchPlaceholder="Pesquisar..."
+                    />
                   </div>
                   <div>
                     <Label className="text-foreground">Litros Esperados</Label>
