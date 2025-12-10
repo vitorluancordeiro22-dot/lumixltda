@@ -471,6 +471,82 @@ export const BatchManagement = () => {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Modal de Edição */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {batchType === 'product' ? 'Editar Lote de Produto' : 'Editar Lote de Matéria-Prima'}
+            </DialogTitle>
+          </DialogHeader>
+
+          <form onSubmit={handleEditSubmit} className="space-y-4">
+            <div>
+              <Label>Data</Label>
+              <Input
+                type="date"
+                value={editFormData.date?.split('T')[0] || ''}
+                onChange={(e) => setEditFormData({...editFormData, date: e.target.value})}
+                required
+              />
+            </div>
+
+            {batchType === 'product' ? (
+              <div>
+                <Label>Quantidade Planejada (Litros)</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={editFormData.planned_liters || ''}
+                  onChange={(e) => setEditFormData({...editFormData, planned_liters: e.target.value})}
+                  required
+                />
+              </div>
+            ) : (
+              <>
+                <div>
+                  <Label>Quantidade</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={editFormData.quantity || ''}
+                    onChange={(e) => setEditFormData({...editFormData, quantity: e.target.value})}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <Label>Lote do Fornecedor</Label>
+                  <Input
+                    value={editFormData.supplier_batch_number || ''}
+                    onChange={(e) => setEditFormData({...editFormData, supplier_batch_number: e.target.value})}
+                    placeholder="Ex: F20241205"
+                  />
+                </div>
+
+                <div>
+                  <Label>Data de Validade</Label>
+                  <Input
+                    type="date"
+                    value={editFormData.expiry_date?.split('T')[0] || ''}
+                    onChange={(e) => setEditFormData({...editFormData, expiry_date: e.target.value})}
+                  />
+                </div>
+              </>
+            )}
+
+            <div className="flex gap-2 pt-4">
+              <Button type="button" variant="outline" className="flex-1" onClick={() => setEditOpen(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit" className="flex-1" disabled={submitting}>
+                {submitting ? 'Salvando...' : 'Salvar'}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
