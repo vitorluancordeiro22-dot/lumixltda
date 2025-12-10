@@ -478,7 +478,11 @@ async def create_product_batch(data: ProductBatchCreate, current_user = Depends(
     
     # Se o usuário forneceu um número customizado, usar ele
     if data.custom_batch_number:
-        batch_number = data.custom_batch_number
+        batch_number = data.custom_batch_number.strip()
+        
+        # Validar formato numérico
+        if not batch_number.isdigit():
+            raise HTTPException(status_code=400, detail='Número de lote deve conter apenas dígitos')
         
         # Verificar se já existe
         existing = await db.product_batches.find_one({
@@ -492,7 +496,7 @@ async def create_product_batch(data: ProductBatchCreate, current_user = Depends(
         if existing or existing_rm:
             raise HTTPException(status_code=400, detail=f'Número de lote {batch_number} já existe')
     else:
-        # Gerar automaticamente
+        # Gerar automaticamente (já considera números customizados anteriores)
         batch_number = await generate_batch_number(data.date)
     
     batch_doc = {
@@ -505,7 +509,8 @@ async def create_product_batch(data: ProductBatchCreate, current_user = Depends(
         'status': 'em_aberto',
         'total_bottled': 0.0,
         'created_at': datetime.now(timezone.utc).isoformat(),
-        'deleted': False
+        'deleted': False,
+        'is_custom': bool(data.custom_batch_number)
     }
     await db.product_batches.insert_one(batch_doc)
     return ProductBatch(**batch_doc)
