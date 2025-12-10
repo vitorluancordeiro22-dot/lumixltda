@@ -254,8 +254,18 @@ export const BatchManagement = () => {
                           onClick={() => openEditDialog(batch, 'product')}
                           size="icon"
                           variant="outline"
+                          title="Editar"
                         >
                           <Edit className="w-4 h-4" />
+                        </Button>
+                        <Button 
+                          onClick={() => handleDelete(batch, 'product')}
+                          size="icon"
+                          variant="outline"
+                          className="text-red-600 hover:bg-red-50"
+                          title="Excluir"
+                        >
+                          <Trash2 className="w-4 h-4" />
                         </Button>
                       </div>
                     </Card>
