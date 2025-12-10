@@ -277,14 +277,23 @@ export const BatchManagement = () => {
                         </div>
                       </div>
 
-                      <Button 
-                        onClick={() => viewRawMaterialBatchDetails(batch)}
-                        className="w-full"
-                        variant="outline"
-                      >
-                        <Eye className="w-4 h-4 mr-2" />
-                        Ver Detalhes
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button 
+                          onClick={() => viewRawMaterialBatchDetails(batch)}
+                          className="flex-1"
+                          variant="outline"
+                        >
+                          <Eye className="w-4 h-4 mr-2" />
+                          Ver Detalhes
+                        </Button>
+                        <Button 
+                          onClick={() => openEditDialog(batch, 'raw_material')}
+                          size="icon"
+                          variant="outline"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                      </div>
                     </Card>
                   );
                 })}
