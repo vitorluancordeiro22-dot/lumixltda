@@ -332,15 +332,16 @@ export const RawMaterials = () => {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label className="text-foreground">Tipo</Label>
-                    <Select value={formData.type} onValueChange={(v) => setFormData({...formData, type: v})}>
-                      <SelectTrigger className="bg-slate-900/50 border-slate-700 text-foreground">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="bg-slate-900 border-slate-700">
-                        <SelectItem value="Litros" className="text-foreground">Litros</SelectItem>
-                        <SelectItem value="Kg" className="text-foreground">Kg</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <Combobox
+                      options={[
+                        { value: 'Litros', label: 'Litros' },
+                        { value: 'Kg', label: 'Kg' }
+                      ]}
+                      value={formData.type}
+                      onChange={(v) => setFormData({...formData, type: v})}
+                      placeholder="Selecione tipo"
+                      searchPlaceholder="Pesquisar..."
+                    />
                   </div>
                   <div>
                     <Label className="text-foreground">Estoque Total</Label>
