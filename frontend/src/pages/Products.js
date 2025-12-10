@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+import { Combobox } from '../components/ui/combobox';
 import { toast } from 'sonner';
 import { Plus, Edit, Trash2, Package, MessageCircle } from 'lucide-react';
 import { ProductFileManager } from '../components/ProductFileManager';
