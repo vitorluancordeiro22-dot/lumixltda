@@ -271,16 +271,14 @@ export const RawMaterials = () => {
               <form onSubmit={handleBatchSubmit} className="space-y-4">
                 <div>
                   <Label className="text-foreground">Matéria-Prima</Label>
-                  <Select value={batchFormData.raw_material_id} onValueChange={(v) => setBatchFormData({...batchFormData, raw_material_id: v})}>
-                    <SelectTrigger className="bg-slate-900/50 border-slate-700 text-foreground">
-                      <SelectValue placeholder="Selecione" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-slate-900 border-slate-700">
-                      {materials.map(m => (
-                        <SelectItem key={m.id} value={m.id} className="text-foreground">{m.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Combobox
+                    options={materials.map(m => ({ value: m.id, label: m.name }))}
+                    value={batchFormData.raw_material_id}
+                    onChange={(v) => setBatchFormData({...batchFormData, raw_material_id: v})}
+                    placeholder="Selecione a matéria-prima"
+                    searchPlaceholder="Digite para pesquisar..."
+                    emptyText="Nenhuma matéria-prima encontrada"
+                  />
                 </div>
                 <div>
                   <Label className="text-foreground">Data</Label>
