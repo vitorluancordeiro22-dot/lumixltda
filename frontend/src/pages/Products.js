@@ -137,10 +137,17 @@ export const Products = () => {
     
     setSubmitting(true);
     try {
-      const response = await api.post('/product-batches', {
+      const payload = {
         ...batchFormData,
         planned_liters: parseFloat(batchFormData.planned_liters)
-      });
+      };
+      
+      // Se tem número customizado, enviar
+      if (batchFormData.custom_batch_number) {
+        payload.custom_batch_number = batchFormData.custom_batch_number;
+      }
+      
+      const response = await api.post('/product-batches', payload);
       
       if (isMountedRef.current) {
         // Salvar lote e produto para WhatsApp
@@ -153,9 +160,11 @@ export const Products = () => {
           product_id: '',
           date: new Date().toISOString().split('T')[0],
           unit: 'Litros',
-          planned_liters: ''
+          planned_liters: '',
+          custom_batch_number: ''
         });
-        toast.success('Lote criado! Use o botão WhatsApp para enviar notificação.');
+        setEditingBatchNumber(false);
+        toast.success('Lote criado! Próximos lotes seguirão essa sequência.');
       }
     } catch (error) {
       if (isMountedRef.current) {
