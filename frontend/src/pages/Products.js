@@ -398,15 +398,16 @@ export const Products = () => {
                       </div>
                       <div className="w-24">
                         <Label className="text-foreground text-xs">Unidade</Label>
-                        <Select value={recipe.unit || 'L'} onValueChange={(v) => updateRecipe(index, 'unit', v)}>
-                          <SelectTrigger className="bg-slate-900/50 border-slate-700 text-foreground">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent className="bg-slate-900 border-slate-700">
-                            <SelectItem value="L" className="text-foreground">L</SelectItem>
-                            <SelectItem value="Kg" className="text-foreground">Kg</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        <Combobox
+                          options={[
+                            { value: 'L', label: 'L' },
+                            { value: 'Kg', label: 'Kg' }
+                          ]}
+                          value={recipe.unit || 'L'}
+                          onChange={(v) => updateRecipe(index, 'unit', v)}
+                          placeholder="Un"
+                          searchPlaceholder="Pesquisar..."
+                        />
                       </div>
                       <div className="w-28">
                         <Label className="text-foreground text-xs">Quantidade</Label>
