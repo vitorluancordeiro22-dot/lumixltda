@@ -350,16 +350,14 @@ export const RawMaterials = () => {
                 </div>
                 <div>
                   <Label className="text-foreground">Fornecedor</Label>
-                  <Select value={formData.supplier_id} onValueChange={(v) => setFormData({...formData, supplier_id: v})}>
-                    <SelectTrigger className="bg-slate-900/50 border-slate-700 text-foreground">
-                      <SelectValue placeholder="Selecione o fornecedor" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-slate-900 border-slate-700">
-                      {suppliers.map(s => (
-                        <SelectItem key={s.id} value={s.id} className="text-foreground">{s.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Combobox
+                    options={suppliers.map(s => ({ value: s.id, label: s.name }))}
+                    value={formData.supplier_id}
+                    onChange={(v) => setFormData({...formData, supplier_id: v})}
+                    placeholder="Selecione o fornecedor"
+                    searchPlaceholder="Digite para pesquisar..."
+                    emptyText="Nenhum fornecedor encontrado"
+                  />
                 </div>
                 <div>
                   <Label className="text-foreground">Data de Recebimento</Label>
