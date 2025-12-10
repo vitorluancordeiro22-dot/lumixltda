@@ -29,7 +29,7 @@ const menuItems = [
   { path: '/production-orders', icon: ClipboardList, label: 'Ordens de Produção' },
   { path: '/industrial-ops', icon: FileText, label: 'OP Industrial' },
   { path: '/counting', icon: Calculator, label: 'Contagem' },
-  { path: '/batches', icon: ListChecks, label: 'Gerenciar Lotes' },
+  { path: '/batch-management', icon: ListChecks, label: 'Gerenciar Lotes' },
   { path: '/suppliers', icon: Truck, label: 'Fornecedores' },
   { path: '/laudos', icon: FileCheck, label: 'Laudos' },
   { path: '/archives', icon: Archive, label: 'Arquivos' },
