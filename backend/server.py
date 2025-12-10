@@ -116,6 +116,7 @@ class ProductBatchCreate(BaseModel):
     date: str
     unit: str
     planned_liters: float
+    custom_batch_number: Optional[str] = None  # Número de lote customizado
 
 class ProductBatchUpdate(BaseModel):
     batch_number: Optional[str] = None
