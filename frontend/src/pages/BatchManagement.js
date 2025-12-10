@@ -102,6 +102,59 @@ export const BatchManagement = () => {
     setDetailsOpen(true);
   };
 
+  const openEditDialog = (batch, type) => {
+    setBatchType(type);
+    setEditFormData({
+      id: batch.id,
+      date: batch.date,
+      planned_liters: batch.planned_liters || 0,
+      quantity: batch.quantity || 0,
+      supplier_batch_number: batch.supplier_batch_number || '',
+      expiry_date: batch.expiry_date || ''
+    });
+    setEditOpen(true);
+  };
+
+  const handleEditSubmit = async (e) => {
+    e.preventDefault();
+    if (submitting) return;
+
+    setSubmitting(true);
+    try {
+      const endpoint = batchType === 'product' 
+        ? `/product-batches/${editFormData.id}`
+        : `/raw-material-batches/${editFormData.id}`;
+
+      const payload = batchType === 'product'
+        ? {
+            date: editFormData.date,
+            planned_liters: parseFloat(editFormData.planned_liters)
+          }
+        : {
+            date: editFormData.date,
+            quantity: parseFloat(editFormData.quantity),
+            supplier_batch_number: editFormData.supplier_batch_number,
+            expiry_date: editFormData.expiry_date
+          };
+
+      await api.put(endpoint, payload);
+      
+      if (isMountedRef.current) {
+        toast.success('Lote atualizado com sucesso!');
+        setEditOpen(false);
+        await fetchData();
+      }
+    } catch (error) {
+      if (isMountedRef.current) {
+        toast.error(error.response?.data?.detail || 'Erro ao atualizar lote');
+      }
+    } finally {
+      if (isMountedRef.current) {
+        setSubmitting(false);
+      }
+    }
+  };
+
   const getStatusBadge = (status) => {
     const statusMap = {
       'em_aberto': { label: 'Em Aberto', className: 'bg-blue-500' },
