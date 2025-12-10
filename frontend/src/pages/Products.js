@@ -306,16 +306,14 @@ export const Products = () => {
               <form onSubmit={handleBatchSubmit} className="space-y-4">
                 <div>
                   <Label className="text-foreground">Produto</Label>
-                  <Select value={batchFormData.product_id} onValueChange={(v) => setBatchFormData({...batchFormData, product_id: v})}>
-                    <SelectTrigger className="bg-slate-900/50 border-slate-700 text-foreground">
-                      <SelectValue placeholder="Selecione o produto" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-slate-900 border-slate-700">
-                      {products.map(p => (
-                        <SelectItem key={p.id} value={p.id} className="text-foreground">{p.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Combobox
+                    options={products.map(p => ({ value: p.id, label: p.name }))}
+                    value={batchFormData.product_id}
+                    onChange={(v) => setBatchFormData({...batchFormData, product_id: v})}
+                    placeholder="Selecione o produto"
+                    searchPlaceholder="Digite para pesquisar..."
+                    emptyText="Nenhum produto encontrado"
+                  />
                 </div>
                 <div>
                   <Label className="text-foreground">Data</Label>
