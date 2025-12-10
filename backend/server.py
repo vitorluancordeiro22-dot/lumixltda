@@ -404,70 +404,58 @@ async def delete_product(product_id: str, current_user = Depends(get_current_use
 
 async def generate_batch_number(date_str: str) -> str:
     """
-    Gera número de lote no formato AAMMCCC onde:
-    AA = 2 últimos dígitos do ano
-    MM = mês com 2 dígitos  
-    CCC = contador sequencial global (001, 002, 003...)
-    
-    O contador é compartilhado entre produtos e matérias-primas
-    para garantir numeração única e sequencial.
+    Gera número de lote seguindo o ÚLTIMO lote criado.
     
     Lógica:
-    1. Verifica lotes do mês/ano atual primeiro
-    2. Se houver número customizado de qualquer mês, segue essa sequência
+    - Busca o lote mais recente (por data de criação)
+    - Incrementa +1 a partir dele
+    - Se não houver lotes, usa formato AAMMCCC (ano, mês, contador)
     """
     date_obj = datetime.fromisoformat(date_str)
     yymm = date_obj.strftime('%y%m')  # AAMM
     
-    # Buscar TODOS os lotes ATIVOS (produtos + matérias-primas)
-    product_batches = await db.product_batches.find(
+    # Buscar o ÚLTIMO lote criado (mais recente) de produtos
+    last_product_batch = await db.product_batches.find_one(
         {'deleted': False},
-        {'_id': 0, 'batch_number': 1}
-    ).to_list(10000)
+        {'_id': 0, 'batch_number': 1, 'created_at': 1},
+        sort=[('created_at', -1)]
+    )
     
-    raw_material_batches = await db.raw_material_batches.find(
+    # Buscar o ÚLTIMO lote criado (mais recente) de matérias-primas
+    last_rm_batch = await db.raw_material_batches.find_one(
         {'deleted': False},
-        {'_id': 0, 'batch_number': 1}
-    ).to_list(10000)
+        {'_id': 0, 'batch_number': 1, 'created_at': 1},
+        sort=[('created_at', -1)]
+    )
     
-    # Combinar todos os lotes
-    all_batches = product_batches + raw_material_batches
+    # Determinar qual é o mais recente entre os dois
+    last_batch = None
     
-    if not all_batches:
+    if last_product_batch and last_rm_batch:
+        # Comparar as datas de criação
+        if last_product_batch['created_at'] > last_rm_batch['created_at']:
+            last_batch = last_product_batch
+        else:
+            last_batch = last_rm_batch
+    elif last_product_batch:
+        last_batch = last_product_batch
+    elif last_rm_batch:
+        last_batch = last_rm_batch
+    
+    # Se não houver nenhum lote, começar do 001
+    if not last_batch:
         return f"{yymm}001"
     
-    # Separar lotes do mês atual e lotes customizados
-    current_month_batches = []
-    all_batches_numbers = []
+    # Pegar o número do último lote e incrementar
+    last_batch_number = last_batch['batch_number']
     
-    for b in all_batches:
-        batch_num = b['batch_number']
-        if batch_num.isdigit() and len(batch_num) >= 7:
-            num = int(batch_num)
-            all_batches_numbers.append(num)
-            
-            # Verificar se é do mês/ano atual
-            if batch_num.startswith(yymm):
-                current_month_batches.append(num)
-    
-    # Se houver lotes do mês atual, incrementar o maior deles
-    if current_month_batches:
-        max_current_month = max(current_month_batches)
-        next_num = max_current_month + 1
-        return str(next_num)
-    
-    # Se não houver lotes do mês atual, verificar se há números customizados
-    # que sejam maiores que o padrão do mês atual (AAMMCCC)
-    base_num = int(f"{yymm}001")
-    
-    if all_batches_numbers:
-        max_all = max(all_batches_numbers)
-        # Se o maior de todos é maior que a base do mês atual, usar ele + 1
-        if max_all >= base_num:
-            return str(max_all + 1)
-    
-    # Caso padrão: primeiro lote do mês
-    return f"{yymm}001"
+    # Validar se é numérico
+    if last_batch_number.isdigit():
+        next_number = int(last_batch_number) + 1
+        return str(next_number)
+    else:
+        # Se não for numérico, usar padrão
+        return f"{yymm}001"
 
 @api_router.get('/batches/next-number')
 async def get_next_batch_number(date: str, current_user = Depends(get_current_user)):
