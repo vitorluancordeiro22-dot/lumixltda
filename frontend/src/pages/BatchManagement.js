@@ -106,6 +106,7 @@ export const BatchManagement = () => {
     setBatchType(type);
     setEditFormData({
       id: batch.id,
+      batch_number: batch.batch_number,
       date: batch.date,
       planned_liters: batch.planned_liters || 0,
       quantity: batch.quantity || 0,
