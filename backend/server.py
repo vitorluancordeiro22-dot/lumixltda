@@ -418,15 +418,15 @@ async def generate_batch_number(date_str: str) -> str:
     date_obj = datetime.fromisoformat(date_str)
     yymm = date_obj.strftime('%y%m')  # AAMM
     
-    # Buscar TODOS os lotes (produtos + matérias-primas)
-    # Não filtrar apenas por mês, para capturar números customizados de outros meses
+    # Buscar TODOS os lotes ATIVOS (produtos + matérias-primas)
+    # Ignorar lotes deletados
     product_batches = await db.product_batches.find(
-        {},
+        {'deleted': False},
         {'_id': 0, 'batch_number': 1}
     ).to_list(10000)
     
     raw_material_batches = await db.raw_material_batches.find(
-        {},
+        {'deleted': False},
         {'_id': 0, 'batch_number': 1}
     ).to_list(10000)
     
