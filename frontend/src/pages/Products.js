@@ -258,11 +258,39 @@ export const Products = () => {
               </DialogHeader>
               {nextBatchNumber && (
                 <div className="p-4 rounded-lg bg-primary/10 border border-primary/30">
-                  <p className="text-sm text-slate-400 mb-1">Número do Próximo Lote:</p>
-                  <p className="text-2xl font-bold text-primary">{nextBatchNumber}</p>
-                  <p className="text-xs text-slate-500 mt-1">
-                    {nextBatchNumber.substring(0, 2)}/{nextBatchNumber.substring(2, 4)}/20{nextBatchNumber.substring(0, 2)} - Lote #{nextBatchNumber.substring(4, 7)}
-                  </p>
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-sm text-muted-foreground">Número do Lote:</p>
+                    <Button 
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setEditingBatchNumber(!editingBatchNumber)}
+                      className="h-6 text-xs"
+                    >
+                      {editingBatchNumber ? 'Usar Automático' : 'Editar Sequência'}
+                    </Button>
+                  </div>
+                  
+                  {editingBatchNumber ? (
+                    <div>
+                      <Input
+                        value={batchFormData.custom_batch_number || nextBatchNumber}
+                        onChange={(e) => setBatchFormData({...batchFormData, custom_batch_number: e.target.value})}
+                        placeholder="Ex: 2512015"
+                        className="text-lg font-bold"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Digite o número do lote desejado. Os próximos seguirão a partir dele.
+                      </p>
+                    </div>
+                  ) : (
+                    <div>
+                      <p className="text-2xl font-bold text-primary">{nextBatchNumber}</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {nextBatchNumber.substring(0, 2)}/{nextBatchNumber.substring(2, 4)}/20{nextBatchNumber.substring(0, 2)} - Lote #{nextBatchNumber.substring(4, 7)}
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
               <form onSubmit={handleBatchSubmit} className="space-y-4">
