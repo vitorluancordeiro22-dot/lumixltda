@@ -52,6 +52,7 @@ function App() {
             <Route path="archives" element={<Archives />} />
             <Route path="industrial-ops" element={<IndustrialOPs />} />
             <Route path="laudos" element={<Laudos />} />
+            <Route path="batch-management" element={<BatchManagement />} />
             <Route path="team" element={<Team />} />
             <Route path="trash" element={<Trash />} />
             <Route path="settings" element={<Settings />} />
