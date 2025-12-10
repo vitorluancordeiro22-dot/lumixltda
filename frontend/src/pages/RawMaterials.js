@@ -31,9 +31,11 @@ export const RawMaterials = () => {
     date: new Date().toISOString().split('T')[0],
     quantity: '',
     supplier_batch_number: '',
-    expiry_date: ''
+    expiry_date: '',
+    custom_batch_number: ''
   });
   const [nextBatchNumber, setNextBatchNumber] = useState('');
+  const [editingBatchNumber, setEditingBatchNumber] = useState(false);
 
   useEffect(() => {
     isMountedRef.current = true;
