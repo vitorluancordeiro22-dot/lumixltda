@@ -529,6 +529,19 @@ export const BatchManagement = () => {
 
           <form onSubmit={handleEditSubmit} className="space-y-4">
             <div>
+              <Label>Número do Lote</Label>
+              <Input
+                value={editFormData.batch_number || ''}
+                onChange={(e) => setEditFormData({...editFormData, batch_number: e.target.value})}
+                placeholder="Ex: 2512050"
+                required
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Apenas números. Cuidado para não criar duplicados.
+              </p>
+            </div>
+
+            <div>
               <Label>Data</Label>
               <Input
                 type="date"
