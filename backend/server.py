@@ -461,7 +461,25 @@ async def get_product_batches(current_user = Depends(get_current_user)):
 async def create_product_batch(data: ProductBatchCreate, current_user = Depends(get_current_user)):
     import uuid
     batch_id = str(uuid.uuid4())
-    batch_number = await generate_batch_number(data.date)
+    
+    # Se o usuário forneceu um número customizado, usar ele
+    if data.custom_batch_number:
+        batch_number = data.custom_batch_number
+        
+        # Verificar se já existe
+        existing = await db.product_batches.find_one({
+            'batch_number': batch_number,
+            'deleted': False
+        })
+        existing_rm = await db.raw_material_batches.find_one({
+            'batch_number': batch_number,
+            'deleted': False
+        })
+        if existing or existing_rm:
+            raise HTTPException(status_code=400, detail=f'Número de lote {batch_number} já existe')
+    else:
+        # Gerar automaticamente
+        batch_number = await generate_batch_number(data.date)
     
     batch_doc = {
         'id': batch_id,
