@@ -412,14 +412,14 @@ async def generate_batch_number(date_str: str) -> str:
     O contador é compartilhado entre produtos e matérias-primas
     para garantir numeração única e sequencial.
     
-    Se um número customizado foi usado anteriormente, a sequência
-    continua a partir dele.
+    Lógica:
+    1. Verifica lotes do mês/ano atual primeiro
+    2. Se houver número customizado de qualquer mês, segue essa sequência
     """
     date_obj = datetime.fromisoformat(date_str)
     yymm = date_obj.strftime('%y%m')  # AAMM
     
     # Buscar TODOS os lotes ATIVOS (produtos + matérias-primas)
-    # Ignorar lotes deletados
     product_batches = await db.product_batches.find(
         {'deleted': False},
         {'_id': 0, 'batch_number': 1}
@@ -434,28 +434,40 @@ async def generate_batch_number(date_str: str) -> str:
     all_batches = product_batches + raw_material_batches
     
     if not all_batches:
-        counter = 1
-    else:
-        # Extrair todos os números de lote numéricos
-        all_numbers = []
-        for b in all_batches:
-            batch_num = b['batch_number']
-            # Verificar se é um número válido (pelo menos 7 dígitos)
-            if batch_num.isdigit() and len(batch_num) >= 7:
-                all_numbers.append(int(batch_num))
-        
-        # O próximo número é o maior encontrado + 1
-        if all_numbers:
-            max_number = max(all_numbers)
-            counter = max_number + 1
-            # Retornar no formato completo mantendo a sequência
-            return str(counter)
-        else:
-            # Primeiro lote do sistema
-            counter = 1
+        return f"{yymm}001"
     
-    # Formato: AAMMCCC (ex: 2512001 = Dezembro/2025, lote 001)
-    return f"{yymm}{counter:03d}"
+    # Separar lotes do mês atual e lotes customizados
+    current_month_batches = []
+    all_batches_numbers = []
+    
+    for b in all_batches:
+        batch_num = b['batch_number']
+        if batch_num.isdigit() and len(batch_num) >= 7:
+            num = int(batch_num)
+            all_batches_numbers.append(num)
+            
+            # Verificar se é do mês/ano atual
+            if batch_num.startswith(yymm):
+                current_month_batches.append(num)
+    
+    # Se houver lotes do mês atual, incrementar o maior deles
+    if current_month_batches:
+        max_current_month = max(current_month_batches)
+        next_num = max_current_month + 1
+        return str(next_num)
+    
+    # Se não houver lotes do mês atual, verificar se há números customizados
+    # que sejam maiores que o padrão do mês atual (AAMMCCC)
+    base_num = int(f"{yymm}001")
+    
+    if all_batches_numbers:
+        max_all = max(all_batches_numbers)
+        # Se o maior de todos é maior que a base do mês atual, usar ele + 1
+        if max_all >= base_num:
+            return str(max_all + 1)
+    
+    # Caso padrão: primeiro lote do mês
+    return f"{yymm}001"
 
 @api_router.get('/batches/next-number')
 async def get_next_batch_number(date: str, current_user = Depends(get_current_user)):
