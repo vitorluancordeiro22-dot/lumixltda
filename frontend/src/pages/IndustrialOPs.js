@@ -297,19 +297,17 @@ export const IndustrialOPs = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label>Turno</Label>
-                  <Select 
-                    value={formData.shift} 
-                    onValueChange={(v) => setFormData({...formData, shift: v})}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione" />
-                    </SelectTrigger>
-                    <SelectContent position="popper">
-                      <SelectItem value="Manhã">Manhã</SelectItem>
-                      <SelectItem value="Tarde">Tarde</SelectItem>
-                      <SelectItem value="Noite">Noite</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Combobox
+                    options={[
+                      { value: 'Manhã', label: 'Manhã' },
+                      { value: 'Tarde', label: 'Tarde' },
+                      { value: 'Noite', label: 'Noite' }
+                    ]}
+                    value={formData.shift}
+                    onChange={(v) => setFormData({...formData, shift: v})}
+                    placeholder="Selecione turno"
+                    searchPlaceholder="Pesquisar..."
+                  />
                 </div>
                 <div>
                   <Label>Equipamento</Label>
