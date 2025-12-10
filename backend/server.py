@@ -142,6 +142,7 @@ class RawMaterialBatchCreate(BaseModel):
     quantity: float
     supplier_batch_number: str = ''
     expiry_date: str = ''
+    custom_batch_number: Optional[str] = None  # Número de lote customizado
 
 class RawMaterialBatchUpdate(BaseModel):
     batch_number: Optional[str] = None
