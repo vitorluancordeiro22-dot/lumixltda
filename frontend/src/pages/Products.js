@@ -387,16 +387,14 @@ export const Products = () => {
                     <div key={`recipe-${index}-${recipe.raw_material_id}`} className="flex gap-2 items-end">
                       <div className="flex-1">
                         <Label className="text-foreground text-xs">Matéria-Prima</Label>
-                        <Select value={recipe.raw_material_id} onValueChange={(v) => updateRecipe(index, 'raw_material_id', v)}>
-                          <SelectTrigger className="bg-slate-900/50 border-slate-700 text-foreground">
-                            <SelectValue placeholder="Selecione" />
-                          </SelectTrigger>
-                          <SelectContent className="bg-slate-900 border-slate-700">
-                            {rawMaterials.map(rm => (
-                              <SelectItem key={rm.id} value={rm.id} className="text-foreground">{rm.name}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <Combobox
+                          options={rawMaterials.map(rm => ({ value: rm.id, label: rm.name }))}
+                          value={recipe.raw_material_id}
+                          onChange={(v) => updateRecipe(index, 'raw_material_id', v)}
+                          placeholder="Selecione matéria-prima"
+                          searchPlaceholder="Digite para pesquisar..."
+                          emptyText="Nenhuma matéria-prima encontrada"
+                        />
                       </div>
                       <div className="w-24">
                         <Label className="text-foreground text-xs">Unidade</Label>
