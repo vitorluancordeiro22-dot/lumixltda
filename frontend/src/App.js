@@ -17,6 +17,7 @@ import { Suppliers } from './pages/Suppliers';
 import { Archives } from './pages/Archives';
 import { IndustrialOPs } from './pages/IndustrialOPs';
 import { Laudos } from './pages/Laudos';
+import { BatchManagement } from './pages/BatchManagement';
 import './App.css';
 
 const PrivateRoute = ({ children }) => {
