@@ -134,10 +134,17 @@ export const RawMaterials = () => {
     
     setSubmitting(true);
     try {
-      await api.post('/raw-material-batches', {
+      const payload = {
         ...batchFormData,
         quantity: parseFloat(batchFormData.quantity)
-      });
+      };
+      
+      // Se tem número customizado, enviar
+      if (batchFormData.custom_batch_number) {
+        payload.custom_batch_number = batchFormData.custom_batch_number;
+      }
+      
+      await api.post('/raw-material-batches', payload);
       
       if (isMountedRef.current) {
         setBatchDialogOpen(false);
@@ -146,10 +153,12 @@ export const RawMaterials = () => {
           date: new Date().toISOString().split('T')[0],
           quantity: '',
           supplier_batch_number: '',
-          expiry_date: ''
+          expiry_date: '',
+          custom_batch_number: ''
         });
+        setEditingBatchNumber(false);
         await fetchMaterials();
-        toast.success('Lote criado e estoque atualizado!');
+        toast.success('Lote criado! Próximos lotes seguirão essa sequência.');
       }
     } catch (error) {
       if (isMountedRef.current) {
