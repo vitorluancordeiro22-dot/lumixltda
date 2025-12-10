@@ -5,7 +5,7 @@ import { Card } from '../components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { Badge } from '../components/ui/badge';
 import { toast } from 'sonner';
-import { Package, Beaker, Eye, Calendar, Building2, Clock, AlertCircle, Edit } from 'lucide-react';
+import { Package, Beaker, Eye, Calendar, Building2, Clock, AlertCircle, Edit, Trash2 } from 'lucide-react';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 
