@@ -123,7 +123,7 @@ export const Suppliers = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-2">Fornecedores</h1>
-          <p className="text-lg text-slate-300">Gerencie seus fornecedores de matérias-primas</p>
+          <p className="text-lg text-muted-foreground">Gerencie seus fornecedores de matérias-primas</p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
           <DialogTrigger asChild>
@@ -132,7 +132,7 @@ export const Suppliers = () => {
               Novo Fornecedor
             </Button>
           </DialogTrigger>
-          <DialogContent className="bg-card border-white/10">
+          <DialogContent className="bg-card border-border">
             <DialogHeader>
               <DialogTitle className="text-foreground">{selectedSupplier ? 'Editar' : 'Novo'} Fornecedor</DialogTitle>
             </DialogHeader>
@@ -142,7 +142,7 @@ export const Suppliers = () => {
                 <Input 
                   value={formData.name} 
                   onChange={(e) => setFormData({...formData, name: e.target.value})} 
-                  className="bg-slate-900/50 border-slate-700 text-foreground" 
+                  className="bg-input border-border text-foreground" 
                   required 
                   placeholder="Ex: Distribuidora ABC"
                 />
@@ -152,7 +152,7 @@ export const Suppliers = () => {
                 <Input 
                   value={formData.contact} 
                   onChange={(e) => setFormData({...formData, contact: e.target.value})} 
-                  className="bg-slate-900/50 border-slate-700 text-foreground"
+                  className="bg-input border-border text-foreground"
                   placeholder="Ex: João Silva"
                 />
               </div>
@@ -162,7 +162,7 @@ export const Suppliers = () => {
                   <Input 
                     value={formData.phone} 
                     onChange={(e) => setFormData({...formData, phone: e.target.value})} 
-                    className="bg-slate-900/50 border-slate-700 text-foreground"
+                    className="bg-input border-border text-foreground"
                     placeholder="(00) 00000-0000"
                   />
                 </div>
@@ -172,7 +172,7 @@ export const Suppliers = () => {
                     type="email"
                     value={formData.email} 
                     onChange={(e) => setFormData({...formData, email: e.target.value})} 
-                    className="bg-slate-900/50 border-slate-700 text-foreground"
+                    className="bg-input border-border text-foreground"
                     placeholder="contato@empresa.com"
                   />
                 </div>
@@ -182,7 +182,7 @@ export const Suppliers = () => {
                 <Input 
                   value={formData.address} 
                   onChange={(e) => setFormData({...formData, address: e.target.value})} 
-                  className="bg-slate-900/50 border-slate-700 text-foreground"
+                  className="bg-input border-border text-foreground"
                   placeholder="Rua, número, cidade"
                 />
               </div>
@@ -199,7 +199,7 @@ export const Suppliers = () => {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {suppliers.map(supplier => (
-            <Card key={supplier.id} data-testid={`supplier-card-${supplier.id}`} className="p-6 glass-effect border-white/5 hover:border-primary/50 transition-smooth">
+            <Card key={supplier.id} data-testid={`supplier-card-${supplier.id}`} className="p-6 border shadow-sm hover:border-primary/50 hover:shadow-md transition-all">
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-start gap-3 flex-1">
                   <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
@@ -208,34 +208,34 @@ export const Suppliers = () => {
                   <div className="flex-1 min-w-0">
                     <h3 className="text-xl font-bold text-foreground mb-1 truncate">{supplier.name}</h3>
                     {supplier.contact && (
-                      <p className="text-sm text-slate-400 truncate">{supplier.contact}</p>
+                      <p className="text-sm text-muted-foreground truncate">{supplier.contact}</p>
                     )}
                   </div>
                 </div>
                 <div className="flex gap-2 flex-shrink-0">
-                  <Button size="icon" variant="ghost" onClick={() => handleEdit(supplier)} className="text-slate-300 hover:text-foreground">
+                  <Button size="icon" variant="ghost" onClick={() => handleEdit(supplier)} className="text-muted-foreground hover:text-foreground">
                     <Edit className="w-4 h-4" />
                   </Button>
-                  <Button size="icon" variant="ghost" onClick={() => handleDelete(supplier.id)} className="text-red-400 hover:text-red-300">
+                  <Button size="icon" variant="ghost" onClick={() => handleDelete(supplier.id)} className="text-red-600 hover:text-red-500 hover:bg-red-50">
                     <Trash2 className="w-4 h-4" />
                   </Button>
                 </div>
               </div>
               <div className="space-y-2 text-sm">
                 {supplier.phone && (
-                  <div className="flex items-center gap-2 text-slate-400">
+                  <div className="flex items-center gap-2 text-muted-foreground">
                     <Phone className="w-4 h-4" />
                     <span className="truncate">{supplier.phone}</span>
                   </div>
                 )}
                 {supplier.email && (
-                  <div className="flex items-center gap-2 text-slate-400">
+                  <div className="flex items-center gap-2 text-muted-foreground">
                     <Mail className="w-4 h-4" />
                     <span className="truncate">{supplier.email}</span>
                   </div>
                 )}
                 {supplier.address && (
-                  <div className="flex items-start gap-2 text-slate-400">
+                  <div className="flex items-start gap-2 text-muted-foreground">
                     <MapPin className="w-4 h-4 flex-shrink-0 mt-0.5" />
                     <span className="line-clamp-2">{supplier.address}</span>
                   </div>
