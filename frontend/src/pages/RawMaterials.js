@@ -217,7 +217,7 @@ export const RawMaterials = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-2">Matérias-Primas</h1>
-          <p className="text-lg text-slate-300">Gerencie o estoque de matérias-primas</p>
+          <p className="text-lg text-muted-foreground">Gerencie o estoque de matérias-primas</p>
         </div>
         <div className="flex gap-3">
           <Dialog open={batchDialogOpen} onOpenChange={setBatchDialogOpen}>
@@ -227,7 +227,7 @@ export const RawMaterials = () => {
                 Soltar Lote
               </Button>
             </DialogTrigger>
-            <DialogContent className="bg-card border-white/10">
+            <DialogContent className="bg-card border-border">
               <DialogHeader>
                 <DialogTitle className="text-foreground">Soltar Lote de Matéria-Prima</DialogTitle>
               </DialogHeader>
@@ -282,7 +282,7 @@ export const RawMaterials = () => {
                 </div>
                 <div>
                   <Label className="text-foreground">Data</Label>
-                  <Input type="date" value={batchFormData.date} onChange={(e) => setBatchFormData({...batchFormData, date: e.target.value})} className="bg-slate-900/50 border-slate-700 text-foreground" />
+                  <Input type="date" value={batchFormData.date} onChange={(e) => setBatchFormData({...batchFormData, date: e.target.value})} className="bg-input border-border text-foreground" />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -290,7 +290,7 @@ export const RawMaterials = () => {
                     <Input 
                       value={batchFormData.supplier_batch_number} 
                       onChange={(e) => setBatchFormData({...batchFormData, supplier_batch_number: e.target.value})} 
-                      className="bg-slate-900/50 border-slate-700 text-foreground"
+                      className="bg-input border-border text-foreground"
                       placeholder="Ex: F20241205"
                     />
                   </div>
@@ -300,13 +300,13 @@ export const RawMaterials = () => {
                       type="date" 
                       value={batchFormData.expiry_date} 
                       onChange={(e) => setBatchFormData({...batchFormData, expiry_date: e.target.value})} 
-                      className="bg-slate-900/50 border-slate-700 text-foreground"
+                      className="bg-input border-border text-foreground"
                     />
                   </div>
                 </div>
                 <div>
                   <Label className="text-foreground">Quantidade Recebida</Label>
-                  <Input type="number" step="0.01" value={batchFormData.quantity} onChange={(e) => setBatchFormData({...batchFormData, quantity: e.target.value})} className="bg-slate-900/50 border-slate-700 text-foreground" required />
+                  <Input type="number" step="0.01" value={batchFormData.quantity} onChange={(e) => setBatchFormData({...batchFormData, quantity: e.target.value})} className="bg-input border-border text-foreground" required />
                 </div>
                 <Button type="submit" disabled={submitting} className="w-full bg-primary hover:bg-primary/90">Criar Lote</Button>
               </form>
@@ -320,14 +320,14 @@ export const RawMaterials = () => {
                 Nova Matéria-Prima
               </Button>
             </DialogTrigger>
-            <DialogContent className="bg-card border-white/10">
+            <DialogContent className="bg-card border-border">
               <DialogHeader>
                 <DialogTitle className="text-foreground">{selectedMaterial ? 'Editar' : 'Nova'} Matéria-Prima</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
                   <Label className="text-foreground">Nome</Label>
-                  <Input value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="bg-slate-900/50 border-slate-700 text-foreground" required />
+                  <Input value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="bg-input border-border text-foreground" required />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -345,7 +345,7 @@ export const RawMaterials = () => {
                   </div>
                   <div>
                     <Label className="text-foreground">Estoque Total</Label>
-                    <Input type="number" step="0.01" value={formData.total_stock} onChange={(e) => setFormData({...formData, total_stock: e.target.value})} className="bg-slate-900/50 border-slate-700 text-foreground" />
+                    <Input type="number" step="0.01" value={formData.total_stock} onChange={(e) => setFormData({...formData, total_stock: e.target.value})} className="bg-input border-border text-foreground" />
                   </div>
                 </div>
                 <div>
@@ -361,7 +361,7 @@ export const RawMaterials = () => {
                 </div>
                 <div>
                   <Label className="text-foreground">Data de Recebimento</Label>
-                  <Input type="date" value={formData.received_date} onChange={(e) => setFormData({...formData, received_date: e.target.value})} className="bg-slate-900/50 border-slate-700 text-foreground" />
+                  <Input type="date" value={formData.received_date} onChange={(e) => setFormData({...formData, received_date: e.target.value})} className="bg-input border-border text-foreground" />
                 </div>
                 <Button type="submit" disabled={submitting} className="w-full bg-primary hover:bg-primary/90">Salvar</Button>
               </form>
@@ -375,35 +375,35 @@ export const RawMaterials = () => {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {materials.map(material => (
-            <Card key={material.id} data-testid={`material-card-${material.id}`} className="p-6 glass-effect border-white/5 hover:border-primary/50 transition-smooth">
+            <Card key={material.id} data-testid={`material-card-${material.id}`} className="p-6 border shadow-sm hover:border-primary/50 hover:shadow-md transition-all">
               <div className="flex items-start justify-between mb-4">
                 <div>
                   <h3 className="text-xl font-bold text-foreground mb-1">{material.name}</h3>
-                  <p className="text-sm text-slate-400">{material.type}</p>
+                  <p className="text-sm text-muted-foreground">{material.type}</p>
                 </div>
                 <div className="flex gap-2">
-                  <Button size="icon" variant="ghost" onClick={() => handleEdit(material)} className="text-slate-300 hover:text-foreground">
+                  <Button size="icon" variant="ghost" onClick={() => handleEdit(material)} className="text-muted-foreground hover:text-foreground">
                     <Edit className="w-4 h-4" />
                   </Button>
-                  <Button size="icon" variant="ghost" onClick={() => handleDelete(material.id)} className="text-red-400 hover:text-red-300">
+                  <Button size="icon" variant="ghost" onClick={() => handleDelete(material.id)} className="text-red-600 hover:text-red-500 hover:bg-red-50">
                     <Trash2 className="w-4 h-4" />
                   </Button>
                 </div>
               </div>
               <div className="space-y-2">
                 {material.supplier_id && (
-                  <p className="text-sm text-slate-400">
-                    <span className="text-slate-500">Fornecedor:</span> {getSupplierName(material.supplier_id)}
+                  <p className="text-sm text-muted-foreground">
+                    <span className="text-muted-foreground/70">Fornecedor:</span> {getSupplierName(material.supplier_id)}
                   </p>
                 )}
                 {material.received_date && (
-                  <p className="text-sm text-slate-400">
-                    <span className="text-slate-500">Recebido em:</span> {new Date(material.received_date).toLocaleDateString('pt-BR')}
+                  <p className="text-sm text-muted-foreground">
+                    <span className="text-muted-foreground/70">Recebido em:</span> {new Date(material.received_date).toLocaleDateString('pt-BR')}
                   </p>
                 )}
               </div>
-              <div className="p-3 rounded-lg bg-slate-800/50 border border-slate-700 mt-3">
-                <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">Estoque Atual</p>
+              <div className="p-3 rounded-lg bg-muted border border-border mt-3">
+                <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Estoque Atual</p>
                 <p className="text-2xl font-bold text-foreground">{material.total_stock.toFixed(2)} {material.type}</p>
               </div>
             </Card>
