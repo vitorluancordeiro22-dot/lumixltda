@@ -351,7 +351,7 @@ export const WhatsAppMultiBatch = () => {
             disabled={selectedBatches.length === 0 || !phoneNumber.trim()}
           >
             <MessageCircle className="w-4 h-4 mr-2" />
-            Enviar WhatsApp ({selectedBatches.length})
+            Baixar Imagem e Abrir WhatsApp ({selectedBatches.length})
           </Button>
         </div>
       </DialogContent>
