@@ -243,6 +243,8 @@ export const Products = () => {
           <p className="text-lg text-slate-300">Gerencie seus produtos e receitas</p>
         </div>
         <div className="flex gap-3">
+          <WhatsAppMultiBatch />
+          
           {createdBatch && batchProduct && (
             <WhatsAppSender
               batch={createdBatch}
@@ -250,7 +252,7 @@ export const Products = () => {
               trigger={
                 <Button className="bg-green-600 hover:bg-green-700">
                   <MessageCircle className="w-4 h-4 mr-2" />
-                  Enviar WhatsApp
+                  Enviar Último Lote
                 </Button>
               }
             />
