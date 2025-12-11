@@ -125,7 +125,17 @@ export const WhatsAppMultiBatch = () => {
     // Linhas da tabela
     selectedBatchesData.forEach((batch, index) => {
       const product = products.find(p => p.id === batch.product_id);
-      const date = new Date(batch.date).toLocaleDateString('pt-BR');
+      
+      // Formatar data corretamente (pode vir como YYYY-MM-DD ou ISO)
+      let date;
+      if (batch.date.includes('T')) {
+        // Data ISO (com hora)
+        date = batch.date.split('T')[0].split('-').reverse().join('/');
+      } else {
+        // Data YYYY-MM-DD
+        date = batch.date.split('-').reverse().join('/');
+      }
+      
       const rowY = headerY + rowHeight + (index * rowHeight);
       
       // Fundo alternado
