@@ -15,14 +15,8 @@ export const WhatsAppSender = ({ batch, product, trigger }) => {
   const generateMessage = React.useCallback(() => {
     if (!batch || !product) return '';
 
-    return `🏭 *Novo Lote Liberado!*
-
-📦 *Produto:* ${product.name}
-🔢 *Lote:* ${batch.batch_number}
-📊 *Quantidade:* ${batch.planned_liters} ${batch.unit}
-📅 *Data:* ${new Date(batch.date).toLocaleDateString('pt-BR')}
-
-✅ Lote pronto para produção!`;
+    const date = new Date(batch.date).toLocaleDateString('pt-BR');
+    return `DATA ${date}     PRODUTO: ${product.name}     LOTE: ${batch.batch_number}`;
   }, [batch, product]);
 
   const handleSendWhatsApp = () => {
