@@ -270,18 +270,27 @@ export const WhatsAppMultiBatch = () => {
             </div>
           )}
 
-          {/* Preview da Mensagem */}
+          {/* Preview da Imagem */}
           {selectedBatchesData.length > 0 && (
             <div className="p-4 bg-muted rounded-lg">
-              <Label className="mb-2 block">Preview da Mensagem (Formato Tabela WhatsApp)</Label>
-              <div className="bg-background p-3 rounded">
-                <pre className="text-xs font-mono whitespace-pre overflow-x-auto">
-{generateMessage()}
-                </pre>
+              <Label className="mb-2 block">Preview da Imagem</Label>
+              <div className="bg-white p-3 rounded border border-border">
+                <img 
+                  src={generateTableImage()} 
+                  alt="Preview da tabela de lotes"
+                  className="w-full rounded shadow-sm"
+                />
               </div>
               <p className="text-xs text-muted-foreground mt-2">
-                💡 Use os 3 acentos (```) no WhatsApp para formatar como tabela
+                📸 Esta imagem será baixada e você poderá enviá-la pelo WhatsApp
               </p>
+              <Button
+                onClick={handleDownloadImage}
+                variant="outline"
+                className="w-full mt-2"
+              >
+                📥 Baixar Imagem Agora
+              </Button>
             </div>
           )}
 
