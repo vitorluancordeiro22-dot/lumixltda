@@ -309,15 +309,24 @@ export const WhatsAppMultiBatch = () => {
                 />
               </div>
               <p className="text-xs text-muted-foreground mt-2">
-                📸 Esta imagem será baixada e você poderá enviá-la pelo WhatsApp
+                📸 Copie (PC) ou baixe a imagem para enviar pelo WhatsApp
               </p>
-              <Button
-                onClick={handleDownloadImage}
-                variant="outline"
-                className="w-full mt-2"
-              >
-                📥 Baixar Imagem Agora
-              </Button>
+              <div className="flex gap-2 mt-2">
+                <Button
+                  onClick={handleCopyImage}
+                  variant="outline"
+                  className="flex-1"
+                >
+                  📋 Copiar Imagem
+                </Button>
+                <Button
+                  onClick={handleDownloadImage}
+                  variant="outline"
+                  className="flex-1"
+                >
+                  📥 Baixar Imagem
+                </Button>
+              </div>
             </div>
           )}
 
