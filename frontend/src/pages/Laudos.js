@@ -208,7 +208,7 @@ export const Laudos = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-2">Laudos</h1>
-          <p className="text-lg text-slate-300">Gerenciamento de documentos e laudos</p>
+          <p className="text-lg text-muted-foreground">Gerenciamento de documentos e laudos</p>
         </div>
 
         <div className="flex gap-3">
@@ -219,7 +219,7 @@ export const Laudos = () => {
                 Nova Pasta
               </Button>
             </DialogTrigger>
-            <DialogContent className="bg-card border-white/10">
+            <DialogContent className="bg-card border-border">
               <DialogHeader>
                 <DialogTitle className="text-foreground">Criar Nova Pasta</DialogTitle>
               </DialogHeader>
@@ -229,7 +229,7 @@ export const Laudos = () => {
                   <Input
                     value={newFolderName}
                     onChange={(e) => setNewFolderName(e.target.value)}
-                    className="bg-slate-900/50 border-slate-700 text-foreground"
+                    className="bg-input border-border text-foreground"
                     placeholder="Ex: Laudos 2024"
                     required
                   />
@@ -255,7 +255,7 @@ export const Laudos = () => {
                   Upload PDF
                 </Button>
               </DialogTrigger>
-              <DialogContent className="bg-card border-white/10">
+              <DialogContent className="bg-card border-border">
                 <DialogHeader>
                   <DialogTitle className="text-foreground">Upload de Laudo</DialogTitle>
                 </DialogHeader>
@@ -265,7 +265,7 @@ export const Laudos = () => {
                     <Input
                       value={selectedFolder.name}
                       disabled
-                      className="bg-slate-900/50 border-slate-700 text-foreground"
+                      className="bg-input border-border text-foreground"
                     />
                   </div>
 
@@ -275,7 +275,7 @@ export const Laudos = () => {
                       type="file"
                       accept=".pdf"
                       onChange={(e) => setSelectedFile(e.target.files[0])}
-                      className="block w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-foreground hover:file:bg-primary/90"
+                      className="block w-full text-sm text-muted-foreground file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
                       required
                     />
                   </div>
@@ -285,7 +285,7 @@ export const Laudos = () => {
                     <Textarea
                       value={uploadNotes}
                       onChange={(e) => setUploadNotes(e.target.value)}
-                      className="bg-slate-900/50 border-slate-700 text-foreground"
+                      className="bg-input border-border text-foreground"
                       placeholder="Notas sobre o arquivo..."
                       rows={3}
                     />
@@ -308,16 +308,16 @@ export const Laudos = () => {
       {/* Main Content */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         {/* Folders Sidebar */}
-        <Card className="md:col-span-1 p-6 glass-effect border-white/5">
+        <Card className="md:col-span-1 p-6 border shadow-sm">
           <h3 className="text-foreground font-semibold mb-4 flex items-center gap-2">
             <Folder className="w-5 h-5 text-primary" />
             Pastas
           </h3>
 
           {loading ? (
-            <p className="text-slate-400 text-sm">Carregando...</p>
+            <p className="text-muted-foreground text-sm">Carregando...</p>
           ) : folders.length === 0 ? (
-            <p className="text-slate-400 text-sm">Nenhuma pasta criada</p>
+            <p className="text-muted-foreground text-sm">Nenhuma pasta criada</p>
           ) : (
             <div className="space-y-2">
               {folders.map((folder) => (
@@ -325,8 +325,8 @@ export const Laudos = () => {
                   key={folder.id}
                   className={`flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all ${
                     selectedFolder?.id === folder.id
-                      ? 'bg-primary/20 border border-primary/50'
-                      : 'bg-slate-800/50 border border-slate-700 hover:border-primary/30'
+                      ? 'bg-primary/10 border border-primary/50'
+                      : 'bg-muted border border-border hover:border-primary/30'
                   }`}
                   onClick={() => setSelectedFolder(folder)}
                 >
@@ -334,20 +334,20 @@ export const Laudos = () => {
                     {selectedFolder?.id === folder.id ? (
                       <FolderOpen className="w-4 h-4 text-primary shrink-0" />
                     ) : (
-                      <Folder className="w-4 h-4 text-slate-400 shrink-0" />
+                      <Folder className="w-4 h-4 text-muted-foreground shrink-0" />
                     )}
                     <span className="text-foreground text-sm truncate">{folder.name}</span>
                   </div>
                   <Button
                     size="sm"
                     variant="ghost"
-                    className="h-6 w-6 p-0 hover:bg-red-600/20"
+                    className="h-6 w-6 p-0 hover:bg-red-50"
                     onClick={(e) => {
                       e.stopPropagation();
                       handleDeleteFolder(folder.id);
                     }}
                   >
-                    <Trash2 className="w-3 h-3 text-red-400" />
+                    <Trash2 className="w-3 h-3 text-red-600" />
                   </Button>
                 </div>
               ))}
@@ -356,46 +356,46 @@ export const Laudos = () => {
         </Card>
 
         {/* Files Content */}
-        <Card className="md:col-span-3 p-6 glass-effect border-white/5">
+        <Card className="md:col-span-3 p-6 border shadow-sm">
           {!selectedFolder ? (
             <div className="text-center py-12">
-              <Folder className="w-16 h-16 text-slate-600 mx-auto mb-4" />
-              <p className="text-slate-400 text-lg">Selecione uma pasta para ver os arquivos</p>
+              <Folder className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+              <p className="text-muted-foreground text-lg">Selecione uma pasta para ver os arquivos</p>
             </div>
           ) : (
             <>
               <div className="flex items-center gap-2 mb-6">
                 <Folder className="w-5 h-5 text-primary" />
-                <ChevronRight className="w-4 h-4 text-slate-500" />
+                <ChevronRight className="w-4 h-4 text-muted-foreground" />
                 <h3 className="text-foreground font-semibold">{selectedFolder.name}</h3>
-                <span className="text-slate-500 text-sm">({files.length} arquivo{files.length !== 1 ? 's' : ''})</span>
+                <span className="text-muted-foreground text-sm">({files.length} arquivo{files.length !== 1 ? 's' : ''})</span>
               </div>
 
               {files.length === 0 ? (
                 <div className="text-center py-12">
-                  <FileText className="w-16 h-16 text-slate-600 mx-auto mb-4" />
-                  <p className="text-slate-400">Nenhum arquivo nesta pasta</p>
-                  <p className="text-slate-500 text-sm mt-2">Use o botão &ldquo;Upload PDF&rdquo; para adicionar arquivos</p>
+                  <FileText className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-muted-foreground">Nenhum arquivo nesta pasta</p>
+                  <p className="text-muted-foreground/70 text-sm mt-2">Use o botão &ldquo;Upload PDF&rdquo; para adicionar arquivos</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {files.map((file) => (
-                    <Card key={file.id} className="p-4 bg-slate-800/50 border-slate-700 hover:border-primary/50 transition-all">
+                    <Card key={file.id} className="p-4 bg-muted border-border hover:border-primary/50 transition-all">
                       <div className="flex items-start gap-3 mb-3">
-                        <FileCheck className="w-10 h-10 text-red-400 shrink-0" />
+                        <FileCheck className="w-10 h-10 text-red-500 shrink-0" />
                         <div className="flex-1 min-w-0">
                           <p className="text-foreground font-medium text-sm truncate mb-1">{file.filename}</p>
-                          <p className="text-slate-400 text-xs">
+                          <p className="text-muted-foreground text-xs">
                             {(file.size / 1024).toFixed(1)} KB
                           </p>
                         </div>
                       </div>
 
                       {file.notes && (
-                        <p className="text-slate-400 text-xs mb-3 line-clamp-2">{file.notes}</p>
+                        <p className="text-muted-foreground text-xs mb-3 line-clamp-2">{file.notes}</p>
                       )}
 
-                      <div className="text-xs text-slate-500 mb-3">
+                      <div className="text-xs text-muted-foreground/70 mb-3">
                         <p>Por: {file.uploaded_by_name}</p>
                         <p>{new Date(file.uploaded_at).toLocaleString('pt-BR')}</p>
                       </div>
@@ -404,7 +404,7 @@ export const Laudos = () => {
                         <Button
                           size="sm"
                           variant="outline"
-                          className="flex-1 border-slate-700 text-foreground hover:bg-slate-700"
+                          className="flex-1 border-border text-foreground hover:bg-muted"
                           onClick={() => handleDownloadFile(file)}
                         >
                           <Download className="w-3 h-3 mr-1" />
@@ -413,7 +413,7 @@ export const Laudos = () => {
                         <Button
                           size="sm"
                           variant="outline"
-                          className="border-red-700 text-red-400 hover:bg-red-600/20"
+                          className="border-red-200 text-red-600 hover:bg-red-50"
                           onClick={() => handleDeleteFile(file.id)}
                         >
                           <Trash2 className="w-3 h-3" />
