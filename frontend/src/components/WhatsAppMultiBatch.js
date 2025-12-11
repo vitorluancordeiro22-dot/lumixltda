@@ -81,6 +81,103 @@ export const WhatsAppMultiBatch = () => {
     return message;
   };
 
+  const generateTableImage = () => {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    
+    // Configurações da tabela
+    const padding = 40;
+    const headerHeight = 80;
+    const rowHeight = 50;
+    const colWidths = [180, 400, 120, 150]; // DATA, PRODUTO, QTD, LOTE
+    const totalWidth = colWidths.reduce((a, b) => a + b, 0) + padding * 2;
+    const totalHeight = headerHeight + (selectedBatchesData.length * rowHeight) + padding * 2;
+    
+    canvas.width = totalWidth;
+    canvas.height = totalHeight;
+    
+    // Fundo branco
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // Título
+    ctx.fillStyle = '#1E293B';
+    ctx.font = 'bold 28px Arial';
+    ctx.fillText('LOTES LIBERADOS', padding, 50);
+    
+    // Cabeçalho da tabela
+    let x = padding;
+    const headerY = headerHeight + padding;
+    
+    // Fundo do cabeçalho
+    ctx.fillStyle = '#0EA5E9';
+    ctx.fillRect(x, headerY, colWidths.reduce((a, b) => a + b, 0), rowHeight);
+    
+    // Texto do cabeçalho
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 18px Arial';
+    const headers = ['DATA', 'PRODUTO', 'QTD', 'LOTE'];
+    headers.forEach((header, i) => {
+      ctx.fillText(header, x + 15, headerY + 32);
+      x += colWidths[i];
+    });
+    
+    // Linhas da tabela
+    selectedBatchesData.forEach((batch, index) => {
+      const product = products.find(p => p.id === batch.product_id);
+      const date = new Date(batch.date).toLocaleDateString('pt-BR');
+      const rowY = headerY + rowHeight + (index * rowHeight);
+      
+      // Fundo alternado
+      ctx.fillStyle = index % 2 === 0 ? '#F8FAFC' : '#FFFFFF';
+      ctx.fillRect(padding, rowY, colWidths.reduce((a, b) => a + b, 0), rowHeight);
+      
+      // Bordas
+      ctx.strokeStyle = '#E2E8F0';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(padding, rowY, colWidths.reduce((a, b) => a + b, 0), rowHeight);
+      
+      // Dados
+      ctx.fillStyle = '#1E293B';
+      ctx.font = '16px Arial';
+      
+      let colX = padding;
+      const values = [
+        date,
+        (product?.name || 'N/A').substring(0, 35),
+        `${batch.planned_liters}L`,
+        batch.batch_number
+      ];
+      
+      values.forEach((value, i) => {
+        ctx.fillText(value, colX + 15, rowY + 32);
+        colX += colWidths[i];
+      });
+    });
+    
+    // Bordas da tabela
+    ctx.strokeStyle = '#0EA5E9';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(padding, headerY, colWidths.reduce((a, b) => a + b, 0), rowHeight + (selectedBatchesData.length * rowHeight));
+    
+    return canvas.toDataURL('image/png');
+  };
+
+  const handleDownloadImage = () => {
+    if (selectedBatches.length === 0) {
+      toast.error('Selecione pelo menos um lote');
+      return;
+    }
+
+    const imageData = generateTableImage();
+    const link = document.createElement('a');
+    link.download = `lotes_${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')}.png`;
+    link.href = imageData;
+    link.click();
+    
+    toast.success('Imagem baixada! Agora envie pelo WhatsApp');
+  };
+
   const handleSendWhatsApp = () => {
     if (!phoneNumber.trim()) {
       toast.error('Digite um número de telefone');
@@ -92,17 +189,22 @@ export const WhatsAppMultiBatch = () => {
       return;
     }
 
+    // Baixar a imagem primeiro
+    handleDownloadImage();
+    
+    // Abrir WhatsApp
     const cleanNumber = phoneNumber.replace(/\D/g, '');
-    const message = generateMessage();
-    const whatsappUrl = `https://wa.me/${cleanNumber}?text=${encodeURIComponent(message)}`;
-
-    window.open(whatsappUrl, '_blank');
-    toast.success('WhatsApp aberto!');
+    const whatsappUrl = `https://wa.me/${cleanNumber}`;
     
     setTimeout(() => {
-      setDialogOpen(false);
-      setPhoneNumber('');
-      setSelectedBatches([]);
+      window.open(whatsappUrl, '_blank');
+      toast.info('Envie a imagem que foi baixada!');
+      
+      setTimeout(() => {
+        setDialogOpen(false);
+        setPhoneNumber('');
+        setSelectedBatches([]);
+      }, 1000);
     }, 500);
   };
 
