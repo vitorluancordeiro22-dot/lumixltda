@@ -309,7 +309,7 @@ export const WhatsAppMultiBatch = () => {
                 />
               </div>
               <p className="text-xs text-muted-foreground mt-2">
-                📸 Copie (PC) ou baixe a imagem para enviar pelo WhatsApp
+                📸 A DATA mostrada é a data que você escolheu no lote (não a data de criação)
               </p>
               <div className="flex gap-2 mt-2">
                 <Button
