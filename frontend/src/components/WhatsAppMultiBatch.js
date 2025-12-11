@@ -4,7 +4,7 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Checkbox } from './ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
-import { MessageCircle, Trash2 } from 'lucide-react';
+import { MessageCircle, Trash2, Copy, Download } from 'lucide-react';
 import { toast } from 'sonner';
 import api from '../lib/api';
 
