@@ -171,10 +171,15 @@ export const WhatsAppMultiBatch = () => {
           {/* Preview da Mensagem */}
           {selectedBatchesData.length > 0 && (
             <div className="p-4 bg-muted rounded-lg">
-              <Label className="mb-2 block">Preview da Mensagem</Label>
-              <pre className="text-xs bg-background p-3 rounded whitespace-pre-wrap font-mono">
-                {generateMessage()}
-              </pre>
+              <Label className="mb-2 block">Preview da Mensagem (Formato Tabela WhatsApp)</Label>
+              <div className="bg-background p-3 rounded">
+                <pre className="text-xs font-mono whitespace-pre overflow-x-auto">
+{generateMessage()}
+                </pre>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                💡 Use os 3 acentos (```) no WhatsApp para formatar como tabela
+              </p>
             </div>
           )}
 
