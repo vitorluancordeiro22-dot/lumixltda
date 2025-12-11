@@ -240,7 +240,7 @@ export const Products = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-2">Produtos</h1>
-          <p className="text-lg text-slate-300">Gerencie seus produtos e receitas</p>
+          <p className="text-lg text-muted-foreground">Gerencie seus produtos e receitas</p>
         </div>
         <div className="flex gap-3">
           <WhatsAppMultiBatch />
@@ -265,7 +265,7 @@ export const Products = () => {
                 Soltar Lote
               </Button>
             </DialogTrigger>
-            <DialogContent className="bg-card border-white/10">
+            <DialogContent className="bg-card border-border">
               <DialogHeader>
                 <DialogTitle className="text-foreground">Soltar Lote de Produto</DialogTitle>
               </DialogHeader>
@@ -320,7 +320,7 @@ export const Products = () => {
                 </div>
                 <div>
                   <Label className="text-foreground">Data</Label>
-                  <Input type="date" value={batchFormData.date} onChange={(e) => setBatchFormData({...batchFormData, date: e.target.value})} className="bg-slate-900/50 border-slate-700 text-foreground" />
+                  <Input type="date" value={batchFormData.date} onChange={(e) => setBatchFormData({...batchFormData, date: e.target.value})} className="bg-input border-border text-foreground" />
                 </div>
                 <div>
                   <Label className="text-foreground">Unidade</Label>
@@ -337,7 +337,7 @@ export const Products = () => {
                 </div>
                 <div>
                   <Label className="text-foreground">Litragem Planejada</Label>
-                  <Input type="number" step="0.01" value={batchFormData.planned_liters} onChange={(e) => setBatchFormData({...batchFormData, planned_liters: e.target.value})} className="bg-slate-900/50 border-slate-700 text-foreground" required />
+                  <Input type="number" step="0.01" value={batchFormData.planned_liters} onChange={(e) => setBatchFormData({...batchFormData, planned_liters: e.target.value})} className="bg-input border-border text-foreground" required />
                 </div>
                 <Button type="submit" disabled={submitting} className="w-full bg-primary hover:bg-primary/90">Criar Lote</Button>
               </form>
@@ -351,14 +351,14 @@ export const Products = () => {
                 Novo Produto
               </Button>
             </DialogTrigger>
-            <DialogContent className="bg-card border-white/10 max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogContent className="bg-card border-border max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle className="text-foreground">{selectedProduct ? 'Editar' : 'Novo'} Produto</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
                   <Label className="text-foreground">Nome</Label>
-                  <Input value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="bg-slate-900/50 border-slate-700 text-foreground" required />
+                  <Input value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="bg-input border-border text-foreground" required />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -376,13 +376,13 @@ export const Products = () => {
                   </div>
                   <div>
                     <Label className="text-foreground">Litros Esperados</Label>
-                    <Input type="number" step="0.01" value={formData.expected_liters} onChange={(e) => setFormData({...formData, expected_liters: e.target.value})} className="bg-slate-900/50 border-slate-700 text-foreground" required />
+                    <Input type="number" step="0.01" value={formData.expected_liters} onChange={(e) => setFormData({...formData, expected_liters: e.target.value})} className="bg-input border-border text-foreground" required />
                   </div>
                 </div>
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <Label className="text-foreground">Receita (Matérias-Primas)</Label>
-                    <Button type="button" onClick={addRecipe} size="sm" variant="outline" className="border-slate-700 text-foreground">
+                    <Button type="button" onClick={addRecipe} size="sm" variant="outline" className="border-border text-foreground">
                       <Plus className="w-4 h-4 mr-1" /> Adicionar
                     </Button>
                   </div>
@@ -414,7 +414,7 @@ export const Products = () => {
                       </div>
                       <div className="w-28">
                         <Label className="text-foreground text-xs">Quantidade</Label>
-                        <Input type="number" step="0.001" value={recipe.quantity_per_liter} onChange={(e) => updateRecipe(index, 'quantity_per_liter', e.target.value)} className="bg-slate-900/50 border-slate-700 text-foreground" placeholder="Ex: 0.5" />
+                        <Input type="number" step="0.001" value={recipe.quantity_per_liter} onChange={(e) => updateRecipe(index, 'quantity_per_liter', e.target.value)} className="bg-input border-border text-foreground" placeholder="Ex: 0.5" />
                       </div>
                       <Button type="button" onClick={() => removeRecipe(index)} size="icon" variant="destructive">
                         <Trash2 className="w-4 h-4" />
@@ -434,28 +434,28 @@ export const Products = () => {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {products.map(product => (
-            <Card key={product.id} data-testid={`product-card-${product.id}`} className="p-6 glass-effect border-white/5 hover:border-primary/50 transition-smooth">
+            <Card key={product.id} data-testid={`product-card-${product.id}`} className="p-6 border shadow-sm hover:border-primary/50 hover:shadow-md transition-all">
               <div className="flex items-start justify-between mb-4">
                 <div>
                   <h3 className="text-xl font-bold text-foreground mb-1">{product.name}</h3>
-                  <p className="text-sm text-slate-400">{product.unit} • {product.expected_liters}L esperados</p>
+                  <p className="text-sm text-muted-foreground">{product.unit} • {product.expected_liters}L esperados</p>
                 </div>
                 <div className="flex gap-2">
-                  <Button size="icon" variant="ghost" onClick={() => handleEdit(product)} className="text-slate-300 hover:text-foreground">
+                  <Button size="icon" variant="ghost" onClick={() => handleEdit(product)} className="text-muted-foreground hover:text-foreground">
                     <Edit className="w-4 h-4" />
                   </Button>
-                  <Button size="icon" variant="ghost" onClick={() => handleDelete(product.id)} className="text-red-400 hover:text-red-300">
+                  <Button size="icon" variant="ghost" onClick={() => handleDelete(product.id)} className="text-red-600 hover:text-red-500 hover:bg-red-50">
                     <Trash2 className="w-4 h-4" />
                   </Button>
                 </div>
               </div>
               {product.recipes && product.recipes.length > 0 && (
-                <div className="text-sm text-slate-400 mb-3">
+                <div className="text-sm text-muted-foreground mb-3">
                   <p className="mb-1">Receita: {product.recipes.length} matéria(s)-prima(s)</p>
                 </div>
               )}
               
-              <div className="mt-4 pt-4 border-t border-slate-700 space-y-2">
+              <div className="mt-4 pt-4 border-t border-border space-y-2">
                 <div className="flex gap-2">
                   <ProductFileManager 
                     product={product} 
