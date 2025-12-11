@@ -63,16 +63,22 @@ export const WhatsAppMultiBatch = () => {
 
     const selectedBatchesData = batches.filter(b => selectedBatches.includes(b.id));
     
-    let message = '';
+    let message = '*LOTES LIBERADOS*\n\n';
+    message += '```\n';
+    message += 'DATA       | PRODUTO                    | QTD    | LOTE\n';
+    message += '-----------|----------------------------|--------|----------\n';
     
     selectedBatchesData.forEach(batch => {
       const product = products.find(p => p.id === batch.product_id);
       const date = new Date(batch.date).toLocaleDateString('pt-BR');
+      const productName = (product?.name || 'N/A').padEnd(26).substring(0, 26);
+      const qty = `${batch.planned_liters}L`.padEnd(6);
       
-      message += `DATA ${date}     PRODUTO: ${product?.name || 'N/A'}     LOTE: ${batch.batch_number}\n`;
+      message += `${date} | ${productName} | ${qty} | ${batch.batch_number}\n`;
     });
-
-    return message.trim();
+    
+    message += '```';
+    return message;
   };
 
   const handleSendWhatsApp = () => {
