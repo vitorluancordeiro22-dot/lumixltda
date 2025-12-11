@@ -64,10 +64,10 @@ export const Login = () => {
       <div className="absolute inset-0 bg-background/60 backdrop-blur-sm" />
 
       {/* Login Card */}
-      <Card data-testid="login-card" className="relative z-10 w-full max-w-md mx-4 p-8 glass-effect border border-white/10">
+      <Card data-testid="login-card" className="relative z-10 w-full max-w-md mx-4 p-8 border shadow-lg bg-card">
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-foreground mb-2">Lumix</h1>
-          <p className="text-slate-400 text-sm">Gestão Inteligente de Produção</p>
+          <p className="text-muted-foreground text-sm">Gestão Inteligente de Produção</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -81,7 +81,7 @@ export const Login = () => {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required={!isLogin}
-                className="h-12 bg-slate-900/50 border-slate-700 text-foreground placeholder:text-slate-500"
+                className="h-12 bg-input border-border text-foreground placeholder:text-muted-foreground"
                 placeholder="Seu nome"
               />
             </div>
@@ -96,7 +96,7 @@ export const Login = () => {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="h-12 bg-slate-900/50 border-slate-700 text-foreground placeholder:text-slate-500"
+              className="h-12 bg-input border-border text-foreground placeholder:text-muted-foreground"
               placeholder="seu@email.com"
             />
           </div>
@@ -110,7 +110,7 @@ export const Login = () => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              className="h-12 bg-slate-900/50 border-slate-700 text-foreground placeholder:text-slate-500"
+              className="h-12 bg-input border-border text-foreground placeholder:text-muted-foreground"
               placeholder="••••••••"
             />
           </div>
