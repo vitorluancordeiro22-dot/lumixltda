@@ -358,7 +358,15 @@ export const WhatsAppMultiBatch = () => {
               <div className="border rounded-lg max-h-64 overflow-y-auto">
                 {batches.map(batch => {
                   const product = products.find(p => p.id === batch.product_id);
-                  const date = new Date(batch.date).toLocaleDateString('pt-BR');
+                  
+                  // Formatar data corretamente
+                  let date;
+                  if (batch.date.includes('T')) {
+                    date = batch.date.split('T')[0].split('-').reverse().join('/');
+                  } else {
+                    date = batch.date.split('-').reverse().join('/');
+                  }
+                  
                   const isSelected = selectedBatches.includes(batch.id);
                   
                   return (
