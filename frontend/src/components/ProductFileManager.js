@@ -100,7 +100,7 @@ export const ProductFileManager = ({ product, onUpdate }) => {
       <Button
         size="sm"
         variant="outline"
-        className="border-slate-700 text-foreground hover:bg-slate-800"
+        className="border-border text-foreground hover:bg-muted"
         onClick={() => setDialogOpen(true)}
       >
         <FileText className="w-3 h-3 mr-1" />
@@ -108,7 +108,7 @@ export const ProductFileManager = ({ product, onUpdate }) => {
       </Button>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="bg-card border-white/10 max-w-2xl">
+        <DialogContent className="bg-card border-border max-w-2xl">
           <DialogHeader>
             <DialogTitle className="text-foreground">
               Arquivos Modelo - {product.name}
@@ -119,7 +119,7 @@ export const ProductFileManager = ({ product, onUpdate }) => {
             {fileTypes.map((type) => (
               <div
                 key={type.key}
-                className="p-4 bg-slate-800/50 rounded-lg border border-slate-700"
+                className="p-4 bg-muted rounded-lg border border-border"
               >
                 <div className="flex items-start justify-between mb-3">
                   <div>
@@ -164,7 +164,7 @@ export const ProductFileManager = ({ product, onUpdate }) => {
                     <Button
                       type="button"
                       variant="outline"
-                      className="w-full border-slate-700 text-foreground hover:bg-slate-800"
+                      className="w-full border-border text-foreground hover:bg-muted"
                       disabled={uploading}
                       onClick={(e) => {
                         e.preventDefault();
@@ -179,7 +179,7 @@ export const ProductFileManager = ({ product, onUpdate }) => {
                   {hasFile(type.key) && (
                     <Button
                       variant="outline"
-                      className="border-slate-700 text-foreground hover:bg-slate-800"
+                      className="border-border text-foreground hover:bg-muted"
                       onClick={() => handleFileDownload(type.key)}
                     >
                       <Download className="w-4 h-4" />
@@ -188,7 +188,7 @@ export const ProductFileManager = ({ product, onUpdate }) => {
                 </div>
 
                 {hasFile(type.key) && (
-                  <div className="mt-2 text-xs text-slate-400">
+                  <div className="mt-2 text-xs text-muted-foreground">
                     <p>Arquivo: {product.file_models[type.key].filename}</p>
                     <p>Enviado em: {new Date(product.file_models[type.key].uploaded_at).toLocaleString('pt-BR')}</p>
                   </div>

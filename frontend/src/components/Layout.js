@@ -68,7 +68,7 @@ const Sidebar = ({ mobile = false, onItemClick }) => {
               to={item.path}
               data-testid={`nav-${item.path.slice(1)}`}
               onClick={onItemClick}
-              className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-smooth ${
+              className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
                 isActive
                   ? 'bg-primary text-primary-foreground shadow-md'
                   : 'text-foreground hover:bg-muted hover:text-foreground'

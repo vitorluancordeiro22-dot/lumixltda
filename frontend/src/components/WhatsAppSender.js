@@ -57,7 +57,7 @@ export const WhatsAppSender = ({ batch, product, trigger }) => {
     <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
       {trigger && React.cloneElement(trigger, { onClick: () => setDialogOpen(true) })}
       
-      <DialogContent className="bg-card border-white/10 max-w-lg">
+      <DialogContent className="bg-card border-border max-w-lg">
         <DialogHeader>
           <DialogTitle className="text-foreground flex items-center gap-2">
             <MessageCircle className="w-5 h-5 text-green-500" />
@@ -71,13 +71,13 @@ export const WhatsAppSender = ({ batch, product, trigger }) => {
             <Input
               value={phoneNumber}
               onChange={(e) => setPhoneNumber(e.target.value)}
-              className="bg-slate-900/50 border-slate-700 text-foreground"
+              className="bg-input border-border text-foreground"
               placeholder="Ex: 5511999999999 ou Nome do Grupo"
             />
-            <p className="text-xs text-slate-400 mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               Para número: use código do país + DDD + número (sem espaços)
             </p>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-muted-foreground">
               Para grupo: digite o nome exato do grupo salvo no WhatsApp
             </p>
           </div>
@@ -87,11 +87,11 @@ export const WhatsAppSender = ({ batch, product, trigger }) => {
             <Textarea
               value={customMessage}
               onChange={(e) => setCustomMessage(e.target.value)}
-              className="bg-slate-900/50 border-slate-700 text-foreground"
+              className="bg-input border-border text-foreground"
               rows={10}
               placeholder="Edite a mensagem se desejar..."
             />
-            <p className="text-xs text-slate-400 mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               Você pode editar a mensagem antes de enviar
             </p>
           </div>
@@ -104,7 +104,7 @@ export const WhatsAppSender = ({ batch, product, trigger }) => {
                 setCustomMessage('');
               }}
               variant="outline"
-              className="flex-1 border-slate-700 text-foreground hover:bg-slate-800"
+              className="flex-1 border-border text-foreground hover:bg-muted"
             >
               Cancelar
             </Button>
