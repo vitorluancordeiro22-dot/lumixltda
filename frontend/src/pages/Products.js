@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { Plus, Edit, Trash2, Package, MessageCircle } from 'lucide-react';
 import { ProductFileManager } from '../components/ProductFileManager';
 import { WhatsAppSender } from '../components/WhatsAppSender';
+import { WhatsAppMultiBatch } from '../components/WhatsAppMultiBatch';
 import { ProductPrintButton } from '../components/ProductPrintButton';
 
 export const Products = () => {
