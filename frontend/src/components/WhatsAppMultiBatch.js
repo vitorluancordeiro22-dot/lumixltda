@@ -317,14 +317,16 @@ export const WhatsAppMultiBatch = () => {
                   variant="outline"
                   className="flex-1"
                 >
-                  📋 Copiar Imagem
+                  <Copy className="w-4 h-4 mr-2" />
+                  Copiar
                 </Button>
                 <Button
                   onClick={handleDownloadImage}
                   variant="outline"
                   className="flex-1"
                 >
-                  📥 Baixar Imagem
+                  <Download className="w-4 h-4 mr-2" />
+                  Baixar
                 </Button>
               </div>
             </div>
