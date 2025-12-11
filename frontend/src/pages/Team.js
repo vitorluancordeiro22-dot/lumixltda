@@ -128,7 +128,7 @@ export const Team = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-2">Equipe</h1>
-          <p className="text-lg text-slate-300">Gerencie os membros da equipe</p>
+          <p className="text-lg text-muted-foreground">Gerencie os membros da equipe</p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
           <DialogTrigger asChild>
@@ -137,18 +137,18 @@ export const Team = () => {
               Novo Membro
             </Button>
           </DialogTrigger>
-          <DialogContent className="bg-card border-white/10">
+          <DialogContent className="bg-card border-border">
             <DialogHeader>
               <DialogTitle className="text-foreground">{selectedMember ? 'Editar' : 'Novo'} Membro</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <Label className="text-foreground">Nome</Label>
-                <Input value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="bg-slate-900/50 border-slate-700 text-foreground" required />
+                <Input value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="bg-input border-border text-foreground" required />
               </div>
               <div>
                 <Label className="text-foreground">Cargo/Função</Label>
-                <Input value={formData.role} onChange={(e) => setFormData({...formData, role: e.target.value})} className="bg-slate-900/50 border-slate-700 text-foreground" required placeholder="Ex: Operador, Pesador, Envasador" />
+                <Input value={formData.role} onChange={(e) => setFormData({...formData, role: e.target.value})} className="bg-input border-border text-foreground" required placeholder="Ex: Operador, Pesador, Envasador" />
               </div>
               <Button type="submit" disabled={submitting} className="w-full bg-primary hover:bg-primary/90">Salvar</Button>
             </form>
@@ -161,7 +161,7 @@ export const Team = () => {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {members.map(member => (
-            <Card key={member.id} data-testid={`member-card-${member.id}`} className="p-6 glass-effect border-white/5 hover:border-primary/50 transition-smooth">
+            <Card key={member.id} data-testid={`member-card-${member.id}`} className="p-6  border hover:border-primary/50 transition-all">
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-start gap-4 flex-1 cursor-pointer" onClick={() => handleViewHistory(member)}>
                   <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center">
@@ -169,11 +169,11 @@ export const Team = () => {
                   </div>
                   <div>
                     <h3 className="text-xl font-bold text-foreground mb-1 hover:text-primary transition-colors">{member.name}</h3>
-                    <p className="text-sm text-slate-400">{member.role}</p>
+                    <p className="text-sm text-muted-foreground">{member.role}</p>
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  <Button size="icon" variant="ghost" onClick={() => handleEdit(member)} className="text-slate-300 hover:text-foreground">
+                  <Button size="icon" variant="ghost" onClick={() => handleEdit(member)} className="text-muted-foreground hover:text-foreground">
                     <Edit className="w-4 h-4" />
                   </Button>
                   <Button size="icon" variant="ghost" onClick={() => handleDelete(member.id)} className="text-red-400 hover:text-red-300">
@@ -185,7 +185,7 @@ export const Team = () => {
                 variant="outline" 
                 size="sm" 
                 onClick={() => handleViewHistory(member)}
-                className="w-full border-slate-700 text-slate-300 hover:text-foreground hover:bg-slate-800"
+                className="w-full border-border text-muted-foreground hover:text-foreground hover:bg-muted"
               >
                 Ver Histórico de Envasamento
               </Button>
@@ -196,7 +196,7 @@ export const Team = () => {
 
       {/* History Dialog */}
       <Dialog open={historyDialogOpen} onOpenChange={setHistoryDialogOpen}>
-        <DialogContent className="bg-card border-white/10 max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="bg-card border-border max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-foreground">
               Histórico de Envasamento - {selectedMember?.name}
@@ -209,12 +209,12 @@ export const Team = () => {
             <div className="space-y-6">
               {/* Summary */}
               <div className="grid grid-cols-2 gap-4">
-                <Card className="p-4 glass-effect border-white/5">
-                  <p className="text-sm text-slate-400 mb-1">Total Envasado</p>
+                <Card className="p-4  border">
+                  <p className="text-sm text-muted-foreground mb-1">Total Envasado</p>
                   <p className="text-3xl font-bold text-primary">{memberHistory.total_liters_bottled.toFixed(1)}L</p>
                 </Card>
-                <Card className="p-4 glass-effect border-white/5">
-                  <p className="text-sm text-slate-400 mb-1">Operações</p>
+                <Card className="p-4  border">
+                  <p className="text-sm text-muted-foreground mb-1">Operações</p>
                   <p className="text-3xl font-bold text-foreground">{memberHistory.total_operations}</p>
                 </Card>
               </div>
@@ -223,18 +223,18 @@ export const Team = () => {
               <div className="space-y-3">
                 <h3 className="text-lg font-semibold text-foreground">Histórico Detalhado</h3>
                 {memberHistory.history.length === 0 ? (
-                  <p className="text-slate-400 text-center py-8">Nenhuma operação de envasamento registrada</p>
+                  <p className="text-muted-foreground text-center py-8">Nenhuma operação de envasamento registrada</p>
                 ) : (
                   memberHistory.history.map((item) => (
-                    <Card key={item.id} className="p-4 glass-effect border-white/5">
+                    <Card key={item.id} className="p-4  border">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
                           <p className="text-foreground font-semibold">{item.product_name}</p>
-                          <p className="text-sm text-slate-400">Lote: {item.batch_number}</p>
-                          <p className="text-xs text-slate-500">
+                          <p className="text-sm text-muted-foreground">Lote: {item.batch_number}</p>
+                          <p className="text-xs text-muted-foreground/70">
                             {new Date(item.date).toLocaleString('pt-BR')}
                           </p>
-                          <div className="mt-2 flex gap-4 text-sm text-slate-300">
+                          <div className="mt-2 flex gap-4 text-sm text-muted-foreground">
                             <span>1L: {item.one_liter}</span>
                             <span>2L: {item.two_liter}</span>
                             <span>5L: {item.five_liter}</span>

@@ -114,11 +114,11 @@ export const Counting = () => {
     <div className="space-y-8">
       <div>
         <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-2">Contagem / Envase</h1>
-        <p className="text-lg text-slate-300">Registre as quantidades envasadas</p>
+        <p className="text-lg text-muted-foreground">Registre as quantidades envasadas</p>
       </div>
 
       {/* Batch Selection */}
-      <Card className="p-6 glass-effect border-white/5">
+      <Card className="p-6  border">
         <Label className="text-foreground text-lg mb-3 block">Selecione o Lote em Aberto</Label>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {batches.map(batch => (
@@ -126,16 +126,16 @@ export const Counting = () => {
               key={batch.id}
               data-testid={`batch-select-${batch.id}`}
               onClick={() => setSelectedBatch(batch)}
-              className={`p-4 rounded-lg border-2 transition-smooth text-left ${
+              className={`p-4 rounded-lg border-2 transition-all text-left ${
                 selectedBatch?.id === batch.id
                   ? 'border-primary bg-primary/10'
-                  : 'border-slate-700 hover:border-slate-600 bg-slate-900/30'
+                  : 'border-border hover:border-primary/30 bg-muted/50'
               }`}
             >
               <p className="text-foreground font-bold mb-1">{getProductName(batch.product_id)}</p>
-              <p className="text-sm text-slate-400">Lote: {batch.batch_number}</p>
-              <p className="text-sm text-slate-400">Planejado: {batch.planned_liters}L</p>
-              <p className="text-sm text-slate-400">Envasado: {batch.total_bottled}L</p>
+              <p className="text-sm text-muted-foreground">Lote: {batch.batch_number}</p>
+              <p className="text-sm text-muted-foreground">Planejado: {batch.planned_liters}L</p>
+              <p className="text-sm text-muted-foreground">Envasado: {batch.total_bottled}L</p>
             </button>
           ))}
         </div>
@@ -144,15 +144,15 @@ export const Counting = () => {
       {selectedBatch && (
         <>
           {/* Progress */}
-          <Card className="p-6 glass-effect border-white/5">
+          <Card className="p-6  border">
             <div className="mb-4">
               <div className="flex items-center justify-between mb-2">
-                <p className="text-slate-400">Progresso do Lote</p>
+                <p className="text-muted-foreground">Progresso do Lote</p>
                 <p className="text-foreground font-bold">
                   {selectedBatch.total_bottled.toFixed(1)} / {selectedBatch.planned_liters} L
                 </p>
               </div>
-              <div className="w-full bg-slate-800 rounded-full h-4 overflow-hidden">
+              <div className="w-full bg-muted rounded-full h-4 overflow-hidden">
                 <div
                   className="h-full bg-primary transition-all"
                   style={{ width: `${Math.min((selectedBatch.total_bottled / selectedBatch.planned_liters) * 100, 100)}%` }}
@@ -165,7 +165,7 @@ export const Counting = () => {
           </Card>
 
           {/* Counting Form */}
-          <Card className="p-6 glass-effect border-white/5">
+          <Card className="p-6  border">
             <h2 className="text-2xl font-bold text-foreground mb-6">Registrar Contagem</h2>
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -176,10 +176,10 @@ export const Counting = () => {
                     data-testid="one-liter-input"
                     value={formData.one_liter}
                     onChange={(e) => setFormData({...formData, one_liter: parseInt(e.target.value) || 0})}
-                    className="h-14 text-xl bg-slate-900/50 border-slate-700 text-foreground text-center"
+                    className="h-14 text-xl bg-input border-border text-foreground text-center"
                     min="0"
                   />
-                  <p className="text-center text-slate-400 text-sm">Total: {formData.one_liter * 1}L</p>
+                  <p className="text-center text-muted-foreground text-sm">Total: {formData.one_liter * 1}L</p>
                 </div>
                 <div className="space-y-2">
                   <Label className="text-foreground text-lg">2 Litros</Label>
@@ -188,10 +188,10 @@ export const Counting = () => {
                     data-testid="two-liter-input"
                     value={formData.two_liter}
                     onChange={(e) => setFormData({...formData, two_liter: parseInt(e.target.value) || 0})}
-                    className="h-14 text-xl bg-slate-900/50 border-slate-700 text-foreground text-center"
+                    className="h-14 text-xl bg-input border-border text-foreground text-center"
                     min="0"
                   />
-                  <p className="text-center text-slate-400 text-sm">Total: {formData.two_liter * 2}L</p>
+                  <p className="text-center text-muted-foreground text-sm">Total: {formData.two_liter * 2}L</p>
                 </div>
                 <div className="space-y-2">
                   <Label className="text-foreground text-lg">5 Litros</Label>
@@ -200,10 +200,10 @@ export const Counting = () => {
                     data-testid="five-liter-input"
                     value={formData.five_liter}
                     onChange={(e) => setFormData({...formData, five_liter: parseInt(e.target.value) || 0})}
-                    className="h-14 text-xl bg-slate-900/50 border-slate-700 text-foreground text-center"
+                    className="h-14 text-xl bg-input border-border text-foreground text-center"
                     min="0"
                   />
-                  <p className="text-center text-slate-400 text-sm">Total: {formData.five_liter * 5}L</p>
+                  <p className="text-center text-muted-foreground text-sm">Total: {formData.five_liter * 5}L</p>
                 </div>
               </div>
               
@@ -216,10 +216,10 @@ export const Counting = () => {
               <div>
                 <Label className="text-foreground">Operador</Label>
                 <Select value={formData.operator} onValueChange={(v) => setFormData({...formData, operator: v})}>
-                  <SelectTrigger className="bg-slate-900/50 border-slate-700 text-foreground h-12">
+                  <SelectTrigger className="bg-input border-border text-foreground h-12">
                     <SelectValue placeholder="Quem fez o envase?" />
                   </SelectTrigger>
-                  <SelectContent className="bg-slate-900 border-slate-700">
+                  <SelectContent className="bg-card border-border">
                     {teamMembers.map(m => (
                       <SelectItem key={m.id} value={m.name} className="text-foreground">{m.name}</SelectItem>
                     ))}
@@ -236,15 +236,15 @@ export const Counting = () => {
 
           {/* History */}
           {countings.length > 0 && (
-            <Card className="p-6 glass-effect border-white/5">
+            <Card className="p-6  border">
               <h3 className="text-xl font-bold text-foreground mb-4">Histórico de Contagens</h3>
               <div className="space-y-3">
                 {countings.map((count) => (
-                  <div key={count.id} className="p-4 rounded-lg bg-slate-900/30 border border-slate-700">
+                  <div key={count.id} className="p-4 rounded-lg bg-muted/50 border border-border">
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-foreground">1L: {count.one_liter} | 2L: {count.two_liter} | 5L: {count.five_liter}</p>
-                        <p className="text-sm text-slate-400">Operador: {count.operator}</p>
+                        <p className="text-sm text-muted-foreground">Operador: {count.operator}</p>
                       </div>
                       <p className="text-foreground font-bold">{count.total}L</p>
                     </div>

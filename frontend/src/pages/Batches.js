@@ -150,11 +150,11 @@ export const Batches = () => {
     <div className="space-y-8">
       <div>
         <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-2">Gerenciar Lotes</h1>
-        <p className="text-lg text-slate-300">Visualize e edite todos os lotes de produtos e matérias-primas</p>
+        <p className="text-lg text-muted-foreground">Visualize e edite todos os lotes de produtos e matérias-primas</p>
       </div>
 
       <Tabs defaultValue="products" className="space-y-6">
-        <TabsList className="bg-slate-800 border border-slate-700">
+        <TabsList className="bg-muted border border-border">
           <TabsTrigger value="products" className="data-[state=active]:bg-primary">
             <Package className="w-4 h-4 mr-2" />
             Lotes de Produtos
@@ -169,14 +169,14 @@ export const Batches = () => {
           {loading ? (
             <div className="text-foreground">Carregando...</div>
           ) : productBatches.length === 0 ? (
-            <Card className="p-12 glass-effect border-white/5 text-center">
-              <Package className="w-16 h-16 text-slate-600 mx-auto mb-4" />
-              <p className="text-slate-400">Nenhum lote de produto encontrado</p>
+            <Card className="p-12  border text-center">
+              <Package className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+              <p className="text-muted-foreground">Nenhum lote de produto encontrado</p>
             </Card>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {productBatches.map(batch => (
-                <Card key={batch.id} data-testid={`product-batch-${batch.id}`} className="p-6 glass-effect border-white/5 hover:border-primary/50 transition-smooth">
+                <Card key={batch.id} data-testid={`product-batch-${batch.id}`} className="p-6  border hover:border-primary/50 transition-all">
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
@@ -185,15 +185,15 @@ export const Batches = () => {
                         </Badge>
                       </div>
                       <h3 className="text-xl font-bold text-foreground mb-1">{getProductName(batch.product_id)}</h3>
-                      <p className="text-sm text-slate-400">Lote: {batch.batch_number}</p>
-                      <p className="text-xs text-slate-500">{formatBatchNumber(batch.batch_number)}</p>
+                      <p className="text-sm text-muted-foreground">Lote: {batch.batch_number}</p>
+                      <p className="text-xs text-muted-foreground/70">{formatBatchNumber(batch.batch_number)}</p>
                     </div>
                     <div className="flex gap-1">
                       <Button 
                         size="icon" 
                         variant="ghost" 
                         onClick={() => handleEdit(batch, 'product')}
-                        className="text-slate-300 hover:text-foreground"
+                        className="text-muted-foreground hover:text-foreground"
                       >
                         <Edit className="w-4 h-4" />
                       </Button>
@@ -208,12 +208,12 @@ export const Batches = () => {
                     </div>
                   </div>
                   <div className="space-y-2 text-sm">
-                    <div className="flex items-center gap-2 text-slate-400">
+                    <div className="flex items-center gap-2 text-muted-foreground">
                       <Calendar className="w-4 h-4" />
                       {new Date(batch.date).toLocaleDateString('pt-BR')}
                     </div>
-                    <div className="p-3 rounded-lg bg-slate-800/50">
-                      <p className="text-xs text-slate-400">Planejado / Envasado</p>
+                    <div className="p-3 rounded-lg bg-muted">
+                      <p className="text-xs text-muted-foreground">Planejado / Envasado</p>
                       <p className="text-lg font-bold text-foreground">
                         {batch.planned_liters}L / {batch.total_bottled}L
                       </p>
@@ -229,14 +229,14 @@ export const Batches = () => {
           {loading ? (
             <div className="text-foreground">Carregando...</div>
           ) : rawMaterialBatches.length === 0 ? (
-            <Card className="p-12 glass-effect border-white/5 text-center">
-              <Boxes className="w-16 h-16 text-slate-600 mx-auto mb-4" />
-              <p className="text-slate-400">Nenhum lote de matéria-prima encontrado</p>
+            <Card className="p-12  border text-center">
+              <Boxes className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+              <p className="text-muted-foreground">Nenhum lote de matéria-prima encontrado</p>
             </Card>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {rawMaterialBatches.map(batch => (
-                <Card key={batch.id} data-testid={`rm-batch-${batch.id}`} className="p-6 glass-effect border-white/5 hover:border-primary/50 transition-smooth">
+                <Card key={batch.id} data-testid={`rm-batch-${batch.id}`} className="p-6  border hover:border-primary/50 transition-all">
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
@@ -245,15 +245,15 @@ export const Batches = () => {
                         </Badge>
                       </div>
                       <h3 className="text-xl font-bold text-foreground mb-1">{getRawMaterialName(batch.raw_material_id)}</h3>
-                      <p className="text-sm text-slate-400">Lote: {batch.batch_number}</p>
-                      <p className="text-xs text-slate-500">{formatBatchNumber(batch.batch_number)}</p>
+                      <p className="text-sm text-muted-foreground">Lote: {batch.batch_number}</p>
+                      <p className="text-xs text-muted-foreground/70">{formatBatchNumber(batch.batch_number)}</p>
                     </div>
                     <div className="flex gap-1">
                       <Button 
                         size="icon" 
                         variant="ghost" 
                         onClick={() => handleEdit(batch, 'material')}
-                        className="text-slate-300 hover:text-foreground"
+                        className="text-muted-foreground hover:text-foreground"
                       >
                         <Edit className="w-4 h-4" />
                       </Button>
@@ -268,12 +268,12 @@ export const Batches = () => {
                     </div>
                   </div>
                   <div className="space-y-2 text-sm">
-                    <div className="flex items-center gap-2 text-slate-400">
+                    <div className="flex items-center gap-2 text-muted-foreground">
                       <Calendar className="w-4 h-4" />
                       {new Date(batch.date).toLocaleDateString('pt-BR')}
                     </div>
-                    <div className="p-3 rounded-lg bg-slate-800/50">
-                      <p className="text-xs text-slate-400">Quantidade</p>
+                    <div className="p-3 rounded-lg bg-muted">
+                      <p className="text-xs text-muted-foreground">Quantidade</p>
                       <p className="text-lg font-bold text-foreground">{batch.quantity}</p>
                     </div>
                   </div>
@@ -286,7 +286,7 @@ export const Batches = () => {
 
       {/* Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="bg-card border-white/10">
+        <DialogContent className="bg-card border-border">
           <DialogHeader>
             <DialogTitle className="text-foreground">Editar Lote</DialogTitle>
           </DialogHeader>
@@ -296,12 +296,12 @@ export const Batches = () => {
               <Input
                 value={formData.batch_number}
                 onChange={(e) => setFormData({...formData, batch_number: e.target.value})}
-                className="bg-slate-900/50 border-slate-700 text-foreground font-mono text-lg"
+                className="bg-input border-border text-foreground font-mono text-lg"
                 placeholder="AAMMCCC"
                 maxLength={7}
                 required
               />
-              <p className="text-xs text-slate-500 mt-1">
+              <p className="text-xs text-muted-foreground/70 mt-1">
                 Formato: AAMMCCC (ex: 2512001 = Dez/2025 #001)
               </p>
             </div>
@@ -312,7 +312,7 @@ export const Batches = () => {
                 type="date"
                 value={formData.date}
                 onChange={(e) => setFormData({...formData, date: e.target.value})}
-                className="bg-slate-900/50 border-slate-700 text-foreground"
+                className="bg-input border-border text-foreground"
                 required
               />
             </div>
@@ -324,7 +324,7 @@ export const Batches = () => {
                   <Input
                     value={formData.unit}
                     onChange={(e) => setFormData({...formData, unit: e.target.value})}
-                    className="bg-slate-900/50 border-slate-700 text-foreground"
+                    className="bg-input border-border text-foreground"
                     required
                   />
                 </div>
@@ -335,7 +335,7 @@ export const Batches = () => {
                     step="0.01"
                     value={formData.planned_liters}
                     onChange={(e) => setFormData({...formData, planned_liters: e.target.value})}
-                    className="bg-slate-900/50 border-slate-700 text-foreground"
+                    className="bg-input border-border text-foreground"
                     required
                   />
                 </div>
@@ -348,7 +348,7 @@ export const Batches = () => {
                   step="0.01"
                   value={formData.quantity}
                   onChange={(e) => setFormData({...formData, quantity: e.target.value})}
-                  className="bg-slate-900/50 border-slate-700 text-foreground"
+                  className="bg-input border-border text-foreground"
                   required
                 />
               </div>

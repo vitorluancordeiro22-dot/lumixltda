@@ -119,7 +119,7 @@ export const Archives = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-2">Arquivos Mensais</h1>
-          <p className="text-lg text-slate-300">Histórico de lotes finalizados por mês</p>
+          <p className="text-lg text-muted-foreground">Histórico de lotes finalizados por mês</p>
         </div>
         <Button 
           onClick={handleAutoArchive}
@@ -134,21 +134,21 @@ export const Archives = () => {
       {loading ? (
         <div className="text-foreground">Carregando...</div>
       ) : months.length === 0 ? (
-        <Card className="p-12 glass-effect border-white/5 text-center">
-          <Archive className="w-16 h-16 text-slate-600 mx-auto mb-4" />
-          <p className="text-slate-400 text-lg mb-2">Nenhum arquivo mensal disponível</p>
-          <p className="text-slate-500 text-sm">
+        <Card className="p-12  border text-center">
+          <Archive className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+          <p className="text-muted-foreground text-lg mb-2">Nenhum arquivo mensal disponível</p>
+          <p className="text-muted-foreground/70 text-sm">
             Clique em &ldquo;Arquivar Finalizados&rdquo; para arquivar lotes concluídos
           </p>
         </Card>
       ) : (
         <>
           {/* Month Selector */}
-          <Card className="p-6 glass-effect border-white/5">
+          <Card className="p-6  border">
             <div className="flex items-center gap-4">
               <Calendar className="w-6 h-6 text-primary" />
               <div className="flex-1">
-                <p className="text-sm text-slate-400 mb-2">Selecionar Mês:</p>
+                <p className="text-sm text-muted-foreground mb-2">Selecionar Mês:</p>
                 <Select 
                   value={selectedMonth ? `${selectedMonth.year}-${selectedMonth.month}` : ''}
                   onValueChange={(value) => {
@@ -156,10 +156,10 @@ export const Archives = () => {
                     setSelectedMonth({ year: parseInt(year), month: parseInt(month), month_name: months.find(m => m.year === parseInt(year) && m.month === parseInt(month))?.month_name });
                   }}
                 >
-                  <SelectTrigger className="bg-slate-900/50 border-slate-700 text-foreground h-12 text-lg">
+                  <SelectTrigger className="bg-input border-border text-foreground h-12 text-lg">
                     <SelectValue placeholder="Selecione o mês" />
                   </SelectTrigger>
-                  <SelectContent className="bg-slate-900 border-slate-700">
+                  <SelectContent className="bg-card border-border">
                     {months.map((m) => (
                       <SelectItem key={`${m.year}-${m.month}`} value={`${m.year}-${m.month}`} className="text-foreground">
                         {m.month_name}
@@ -173,7 +173,7 @@ export const Archives = () => {
 
           {selectedMonth && (
             <Tabs defaultValue="products" className="space-y-6">
-              <TabsList className="bg-slate-800 border border-slate-700">
+              <TabsList className="bg-muted border border-border">
                 <TabsTrigger value="products" className="data-[state=active]:bg-primary">
                   <Package className="w-4 h-4 mr-2" />
                   Produtos ({productBatches.length})
@@ -186,27 +186,27 @@ export const Archives = () => {
 
               <TabsContent value="products" className="space-y-4">
                 {productBatches.length === 0 ? (
-                  <Card className="p-12 glass-effect border-white/5 text-center">
-                    <Package className="w-16 h-16 text-slate-600 mx-auto mb-4" />
-                    <p className="text-slate-400">Nenhum produto arquivado neste mês</p>
+                  <Card className="p-12  border text-center">
+                    <Package className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+                    <p className="text-muted-foreground">Nenhum produto arquivado neste mês</p>
                   </Card>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {productBatches.map(batch => (
-                      <Card key={batch.id} className="p-6 glass-effect border-white/5">
+                      <Card key={batch.id} className="p-6  border">
                         <div className="mb-4">
                           <Badge className="bg-emerald-600 mb-2">Finalizado</Badge>
                           <h3 className="text-xl font-bold text-foreground mb-1">{getProductName(batch.product_id)}</h3>
-                          <p className="text-sm text-slate-400">Lote: {batch.batch_number}</p>
-                          <p className="text-xs text-slate-500">{formatBatchNumber(batch.batch_number)}</p>
+                          <p className="text-sm text-muted-foreground">Lote: {batch.batch_number}</p>
+                          <p className="text-xs text-muted-foreground/70">{formatBatchNumber(batch.batch_number)}</p>
                         </div>
                         <div className="space-y-2 text-sm">
-                          <div className="flex items-center gap-2 text-slate-400">
+                          <div className="flex items-center gap-2 text-muted-foreground">
                             <Calendar className="w-4 h-4" />
                             {new Date(batch.date).toLocaleDateString('pt-BR')}
                           </div>
-                          <div className="p-3 rounded-lg bg-slate-800/50">
-                            <p className="text-xs text-slate-400">Planejado / Envasado</p>
+                          <div className="p-3 rounded-lg bg-muted">
+                            <p className="text-xs text-muted-foreground">Planejado / Envasado</p>
                             <p className="text-lg font-bold text-foreground">
                               {batch.planned_liters}L / {batch.total_bottled}L
                             </p>
@@ -220,27 +220,27 @@ export const Archives = () => {
 
               <TabsContent value="materials" className="space-y-4">
                 {rawMaterialBatches.length === 0 ? (
-                  <Card className="p-12 glass-effect border-white/5 text-center">
-                    <Boxes className="w-16 h-16 text-slate-600 mx-auto mb-4" />
-                    <p className="text-slate-400">Nenhuma matéria-prima arquivada neste mês</p>
+                  <Card className="p-12  border text-center">
+                    <Boxes className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+                    <p className="text-muted-foreground">Nenhuma matéria-prima arquivada neste mês</p>
                   </Card>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {rawMaterialBatches.map(batch => (
-                      <Card key={batch.id} className="p-6 glass-effect border-white/5">
+                      <Card key={batch.id} className="p-6  border">
                         <div className="mb-4">
                           <Badge className="bg-emerald-600 mb-2">Finalizado</Badge>
                           <h3 className="text-xl font-bold text-foreground mb-1">{getRawMaterialName(batch.raw_material_id)}</h3>
-                          <p className="text-sm text-slate-400">Lote: {batch.batch_number}</p>
-                          <p className="text-xs text-slate-500">{formatBatchNumber(batch.batch_number)}</p>
+                          <p className="text-sm text-muted-foreground">Lote: {batch.batch_number}</p>
+                          <p className="text-xs text-muted-foreground/70">{formatBatchNumber(batch.batch_number)}</p>
                         </div>
                         <div className="space-y-2 text-sm">
-                          <div className="flex items-center gap-2 text-slate-400">
+                          <div className="flex items-center gap-2 text-muted-foreground">
                             <Calendar className="w-4 h-4" />
                             {new Date(batch.date).toLocaleDateString('pt-BR')}
                           </div>
-                          <div className="p-3 rounded-lg bg-slate-800/50">
-                            <p className="text-xs text-slate-400">Quantidade</p>
+                          <div className="p-3 rounded-lg bg-muted">
+                            <p className="text-xs text-muted-foreground">Quantidade</p>
                             <p className="text-lg font-bold text-foreground">{batch.quantity}</p>
                           </div>
                         </div>

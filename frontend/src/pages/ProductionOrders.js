@@ -178,7 +178,7 @@ export const ProductionOrders = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-2">Ordens de Produção</h1>
-          <p className="text-lg text-slate-300">Gerencie suas ordens de produção</p>
+          <p className="text-lg text-muted-foreground">Gerencie suas ordens de produção</p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
           <DialogTrigger asChild>
@@ -187,7 +187,7 @@ export const ProductionOrders = () => {
               Nova Ordem
             </Button>
           </DialogTrigger>
-          <DialogContent className="bg-card border-white/10 max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="bg-card border-border max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="text-foreground">Nova Ordem de Produção</DialogTitle>
             </DialogHeader>
@@ -195,10 +195,10 @@ export const ProductionOrders = () => {
               <div>
                 <Label className="text-foreground">Produto</Label>
                 <Select value={formData.product_id} onValueChange={handleProductChange}>
-                  <SelectTrigger className="bg-slate-900/50 border-slate-700 text-foreground">
+                  <SelectTrigger className="bg-input border-border text-foreground">
                     <SelectValue placeholder="Selecione o produto" />
                   </SelectTrigger>
-                  <SelectContent className="bg-slate-900 border-slate-700">
+                  <SelectContent className="bg-card border-border">
                     {products.map(p => (
                       <SelectItem key={p.id} value={p.id} className="text-foreground">{p.name}</SelectItem>
                     ))}
@@ -208,10 +208,10 @@ export const ProductionOrders = () => {
               <div>
                 <Label className="text-foreground">Lote do Produto</Label>
                 <Select value={formData.product_batch_id} onValueChange={(v) => setFormData({...formData, product_batch_id: v})}>
-                  <SelectTrigger className="bg-slate-900/50 border-slate-700 text-foreground">
+                  <SelectTrigger className="bg-input border-border text-foreground">
                     <SelectValue placeholder="Selecione o lote" />
                   </SelectTrigger>
-                  <SelectContent className="bg-slate-900 border-slate-700">
+                  <SelectContent className="bg-card border-border">
                     {batches.filter(b => b.product_id === formData.product_id).map(b => (
                       <SelectItem key={b.id} value={b.id} className="text-foreground">{b.batch_number}</SelectItem>
                     ))}
@@ -221,20 +221,20 @@ export const ProductionOrders = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label className="text-foreground">Data</Label>
-                  <Input type="date" value={formData.date} onChange={(e) => setFormData({...formData, date: e.target.value})} className="bg-slate-900/50 border-slate-700 text-foreground" />
+                  <Input type="date" value={formData.date} onChange={(e) => setFormData({...formData, date: e.target.value})} className="bg-input border-border text-foreground" />
                 </div>
                 <div>
                   <Label className="text-foreground">Tamanho da Produção</Label>
-                  <Input type="number" step="0.01" value={formData.production_size} onChange={(e) => handleProductionSizeChange(e.target.value)} className="bg-slate-900/50 border-slate-700 text-foreground" required placeholder="Litros" />
+                  <Input type="number" step="0.01" value={formData.production_size} onChange={(e) => handleProductionSizeChange(e.target.value)} className="bg-input border-border text-foreground" required placeholder="Litros" />
                 </div>
               </div>
               <div>
                 <Label className="text-foreground">Pesador</Label>
                 <Select value={formData.weigher} onValueChange={(v) => setFormData({...formData, weigher: v})}>
-                  <SelectTrigger className="bg-slate-900/50 border-slate-700 text-foreground">
+                  <SelectTrigger className="bg-input border-border text-foreground">
                     <SelectValue placeholder="Selecione" />
                   </SelectTrigger>
-                  <SelectContent className="bg-slate-900 border-slate-700">
+                  <SelectContent className="bg-card border-border">
                     {teamMembers.map(m => (
                       <SelectItem key={m.id} value={m.name} className="text-foreground">{m.name}</SelectItem>
                     ))}
@@ -244,9 +244,9 @@ export const ProductionOrders = () => {
               {formData.materials_used.length > 0 && (
                 <div className="space-y-2">
                   <Label className="text-foreground">Matérias-Primas (Cálculo Automático)</Label>
-                  <div className="space-y-2 p-4 rounded-lg bg-slate-900/50 border border-slate-700">
+                  <div className="space-y-2 p-4 rounded-lg bg-input border border-border">
                     {formData.materials_used.map((material, idx) => (
-                      <div key={idx} className="text-sm text-slate-300">
+                      <div key={idx} className="text-sm text-muted-foreground">
                         Material {idx + 1}: {material.quantity.toFixed(3)} unidades
                       </div>
                     ))}
@@ -264,11 +264,11 @@ export const ProductionOrders = () => {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {orders.map(order => (
-            <Card key={order.id} data-testid={`order-card-${order.id}`} className="p-6 glass-effect border-white/5">
+            <Card key={order.id} data-testid={`order-card-${order.id}`} className="p-6  border">
               <div className="flex items-start justify-between mb-4">
                 <div className="flex-1">
                   <h3 className="text-xl font-bold text-foreground mb-2">{getProductName(order.product_id)}</h3>
-                  <div className="space-y-1 text-sm text-slate-400">
+                  <div className="space-y-1 text-sm text-muted-foreground">
                     <p>Lote: {getBatchNumber(order.product_batch_id)}</p>
                     <p>Data: {new Date(order.date).toLocaleDateString('pt-BR')}</p>
                     <p>Pesador: {order.weigher}</p>

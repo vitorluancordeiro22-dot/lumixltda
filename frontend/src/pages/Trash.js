@@ -67,31 +67,31 @@ export const Trash = () => {
     <div className="space-y-8">
       <div>
         <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-2">Lixeira</h1>
-        <p className="text-lg text-slate-300">Restaure ou apague itens permanentemente</p>
+        <p className="text-lg text-muted-foreground">Restaure ou apague itens permanentemente</p>
       </div>
 
       {loading ? (
         <div>Carregando...</div>
       ) : items.length === 0 ? (
-        <Card className="p-12 glass-effect border-white/5 text-center">
+        <Card className="p-12  border text-center">
           <div className="flex flex-col items-center justify-center">
-            <Trash2 className="w-16 h-16 text-slate-600 mb-4" />
-            <p className="text-slate-400 text-lg">A lixeira está vazia</p>
+            <Trash2 className="w-16 h-16 text-muted-foreground mb-4" />
+            <p className="text-muted-foreground text-lg">A lixeira está vazia</p>
           </div>
         </Card>
       ) : (
         <div className="space-y-4">
           {items.map(item => (
-            <Card key={item.id} data-testid={`trash-item-${item.id}`} className="p-6 glass-effect border-white/5">
+            <Card key={item.id} data-testid={`trash-item-${item.id}`} className="p-6  border">
               <div className="flex items-center justify-between">
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
-                    <Badge variant="outline" className="border-slate-700 text-slate-300">
+                    <Badge variant="outline" className="border-border text-muted-foreground">
                       {getItemLabel(item.item_type)}
                     </Badge>
                     <h3 className="text-xl font-bold text-foreground">{getItemName(item)}</h3>
                   </div>
-                  <p className="text-sm text-slate-400">
+                  <p className="text-sm text-muted-foreground">
                     Excluído em: {new Date(item.deleted_at).toLocaleString('pt-BR')}
                   </p>
                 </div>
