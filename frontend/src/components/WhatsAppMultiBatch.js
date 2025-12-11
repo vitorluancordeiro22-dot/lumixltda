@@ -163,6 +163,33 @@ export const WhatsAppMultiBatch = () => {
     return canvas.toDataURL('image/png');
   };
 
+  const handleCopyImage = async () => {
+    if (selectedBatches.length === 0) {
+      toast.error('Selecione pelo menos um lote');
+      return;
+    }
+
+    try {
+      const imageData = generateTableImage();
+      
+      // Converter base64 para blob
+      const response = await fetch(imageData);
+      const blob = await response.blob();
+      
+      // Copiar para área de transferência
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          'image/png': blob
+        })
+      ]);
+      
+      toast.success('✅ Imagem copiada! Cole no WhatsApp (Ctrl+V)');
+    } catch (error) {
+      console.error('Erro ao copiar:', error);
+      toast.error('Erro ao copiar imagem. Use o botão de baixar.');
+    }
+  };
+
   const handleDownloadImage = () => {
     if (selectedBatches.length === 0) {
       toast.error('Selecione pelo menos um lote');
