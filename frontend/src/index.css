@@ -47,3 +47,166 @@
 ::-webkit-scrollbar-thumb:hover {
   background: #94A3B8;
 }
+
+/* ========================================
+   MODO MOBILE - Estilos otimizados para celular
+   ======================================== */
+
+body.mobile-mode {
+  /* Previne zoom indesejado */
+  touch-action: manipulation;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* Reduz tamanhos de texto no modo mobile */
+body.mobile-mode h1 {
+  font-size: 1.5rem !important;
+  line-height: 1.3 !important;
+}
+
+body.mobile-mode h2 {
+  font-size: 1.25rem !important;
+}
+
+body.mobile-mode h3 {
+  font-size: 1.1rem !important;
+}
+
+/* Cards mais compactos */
+body.mobile-mode .p-6 {
+  padding: 1rem !important;
+}
+
+body.mobile-mode .p-8 {
+  padding: 1rem !important;
+}
+
+/* Grid responsivo para mobile */
+body.mobile-mode .grid-cols-2,
+body.mobile-mode .grid-cols-3,
+body.mobile-mode .grid-cols-4,
+body.mobile-mode .md\:grid-cols-2,
+body.mobile-mode .md\:grid-cols-3,
+body.mobile-mode .md\:grid-cols-4,
+body.mobile-mode .lg\:grid-cols-2,
+body.mobile-mode .lg\:grid-cols-3,
+body.mobile-mode .lg\:grid-cols-4 {
+  grid-template-columns: 1fr !important;
+}
+
+/* Botões mais tocáveis */
+body.mobile-mode button {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+body.mobile-mode button.h-9 {
+  min-height: 44px !important;
+}
+
+/* Inputs mais acessíveis */
+body.mobile-mode input,
+body.mobile-mode select,
+body.mobile-mode textarea {
+  font-size: 16px !important; /* Previne zoom no iOS */
+  min-height: 44px;
+}
+
+/* Espaçamentos ajustados */
+body.mobile-mode .gap-6 {
+  gap: 1rem !important;
+}
+
+body.mobile-mode .gap-8 {
+  gap: 1rem !important;
+}
+
+body.mobile-mode .space-y-6 > * + * {
+  margin-top: 1rem !important;
+}
+
+body.mobile-mode .space-y-8 > * + * {
+  margin-top: 1rem !important;
+}
+
+/* Texto do subtítulo menor */
+body.mobile-mode .text-lg {
+  font-size: 0.95rem !important;
+}
+
+/* Badges e tags menores */
+body.mobile-mode [class*="Badge"],
+body.mobile-mode .badge {
+  font-size: 0.7rem !important;
+  padding: 0.2rem 0.5rem !important;
+}
+
+/* Tabelas responsivas */
+body.mobile-mode table {
+  display: block;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Dialog/Modal mais compacto */
+body.mobile-mode [role="dialog"] {
+  max-width: 95vw !important;
+  max-height: 90vh !important;
+  margin: 0.5rem !important;
+}
+
+body.mobile-mode [role="dialog"] .p-6 {
+  padding: 1rem !important;
+}
+
+/* Flex wrap para itens em linha */
+body.mobile-mode .flex.gap-2,
+body.mobile-mode .flex.gap-3,
+body.mobile-mode .flex.gap-4 {
+  flex-wrap: wrap;
+}
+
+/* Largura total para elementos flex */
+body.mobile-mode .flex-1 {
+  min-width: 100%;
+}
+
+/* Ajuste do container principal */
+body.mobile-mode main {
+  padding-top: 60px !important;
+}
+
+body.mobile-mode main > div {
+  padding: 0.75rem !important;
+}
+
+/* Texto mais legível */
+body.mobile-mode .text-sm {
+  font-size: 0.85rem !important;
+}
+
+body.mobile-mode .text-xs {
+  font-size: 0.75rem !important;
+}
+
+/* Cards em coluna única */
+body.mobile-mode .grid {
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+/* Ajuste de margens */
+body.mobile-mode .mb-8 {
+  margin-bottom: 1rem !important;
+}
+
+body.mobile-mode .mt-8 {
+  margin-top: 1rem !important;
+}
+
+/* Scroll suave */
+body.mobile-mode {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
