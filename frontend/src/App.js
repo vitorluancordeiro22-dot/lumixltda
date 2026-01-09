@@ -38,29 +38,31 @@ const PrivateRoute = ({ children }) => {
 function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/" element={<PrivateRoute><Layout /></PrivateRoute>}>
-            <Route index element={<Navigate to="/dashboard" replace />} />
-            <Route path="dashboard" element={<Dashboard />} />
-            <Route path="products" element={<Products />} />
-            <Route path="raw-materials" element={<RawMaterials />} />
-            <Route path="production-orders" element={<ProductionOrders />} />
-            <Route path="counting" element={<Counting />} />
-            <Route path="batches" element={<Batches />} />
-            <Route path="suppliers" element={<Suppliers />} />
-            <Route path="archives" element={<Archives />} />
-            <Route path="industrial-ops" element={<IndustrialOPs />} />
-            <Route path="laudos" element={<Laudos />} />
-            <Route path="batch-management" element={<BatchManagement />} />
-            <Route path="team" element={<Team />} />
-            <Route path="trash" element={<Trash />} />
-            <Route path="settings" element={<Settings />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
-      <Toaster position="top-right" theme="dark" />
+      <MobileProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="/" element={<PrivateRoute><Layout /></PrivateRoute>}>
+              <Route index element={<Navigate to="/dashboard" replace />} />
+              <Route path="dashboard" element={<Dashboard />} />
+              <Route path="products" element={<Products />} />
+              <Route path="raw-materials" element={<RawMaterials />} />
+              <Route path="production-orders" element={<ProductionOrders />} />
+              <Route path="counting" element={<Counting />} />
+              <Route path="batches" element={<Batches />} />
+              <Route path="suppliers" element={<Suppliers />} />
+              <Route path="archives" element={<Archives />} />
+              <Route path="industrial-ops" element={<IndustrialOPs />} />
+              <Route path="laudos" element={<Laudos />} />
+              <Route path="batch-management" element={<BatchManagement />} />
+              <Route path="team" element={<Team />} />
+              <Route path="trash" element={<Trash />} />
+              <Route path="settings" element={<Settings />} />
+            </Route>
+          </Routes>
+        </BrowserRouter>
+        <Toaster position="top-right" theme="dark" />
+      </MobileProvider>
     </AuthProvider>
   );
 }
