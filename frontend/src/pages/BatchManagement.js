@@ -73,11 +73,17 @@ export const BatchManagement = () => {
             rmb => rmb.raw_material_id === rm.id && rmb.quantity > 0
           ).sort((a, b) => new Date(b.date) - new Date(a.date));
 
+          // Cálculo PROPORCIONAL:
+          // quantity_per_liter é a quantidade para os litros_esperados do produto
+          // Se litros_planejados é diferente, calculamos proporcionalmente
+          const expectedLiters = product.expected_liters || 1;
+          const plannedLiters = batch.planned_liters || 0;
+          const quantityNeeded = (recipe.quantity_per_liter / expectedLiters) * plannedLiters;
+
           recipesWithDetails.push({
             ...recipe,
             raw_material: rm,
-            // A quantidade na receita é FIXA (não multiplica pela litragem)
-            quantity_needed: recipe.quantity_per_liter,
+            quantity_needed: quantityNeeded,
             batches: rmBatchesForThis
           });
         }
