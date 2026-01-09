@@ -71,3 +71,47 @@
 - Frontend routing and navigation working as expected
 - Modal dialogs and UI interactions functioning properly
 - Database contains test data with proper batch and recipe information
+
+---
+
+## TESTING RESULTS - 2025-01-09 (UPDATED TESTING)
+
+### Feature 1: Mobile Mode Button - ✅ WORKING PERFECTLY
+**Test Status:** PASSED
+**Details:**
+- ✅ "Usar no Celular" button found at bottom right corner
+- ✅ Sidebar disappears when clicked (desktop → mobile mode)
+- ✅ Hamburger menu (☰) appears at top left in mobile mode
+- ✅ Button text changes to "Modo Desktop" correctly
+- ✅ Hamburger menu opens mobile navigation drawer successfully
+- ✅ "Modo Desktop" button returns to desktop view
+- ✅ Sidebar reappears when returning to desktop mode
+- ✅ All transitions are smooth and responsive
+
+### Feature 2: Recipe Quantity Calculation - ✅ FIXED AND WORKING CORRECTLY
+**Test Status:** PASSED - CRITICAL FIX VERIFIED
+**Details:**
+- ✅ Successfully navigated to Gerenciar Lotes page
+- ✅ Found "Refrigerante Cocaccc" batch (Lote 2512011) with 333 Litros planejados
+- ✅ Opened batch details modal successfully
+- ✅ Found "Matérias-Primas da Receita" section
+- ✅ **CRITICAL VERIFICATION**: Recipe calculation is PROPORTIONAL and CORRECT
+  - Recipe shows: "100 Kg / 1000L" (recipe proportion)
+  - Calculated quantity: "Quantidade necessária para 333L: 33.3000 Kg"
+  - **Formula verified**: (100 Kg / 1000L) × 333L = 33.3 Kg ✅
+  - This is the CORRECT proportional calculation, NOT fixed quantity
+- ✅ Bug has been successfully FIXED - no more incorrect multiplication
+
+### Feature 3: Theme Consistency - ✅ WORKING
+**Test Status:** PASSED
+**Details:**
+- ✅ Light theme applied consistently across all pages
+- ✅ Proper contrast and readability maintained
+- ✅ UI elements render correctly in both desktop and mobile modes
+
+### Testing Agent Summary:
+- All requested features are working correctly
+- Mobile mode toggle functionality is fully implemented and responsive
+- Recipe quantity calculation has been fixed to use proportional calculation
+- No critical issues found during comprehensive testing
+- Application is ready for production use
