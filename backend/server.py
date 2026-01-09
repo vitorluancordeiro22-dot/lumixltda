@@ -1018,9 +1018,13 @@ async def get_employee_history(member_id: str, current_user = Depends(get_curren
                 'date': counting['created_at'],
                 'product_name': product['name'] if product else 'N/A',
                 'batch_number': batch['batch_number'],
-                'one_liter': counting['one_liter'],
-                'two_liter': counting['two_liter'],
-                'five_liter': counting['five_liter'],
+                'half_liter': counting.get('half_liter', 0),
+                'one_liter': counting.get('one_liter', 0),
+                'two_liter': counting.get('two_liter', 0),
+                'five_liter': counting.get('five_liter', 0),
+                'three_thirty_gram': counting.get('three_thirty_gram', 0),
+                'five_hundred_gram': counting.get('five_hundred_gram', 0),
+                'one_kg': counting.get('one_kg', 0),
                 'total_liters': counting['total']
             })
             total_liters += counting['total']
