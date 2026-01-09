@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Button } from './ui/button';
@@ -19,7 +19,9 @@ import {
   Truck,
   Archive,
   FileText,
-  FileCheck
+  FileCheck,
+  Smartphone,
+  Monitor
 } from 'lucide-react';
 
 const menuItems = [
