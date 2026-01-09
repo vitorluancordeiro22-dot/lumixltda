@@ -411,10 +411,10 @@ export const BatchManagement = () => {
                       <div key={idx} className="p-4 bg-muted rounded-lg border border-border">
                         <div className="flex justify-between items-start mb-2">
                           <p className="font-semibold text-foreground">{recipe.raw_material?.name}</p>
-                          <Badge variant="outline">Receita</Badge>
+                          <Badge variant="outline">{recipe.quantity_per_liter} {recipe.unit} / {selectedBatch.product?.expected_liters || '?'}L</Badge>
                         </div>
                         <p className="text-sm text-muted-foreground mb-3">
-                          Quantidade necessária: <span className="font-semibold text-foreground">{recipe.quantity_needed} {recipe.unit}</span>
+                          Quantidade necessária para {selectedBatch.planned_liters}L: <span className="font-semibold text-foreground">{recipe.quantity_needed.toFixed(4)} {recipe.unit}</span>
                         </p>
                         
                         {/* Lotes Disponíveis */}
