@@ -76,7 +76,8 @@ export const BatchManagement = () => {
           recipesWithDetails.push({
             ...recipe,
             raw_material: rm,
-            quantity_needed: recipe.quantity_per_liter * batch.planned_liters,
+            // A quantidade na receita é FIXA (não multiplica pela litragem)
+            quantity_needed: recipe.quantity_per_liter,
             batches: rmBatchesForThis
           });
         }
