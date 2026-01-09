@@ -178,17 +178,27 @@ class ProductionOrderCreate(BaseModel):
 class Counting(BaseModel):
     id: str
     product_batch_id: str
-    one_liter: int = 0
-    two_liter: int = 0
-    five_liter: int = 0
+    # Opções de volume (ml/L)
+    half_liter: int = 0      # 500ml
+    one_liter: int = 0       # 1L
+    two_liter: int = 0       # 2L
+    five_liter: int = 0      # 5L
+    # Opções de peso (g/Kg)
+    three_thirty_gram: int = 0  # 330g
+    five_hundred_gram: int = 0  # 500g
+    one_kg: int = 0             # 1Kg
     total: float = 0.0
     operator: str
     created_at: str
 
 class CountingCreate(BaseModel):
+    half_liter: int = 0
     one_liter: int = 0
     two_liter: int = 0
     five_liter: int = 0
+    three_thirty_gram: int = 0
+    five_hundred_gram: int = 0
+    one_kg: int = 0
     operator: str
 
 class TeamMember(BaseModel):
