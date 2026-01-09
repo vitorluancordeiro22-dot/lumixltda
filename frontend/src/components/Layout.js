@@ -108,20 +108,7 @@ const Sidebar = ({ mobile = false, onItemClick }) => {
 
 export const Layout = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [forceMobileView, setForceMobileView] = useState(() => {
-    // Recuperar preferência salva
-    const saved = localStorage.getItem('lumix-mobile-view');
-    return saved === 'true';
-  });
-
-  // Salvar preferência quando mudar
-  useEffect(() => {
-    localStorage.setItem('lumix-mobile-view', forceMobileView.toString());
-  }, [forceMobileView]);
-
-  const toggleMobileView = () => {
-    setForceMobileView(prev => !prev);
-  };
+  const { forceMobileView, toggleMobileView } = useMobile();
 
   // Se forceMobileView está ativo, escondemos a sidebar desktop e mostramos o menu mobile
   const showDesktopSidebar = !forceMobileView;
