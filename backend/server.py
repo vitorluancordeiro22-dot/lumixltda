@@ -823,15 +823,23 @@ async def get_counting(batch_id: str, current_user = Depends(get_current_user)):
 async def add_counting(batch_id: str, data: CountingCreate, current_user = Depends(get_current_user)):
     import uuid
     
-    # Calculate total
-    total = (data.one_liter * 1) + (data.two_liter * 2) + (data.five_liter * 5)
+    # Calculate total - volume (Litros)
+    volume_total = (data.half_liter * 0.5) + (data.one_liter * 1) + (data.two_liter * 2) + (data.five_liter * 5)
+    # Calculate total - weight (Kg)
+    weight_total = (data.three_thirty_gram * 0.33) + (data.five_hundred_gram * 0.5) + (data.one_kg * 1)
+    
+    total = volume_total + weight_total
     
     count_doc = {
         'id': str(uuid.uuid4()),
         'product_batch_id': batch_id,
+        'half_liter': data.half_liter,
         'one_liter': data.one_liter,
         'two_liter': data.two_liter,
         'five_liter': data.five_liter,
+        'three_thirty_gram': data.three_thirty_gram,
+        'five_hundred_gram': data.five_hundred_gram,
+        'one_kg': data.one_kg,
         'total': float(total),
         'operator': data.operator,
         'created_at': datetime.now(timezone.utc).isoformat()
