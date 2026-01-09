@@ -107,22 +107,41 @@ const Sidebar = ({ mobile = false, onItemClick }) => {
 
 export const Layout = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [forceMobileView, setForceMobileView] = useState(() => {
+    // Recuperar preferência salva
+    const saved = localStorage.getItem('lumix-mobile-view');
+    return saved === 'true';
+  });
+
+  // Salvar preferência quando mudar
+  useEffect(() => {
+    localStorage.setItem('lumix-mobile-view', forceMobileView.toString());
+  }, [forceMobileView]);
+
+  const toggleMobileView = () => {
+    setForceMobileView(prev => !prev);
+  };
+
+  // Se forceMobileView está ativo, escondemos a sidebar desktop e mostramos o menu mobile
+  const showDesktopSidebar = !forceMobileView;
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Desktop Sidebar */}
-      <aside className="hidden md:fixed md:inset-y-0 md:flex md:w-64 md:flex-col bg-card border-r border-border z-50 shadow-sm">
-        <Sidebar />
-      </aside>
+      {/* Desktop Sidebar - escondido se forceMobileView está ativo */}
+      {showDesktopSidebar && (
+        <aside className="hidden md:fixed md:inset-y-0 md:flex md:w-64 md:flex-col bg-card border-r border-border z-50 shadow-sm">
+          <Sidebar />
+        </aside>
+      )}
 
-      {/* Mobile Sidebar */}
+      {/* Mobile Sidebar - sempre disponível quando forceMobileView ou em tela pequena */}
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
         <SheetTrigger asChild>
           <Button
             variant="ghost"
             size="icon"
             data-testid="mobile-menu-button"
-            className="md:hidden fixed top-4 left-4 z-50"
+            className={`${forceMobileView ? 'fixed' : 'md:hidden fixed'} top-4 left-4 z-50 bg-card shadow-md border border-border`}
           >
             <Menu className="h-6 w-6" />
           </Button>
@@ -132,9 +151,30 @@ export const Layout = () => {
         </SheetContent>
       </Sheet>
 
+      {/* Botão Flutuante - Alternar Modo Mobile/Desktop */}
+      <Button
+        onClick={toggleMobileView}
+        variant="outline"
+        size="sm"
+        className="fixed bottom-4 right-4 z-50 bg-card shadow-lg border-primary/50 hover:bg-primary/10 gap-2"
+        title={forceMobileView ? 'Voltar para modo Desktop' : 'Usar no Celular'}
+      >
+        {forceMobileView ? (
+          <>
+            <Monitor className="h-4 w-4" />
+            <span className="hidden sm:inline">Modo Desktop</span>
+          </>
+        ) : (
+          <>
+            <Smartphone className="h-4 w-4" />
+            <span className="hidden sm:inline">Usar no Celular</span>
+          </>
+        )}
+      </Button>
+
       {/* Main Content */}
-      <main className="md:pl-64 min-h-screen">
-        <div className="p-4 md:p-8">
+      <main className={`${showDesktopSidebar ? 'md:pl-64' : 'pl-0'} min-h-screen`}>
+        <div className={`p-4 ${showDesktopSidebar ? 'md:p-8' : 'pt-16 px-4 pb-4'}`}>
           <Outlet />
         </div>
       </main>
