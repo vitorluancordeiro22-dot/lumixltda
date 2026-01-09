@@ -412,9 +412,9 @@ export const Products = () => {
                           searchPlaceholder="Pesquisar..."
                         />
                       </div>
-                      <div className="w-28">
-                        <Label className="text-foreground text-xs">Quantidade</Label>
-                        <Input type="number" step="0.001" value={recipe.quantity_per_liter} onChange={(e) => updateRecipe(index, 'quantity_per_liter', e.target.value)} className="bg-input border-border text-foreground" placeholder="Ex: 0.5" />
+                      <div className="w-32">
+                        <Label className="text-foreground text-xs">Qtd. Total</Label>
+                        <Input type="number" step="0.001" value={recipe.quantity_per_liter} onChange={(e) => updateRecipe(index, 'quantity_per_liter', e.target.value)} className="bg-input border-border text-foreground" placeholder="Ex: 0.100" />
                       </div>
                       <Button type="button" onClick={() => removeRecipe(index)} size="icon" variant="destructive">
                         <Trash2 className="w-4 h-4" />
