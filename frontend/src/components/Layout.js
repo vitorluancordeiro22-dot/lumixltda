@@ -156,7 +156,7 @@ export const Layout = () => {
         onClick={toggleMobileView}
         variant="outline"
         size="sm"
-        className="fixed bottom-4 right-4 z-50 bg-card shadow-lg border-primary/50 hover:bg-primary/10 gap-2"
+        className="fixed bottom-20 right-4 z-50 bg-card shadow-lg border-primary/50 hover:bg-primary/10 gap-2"
         title={forceMobileView ? 'Voltar para modo Desktop' : 'Usar no Celular'}
       >
         {forceMobileView ? (
