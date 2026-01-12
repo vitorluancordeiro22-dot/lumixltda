@@ -8,7 +8,7 @@ import { Label } from '../components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Combobox } from '../components/ui/combobox';
 import { toast } from 'sonner';
-import { Plus, Edit, Trash2, Package, MessageCircle } from 'lucide-react';
+import { Plus, Edit, Trash2, Package, MessageCircle, Copy, Search } from 'lucide-react';
 import { ProductFileManager } from '../components/ProductFileManager';
 import { WhatsAppSender } from '../components/WhatsAppSender';
 import { WhatsAppMultiBatch } from '../components/WhatsAppMultiBatch';
