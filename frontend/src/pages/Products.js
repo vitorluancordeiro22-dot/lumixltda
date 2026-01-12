@@ -501,7 +501,7 @@ export const Products = () => {
           ))}
           {filteredProducts.length === 0 && searchTerm && (
             <div className="col-span-full text-center py-8 text-muted-foreground">
-              Nenhum produto encontrado para "{searchTerm}"
+              Nenhum produto encontrado para &ldquo;{searchTerm}&rdquo;
             </div>
           )}
         </div>

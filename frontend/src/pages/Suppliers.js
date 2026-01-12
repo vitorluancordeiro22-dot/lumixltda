@@ -264,7 +264,7 @@ export const Suppliers = () => {
           ))}
           {filteredSuppliers.length === 0 && searchTerm && (
             <div className="col-span-full text-center py-8 text-muted-foreground">
-              Nenhum fornecedor encontrado para "{searchTerm}"
+              Nenhum fornecedor encontrado para &ldquo;{searchTerm}&rdquo;
             </div>
           )}
         </div>

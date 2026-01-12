@@ -212,7 +212,7 @@ export const Team = () => {
           ))}
           {filteredMembers.length === 0 && searchTerm && (
             <div className="col-span-full text-center py-8 text-muted-foreground">
-              Nenhum funcionário encontrado para "{searchTerm}"
+              Nenhum funcionário encontrado para &ldquo;{searchTerm}&rdquo;
             </div>
           )}
         </div>

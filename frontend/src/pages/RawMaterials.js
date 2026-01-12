@@ -428,7 +428,7 @@ export const RawMaterials = () => {
           ))}
           {filteredMaterials.length === 0 && searchTerm && (
             <div className="col-span-full text-center py-8 text-muted-foreground">
-              Nenhuma matéria-prima encontrada para "{searchTerm}"
+              Nenhuma matéria-prima encontrada para &ldquo;{searchTerm}&rdquo;
             </div>
           )}
         </div>
