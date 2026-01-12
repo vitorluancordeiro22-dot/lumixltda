@@ -376,11 +376,23 @@ export const RawMaterials = () => {
         </div>
       </div>
 
+      {/* Campo de Pesquisa */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" />
+        <Input
+          type="text"
+          placeholder="Pesquisar matérias-primas..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="pl-10 h-12 bg-input border-border text-foreground"
+        />
+      </div>
+
       {loading ? (
         <div>Carregando...</div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {materials.map(material => (
+          {filteredMaterials.map(material => (
             <Card key={material.id} data-testid={`material-card-${material.id}`} className="p-6 border shadow-sm hover:border-primary/50 hover:shadow-md transition-all">
               <div className="flex items-start justify-between mb-4">
                 <div>
@@ -414,6 +426,11 @@ export const RawMaterials = () => {
               </div>
             </Card>
           ))}
+          {filteredMaterials.length === 0 && searchTerm && (
+            <div className="col-span-full text-center py-8 text-muted-foreground">
+              Nenhuma matéria-prima encontrada para "{searchTerm}"
+            </div>
+          )}
         </div>
       )}
     </div>
