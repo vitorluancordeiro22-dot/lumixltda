@@ -250,14 +250,16 @@ export const Archives = () => {
               </TabsContent>
 
               <TabsContent value="materials" className="space-y-4">
-                {rawMaterialBatches.length === 0 ? (
+                {filteredRawMaterialBatches.length === 0 ? (
                   <Card className="p-12  border text-center">
                     <Boxes className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-                    <p className="text-muted-foreground">Nenhuma matéria-prima arquivada neste mês</p>
+                    <p className="text-muted-foreground">
+                      {searchTerm ? `Nenhuma matéria-prima encontrada para "${searchTerm}"` : 'Nenhuma matéria-prima arquivada neste mês'}
+                    </p>
                   </Card>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {rawMaterialBatches.map(batch => (
+                    {filteredRawMaterialBatches.map(batch => (
                       <Card key={batch.id} className="p-6  border">
                         <div className="mb-4">
                           <Badge className="bg-emerald-600 mb-2">Finalizado</Badge>
