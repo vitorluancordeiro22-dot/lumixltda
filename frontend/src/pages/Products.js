@@ -41,6 +41,7 @@ export const Products = () => {
   const [editingBatchNumber, setEditingBatchNumber] = useState(false);
   const [createdBatch, setCreatedBatch] = useState(null);
   const [batchProduct, setBatchProduct] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     isMountedRef.current = true;
