@@ -317,16 +317,18 @@ export const BatchManagement = () => {
             <div className="flex items-center gap-2 mb-4">
               <Beaker className="w-6 h-6 text-primary" />
               <h2 className="text-2xl font-bold text-foreground">Lotes de Matérias-Primas</h2>
-              <Badge variant="outline">{rmBatches.length}</Badge>
+              <Badge variant="outline">{filteredRmBatches.length}</Badge>
             </div>
             
-            {rmBatches.length === 0 ? (
+            {filteredRmBatches.length === 0 ? (
               <Card className="p-8 text-center">
-                <p className="text-muted-foreground">Nenhum lote de matéria-prima cadastrado</p>
+                <p className="text-muted-foreground">
+                  {searchTerm ? `Nenhum lote encontrado para "${searchTerm}"` : 'Nenhum lote de matéria-prima cadastrado'}
+                </p>
               </Card>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {rmBatches.map(batch => {
+                {filteredRmBatches.map(batch => {
                   const rm = rawMaterials.find(r => r.id === batch.raw_material_id);
                   return (
                     <Card key={batch.id} className="p-4 hover:shadow-lg transition-shadow cursor-pointer">
