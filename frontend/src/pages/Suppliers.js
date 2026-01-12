@@ -262,6 +262,11 @@ export const Suppliers = () => {
               </div>
             </Card>
           ))}
+          {filteredSuppliers.length === 0 && searchTerm && (
+            <div className="col-span-full text-center py-8 text-muted-foreground">
+              Nenhum fornecedor encontrado para "{searchTerm}"
+            </div>
+          )}
         </div>
       )}
     </div>
