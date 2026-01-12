@@ -213,14 +213,19 @@ export const RawMaterials = () => {
 
   const getSupplierName = (id) => suppliers.find(s => s.id === id)?.name || 'Sem fornecedor';
 
+  // Filtrar matérias-primas pela pesquisa
+  const filteredMaterials = materials.filter(material => 
+    material.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   return (
-    <div className="space-y-8">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-2">Matérias-Primas</h1>
           <p className="text-lg text-muted-foreground">Gerencie o estoque de matérias-primas</p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-3">
           <Dialog open={batchDialogOpen} onOpenChange={setBatchDialogOpen}>
             <DialogTrigger asChild>
               <Button data-testid="release-material-batch-button" className="bg-amber-600 hover:bg-amber-700">
