@@ -188,28 +188,42 @@ export const Archives = () => {
             </div>
           </Card>
 
+          {/* Campo de Pesquisa */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" />
+            <Input
+              type="text"
+              placeholder="Pesquisar lotes arquivados por nome ou número..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 h-12 bg-input border-border text-foreground"
+            />
+          </div>
+
           {selectedMonth && (
             <Tabs defaultValue="products" className="space-y-6">
               <TabsList className="bg-muted border border-border">
                 <TabsTrigger value="products" className="data-[state=active]:bg-primary">
                   <Package className="w-4 h-4 mr-2" />
-                  Produtos ({productBatches.length})
+                  Produtos ({filteredProductBatches.length})
                 </TabsTrigger>
                 <TabsTrigger value="materials" className="data-[state=active]:bg-primary">
                   <Boxes className="w-4 h-4 mr-2" />
-                  Matérias-Primas ({rawMaterialBatches.length})
+                  Matérias-Primas ({filteredRawMaterialBatches.length})
                 </TabsTrigger>
               </TabsList>
 
               <TabsContent value="products" className="space-y-4">
-                {productBatches.length === 0 ? (
+                {filteredProductBatches.length === 0 ? (
                   <Card className="p-12  border text-center">
                     <Package className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-                    <p className="text-muted-foreground">Nenhum produto arquivado neste mês</p>
+                    <p className="text-muted-foreground">
+                      {searchTerm ? `Nenhum produto encontrado para "${searchTerm}"` : 'Nenhum produto arquivado neste mês'}
+                    </p>
                   </Card>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {productBatches.map(batch => (
+                    {filteredProductBatches.map(batch => (
                       <Card key={batch.id} className="p-6  border">
                         <div className="mb-4">
                           <Badge className="bg-emerald-600 mb-2">Finalizado</Badge>
