@@ -119,9 +119,15 @@ export const Suppliers = () => {
     });
   };
 
+  // Filtrar fornecedores pela pesquisa
+  const filteredSuppliers = suppliers.filter(supplier => 
+    supplier.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (supplier.contact && supplier.contact.toLowerCase().includes(searchTerm.toLowerCase()))
+  );
+
   return (
-    <div className="space-y-8">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-2">Fornecedores</h1>
           <p className="text-lg text-muted-foreground">Gerencie seus fornecedores de matérias-primas</p>
