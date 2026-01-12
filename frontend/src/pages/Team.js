@@ -163,11 +163,23 @@ export const Team = () => {
         </Dialog>
       </div>
 
+      {/* Campo de Pesquisa */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" />
+        <Input
+          type="text"
+          placeholder="Pesquisar funcionários..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="pl-10 h-12 bg-input border-border text-foreground"
+        />
+      </div>
+
       {loading ? (
         <div>Carregando...</div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {members.map(member => (
+          {filteredMembers.map(member => (
             <Card key={member.id} data-testid={`member-card-${member.id}`} className="p-6  border hover:border-primary/50 transition-all">
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-start gap-4 flex-1 cursor-pointer" onClick={() => handleViewHistory(member)}>
