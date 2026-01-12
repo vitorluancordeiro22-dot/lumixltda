@@ -115,9 +115,25 @@ export const Archives = () => {
     return `${month}/20${year} - #${seq}`;
   };
 
+  // Filtrar lotes de produtos pela pesquisa
+  const filteredProductBatches = productBatches.filter(batch => {
+    const productName = getProductName(batch.product_id).toLowerCase();
+    const batchNumber = batch.batch_number?.toLowerCase() || '';
+    const search = searchTerm.toLowerCase();
+    return productName.includes(search) || batchNumber.includes(search);
+  });
+
+  // Filtrar lotes de matérias-primas pela pesquisa
+  const filteredRawMaterialBatches = rawMaterialBatches.filter(batch => {
+    const rmName = getRawMaterialName(batch.raw_material_id).toLowerCase();
+    const batchNumber = batch.batch_number?.toLowerCase() || '';
+    const search = searchTerm.toLowerCase();
+    return rmName.includes(search) || batchNumber.includes(search);
+  });
+
   return (
-    <div className="space-y-8">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-2">Arquivos Mensais</h1>
           <p className="text-lg text-muted-foreground">Histórico de lotes finalizados por mês</p>
