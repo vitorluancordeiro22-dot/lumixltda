@@ -447,22 +447,37 @@ export const Products = () => {
         </div>
       </div>
 
+      {/* Campo de Pesquisa */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" />
+        <Input
+          type="text"
+          placeholder="Pesquisar produtos..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="pl-10 h-12 bg-input border-border text-foreground"
+        />
+      </div>
+
       {loading ? (
         <div>Carregando...</div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {products.map(product => (
+          {filteredProducts.map(product => (
             <Card key={product.id} data-testid={`product-card-${product.id}`} className="p-6 border shadow-sm hover:border-primary/50 hover:shadow-md transition-all">
               <div className="flex items-start justify-between mb-4">
                 <div>
                   <h3 className="text-xl font-bold text-foreground mb-1">{product.name}</h3>
                   <p className="text-sm text-muted-foreground">{product.unit} • {product.expected_liters}L esperados</p>
                 </div>
-                <div className="flex gap-2">
-                  <Button size="icon" variant="ghost" onClick={() => handleEdit(product)} className="text-muted-foreground hover:text-foreground">
+                <div className="flex gap-1">
+                  <Button size="icon" variant="ghost" onClick={() => handleDuplicate(product)} className="text-muted-foreground hover:text-primary" title="Duplicar">
+                    <Copy className="w-4 h-4" />
+                  </Button>
+                  <Button size="icon" variant="ghost" onClick={() => handleEdit(product)} className="text-muted-foreground hover:text-foreground" title="Editar">
                     <Edit className="w-4 h-4" />
                   </Button>
-                  <Button size="icon" variant="ghost" onClick={() => handleDelete(product.id)} className="text-red-600 hover:text-red-500 hover:bg-red-50">
+                  <Button size="icon" variant="ghost" onClick={() => handleDelete(product.id)} className="text-red-600 hover:text-red-500 hover:bg-red-50" title="Excluir">
                     <Trash2 className="w-4 h-4" />
                   </Button>
                 </div>
@@ -484,6 +499,11 @@ export const Products = () => {
               </div>
             </Card>
           ))}
+          {filteredProducts.length === 0 && searchTerm && (
+            <div className="col-span-full text-center py-8 text-muted-foreground">
+              Nenhum produto encontrado para "{searchTerm}"
+            </div>
+          )}
         </div>
       )}
     </div>
