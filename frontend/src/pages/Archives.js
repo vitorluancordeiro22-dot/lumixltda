@@ -3,11 +3,11 @@ import api from '../lib/api';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
-import { Label } from '../components/ui/label';
+import { Input } from '../components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { toast } from 'sonner';
-import { Archive, Package, Boxes, Calendar } from 'lucide-react';
+import { Archive, Package, Boxes, Calendar, Search } from 'lucide-react';
 
 export const Archives = () => {
   const [months, setMonths] = useState([]);
@@ -18,6 +18,7 @@ export const Archives = () => {
   const [rawMaterials, setRawMaterials] = useState([]);
   const [loading, setLoading] = useState(true);
   const [archiving, setArchiving] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
   const isMountedRef = useRef(true);
 
   useEffect(() => {
