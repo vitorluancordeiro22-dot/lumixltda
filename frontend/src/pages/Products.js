@@ -254,13 +254,13 @@ export const Products = () => {
   };
 
   return (
-    <div className="space-y-8">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-2">Produtos</h1>
           <p className="text-lg text-muted-foreground">Gerencie seus produtos e receitas</p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-3">
           <WhatsAppMultiBatch />
           
           {createdBatch && batchProduct && (
