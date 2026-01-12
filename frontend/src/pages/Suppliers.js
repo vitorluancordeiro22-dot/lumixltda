@@ -201,11 +201,23 @@ export const Suppliers = () => {
         </Dialog>
       </div>
 
+      {/* Campo de Pesquisa */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" />
+        <Input
+          type="text"
+          placeholder="Pesquisar fornecedores..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="pl-10 h-12 bg-input border-border text-foreground"
+        />
+      </div>
+
       {loading ? (
         <div className="text-foreground">Carregando...</div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {suppliers.map(supplier => (
+          {filteredSuppliers.map(supplier => (
             <Card key={supplier.id} data-testid={`supplier-card-${supplier.id}`} className="p-6 border shadow-sm hover:border-primary/50 hover:shadow-md transition-all">
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-start gap-3 flex-1">
