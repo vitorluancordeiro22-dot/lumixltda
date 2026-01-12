@@ -1,117 +1,29 @@
 # Test Results
 
-## Test Run: 2025-01-09
-
-### Testing Protocol
-- Test file to create: /app/backend/tests/test_batch_quantity.py
+## Test Run: 2025-01-12
 
 ### What to test:
 
-1. **Mobile View Toggle Button**
-   - Verify "Usar no Celular" button appears at bottom right
-   - Click it and verify sidebar disappears
-   - Verify hamburger menu (☰) appears at top left
-   - Click hamburger to open mobile menu
-   - Verify "Modo Desktop" button appears to switch back
-   - Click "Modo Desktop" and verify sidebar returns
+1. **Duplicate Product Feature**
+   - Go to Products page
+   - Find the copy icon (📋) next to edit button on any product card
+   - Click it and verify modal opens with "(Cópia)" appended to name
+   - All data (unit, liters, recipes) should be copied
+   - Save and verify new product is created
 
-2. **Batch Recipe Quantity Fix**
-   - Go to Gerenciar Lotes
-   - Click "Ver Detalhes" on a batch with "Refrigerante Cola" product
-   - Verify the "Quantidade necessária" shows the FIXED value from recipe (e.g., 0.9 L)
-   - It should NOT multiply by planned liters (old bug showed 299.70 L)
+2. **Search Feature on Multiple Pages**
+   - Products: Search field filters products by name
+   - Raw Materials: Search field filters materials by name
+   - Suppliers: Search field filters by name or contact
+   - Team: Search field filters by name or role
+   - Batch Management: Search field filters batches by number or product name
 
-3. **Theme Consistency**
-   - All pages should have light theme with proper contrast
+3. **Counting Page Improvements**
+   - Select a product batch
+   - Verify form scrolls into view automatically
+   - Verify 500ml option exists for volume products
+   - For Kg products (like Açúcar Refinado), verify weight options (330g, 500g, 1Kg) appear instead of volume
 
 ### Test Credentials
 - Email: teste@teste.com
 - Password: password
-
-### Incorporate User Feedback
-- User confirmed the recipe quantity should be FIXED, not multiplied by liters
-- Example: if recipe says 0.100g, that's the total amount needed regardless of batch size
-
----
-
-## TESTING RESULTS - 2025-01-09
-
-### Feature 1: Mobile View Toggle Button - ✅ WORKING
-**Test Status:** PASSED
-**Details:**
-- ✅ "Usar no Celular" button found at bottom right corner
-- ✅ Sidebar disappears when clicked (desktop → mobile mode)
-- ✅ Hamburger menu (☰) appears at top left in mobile mode
-- ✅ Button text changes to "Modo Desktop" correctly
-- ✅ Hamburger menu opens mobile navigation drawer
-- ✅ "Modo Desktop" button returns to desktop view
-- ✅ Sidebar reappears when returning to desktop mode
-
-### Feature 2: Batch Recipe Quantity Fix - ✅ FIXED
-**Test Status:** PASSED
-**Details:**
-- ✅ Successfully navigated to Gerenciar Lotes page
-- ✅ Found 26 total batch cards including 3 "Refrigerante Cola" batches
-- ✅ Opened batch details modal for Cola batch (Lote 2512011)
-- ✅ Found "Matérias-Primas da Receita" section
-- ✅ Recipe quantity shows FIXED value: "0.9 L" (not multiplied)
-- ✅ Quantity is reasonable and appears to be the correct recipe amount
-- ✅ Bug appears to be FIXED - no large multiplied values detected
-
-### Feature 3: Theme Consistency - ✅ WORKING
-**Test Status:** PASSED
-**Details:**
-- ✅ Light theme applied consistently across all pages
-- ✅ Proper contrast and readability maintained
-- ✅ UI elements render correctly in both desktop and mobile modes
-
-### Technical Notes:
-- Login functionality working correctly with provided credentials
-- Backend API responding properly (200 OK responses in logs)
-- Frontend routing and navigation working as expected
-- Modal dialogs and UI interactions functioning properly
-- Database contains test data with proper batch and recipe information
-
----
-
-## TESTING RESULTS - 2025-01-09 (UPDATED TESTING)
-
-### Feature 1: Mobile Mode Button - ✅ WORKING PERFECTLY
-**Test Status:** PASSED
-**Details:**
-- ✅ "Usar no Celular" button found at bottom right corner
-- ✅ Sidebar disappears when clicked (desktop → mobile mode)
-- ✅ Hamburger menu (☰) appears at top left in mobile mode
-- ✅ Button text changes to "Modo Desktop" correctly
-- ✅ Hamburger menu opens mobile navigation drawer successfully
-- ✅ "Modo Desktop" button returns to desktop view
-- ✅ Sidebar reappears when returning to desktop mode
-- ✅ All transitions are smooth and responsive
-
-### Feature 2: Recipe Quantity Calculation - ✅ FIXED AND WORKING CORRECTLY
-**Test Status:** PASSED - CRITICAL FIX VERIFIED
-**Details:**
-- ✅ Successfully navigated to Gerenciar Lotes page
-- ✅ Found "Refrigerante Cocaccc" batch (Lote 2512011) with 333 Litros planejados
-- ✅ Opened batch details modal successfully
-- ✅ Found "Matérias-Primas da Receita" section
-- ✅ **CRITICAL VERIFICATION**: Recipe calculation is PROPORTIONAL and CORRECT
-  - Recipe shows: "100 Kg / 1000L" (recipe proportion)
-  - Calculated quantity: "Quantidade necessária para 333L: 33.3000 Kg"
-  - **Formula verified**: (100 Kg / 1000L) × 333L = 33.3 Kg ✅
-  - This is the CORRECT proportional calculation, NOT fixed quantity
-- ✅ Bug has been successfully FIXED - no more incorrect multiplication
-
-### Feature 3: Theme Consistency - ✅ WORKING
-**Test Status:** PASSED
-**Details:**
-- ✅ Light theme applied consistently across all pages
-- ✅ Proper contrast and readability maintained
-- ✅ UI elements render correctly in both desktop and mobile modes
-
-### Testing Agent Summary:
-- All requested features are working correctly
-- Mobile mode toggle functionality is fully implemented and responsive
-- Recipe quantity calculation has been fixed to use proportional calculation
-- No critical issues found during comprehensive testing
-- Application is ready for production use
