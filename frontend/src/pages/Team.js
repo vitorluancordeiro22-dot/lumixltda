@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { toast } from 'sonner';
-import { Plus, Edit, Trash2, Users } from 'lucide-react';
+import { Plus, Edit, Trash2, Users, Search } from 'lucide-react';
 
 export const Team = () => {
   const [members, setMembers] = useState([]);
@@ -19,6 +19,7 @@ export const Team = () => {
   const [submitting, setSubmitting] = useState(false);
   const isMountedRef = React.useRef(true);
   const [formData, setFormData] = useState({ name: '', role: '' });
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     isMountedRef.current = true;

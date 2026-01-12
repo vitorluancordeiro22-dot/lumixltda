@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { toast } from 'sonner';
-import { Plus, Edit, Trash2, Truck, Phone, Mail, MapPin } from 'lucide-react';
+import { Plus, Edit, Trash2, Truck, Phone, Mail, MapPin, Search } from 'lucide-react';
 
 export const Suppliers = () => {
   const [suppliers, setSuppliers] = useState([]);
@@ -15,6 +15,7 @@ export const Suppliers = () => {
   const [selectedSupplier, setSelectedSupplier] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const isMountedRef = useRef(true);
+  const [searchTerm, setSearchTerm] = useState('');
   
   const [formData, setFormData] = useState({
     name: '',

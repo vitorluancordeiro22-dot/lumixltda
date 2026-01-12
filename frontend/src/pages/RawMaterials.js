@@ -8,7 +8,7 @@ import { Label } from '../components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Combobox } from '../components/ui/combobox';
 import { toast } from 'sonner';
-import { Plus, Edit, Trash2, Boxes, Package } from 'lucide-react';
+import { Plus, Edit, Trash2, Boxes, Package, Search } from 'lucide-react';
 
 export const RawMaterials = () => {
   const [materials, setMaterials] = useState([]);
@@ -18,6 +18,7 @@ export const RawMaterials = () => {
   const [selectedMaterial, setSelectedMaterial] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const isMountedRef = React.useRef(true);
+  const [searchTerm, setSearchTerm] = useState('');
   
   const [suppliers, setSuppliers] = useState([]);
   const [formData, setFormData] = useState({
