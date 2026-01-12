@@ -210,6 +210,11 @@ export const Team = () => {
               </Button>
             </Card>
           ))}
+          {filteredMembers.length === 0 && searchTerm && (
+            <div className="col-span-full text-center py-8 text-muted-foreground">
+              Nenhum funcionário encontrado para "{searchTerm}"
+            </div>
+          )}
         </div>
       )}
 
