@@ -200,11 +200,38 @@ export const BatchManagement = () => {
     return <Badge className={config.className}>{config.label}</Badge>;
   };
 
+  // Filtrar lotes pela pesquisa
+  const filteredProductBatches = productBatches.filter(batch => {
+    const product = products.find(p => p.id === batch.product_id);
+    const productName = product?.name || '';
+    return batch.batch_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+           productName.toLowerCase().includes(searchTerm.toLowerCase());
+  });
+
+  const filteredRmBatches = rmBatches.filter(batch => {
+    const rm = rawMaterials.find(r => r.id === batch.raw_material_id);
+    const rmName = rm?.name || '';
+    return batch.batch_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+           rmName.toLowerCase().includes(searchTerm.toLowerCase());
+  });
+
   return (
     <div className="p-6 space-y-6">
       <div>
         <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-2">Gerenciar Lotes</h1>
         <p className="text-lg text-muted-foreground">Visualize detalhes de todos os lotes</p>
+      </div>
+
+      {/* Campo de Pesquisa */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" />
+        <Input
+          type="text"
+          placeholder="Pesquisar lotes por número ou produto..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="pl-10 h-12 bg-input border-border text-foreground"
+        />
       </div>
 
       {loading ? (
@@ -216,16 +243,18 @@ export const BatchManagement = () => {
             <div className="flex items-center gap-2 mb-4">
               <Package className="w-6 h-6 text-primary" />
               <h2 className="text-2xl font-bold text-foreground">Lotes de Produtos</h2>
-              <Badge variant="outline">{productBatches.length}</Badge>
+              <Badge variant="outline">{filteredProductBatches.length}</Badge>
             </div>
             
-            {productBatches.length === 0 ? (
+            {filteredProductBatches.length === 0 ? (
               <Card className="p-8 text-center">
-                <p className="text-muted-foreground">Nenhum lote de produto cadastrado</p>
+                <p className="text-muted-foreground">
+                  {searchTerm ? `Nenhum lote encontrado para "${searchTerm}"` : 'Nenhum lote de produto cadastrado'}
+                </p>
               </Card>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {productBatches.map(batch => {
+                {filteredProductBatches.map(batch => {
                   const product = products.find(p => p.id === batch.product_id);
                   return (
                     <Card key={batch.id} className="p-4 hover:shadow-lg transition-shadow cursor-pointer">
