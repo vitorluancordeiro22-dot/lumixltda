@@ -206,6 +206,23 @@ export const Products = () => {
     setDialogOpen(true);
   };
 
+  const handleDuplicate = (product) => {
+    setSelectedProduct(null); // Null para criar novo, não editar
+    setFormData({
+      name: `${product.name} (Cópia)`,
+      unit: product.unit,
+      expected_liters: product.expected_liters.toString(),
+      recipes: product.recipes ? [...product.recipes] : []
+    });
+    setDialogOpen(true);
+    toast.info('Produto duplicado! Edite o nome e salve.');
+  };
+
+  // Filtrar produtos pela pesquisa
+  const filteredProducts = products.filter(product => 
+    product.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   const resetForm = () => {
     setSelectedProduct(null);
     setFormData({
