@@ -1083,8 +1083,8 @@ async def delete_from_trash_permanently(item_id: str, current_user = Depends(get
 @api_router.post('/archive/auto-archive-month')
 async def auto_archive_finished_items(current_user = Depends(get_current_user)):
     """
-    Arquiva automaticamente itens finalizados do mês anterior.
-    Apenas move lotes com status 'finalizado' para o arquivo.
+    Arquiva automaticamente TODOS os itens finalizados, independente do mês.
+    Inclui informações de quem fez o envase.
     """
     now = datetime.now(timezone.utc)
     
@@ -1096,17 +1096,25 @@ async def auto_archive_finished_items(current_user = Depends(get_current_user)):
     
     archived_products = 0
     for batch in product_batches:
-        # Verificar se é do mês anterior ou anterior
         batch_date = datetime.fromisoformat(batch['date'])
-        if batch_date.year < now.year or (batch_date.year == now.year and batch_date.month < now.month):
-            # Adicionar info de arquivo
-            batch['archived_year'] = batch_date.year
-            batch['archived_month'] = batch_date.month
-            batch['archived_at'] = now.isoformat()
-            
-            await db.archived_product_batches.insert_one(batch)
-            await db.product_batches.delete_one({'id': batch['id']})
-            archived_products += 1
+        
+        # Buscar contagens deste lote para pegar operadores
+        countings = await db.counting.find({'product_batch_id': batch['id']}, {'_id': 0}).to_list(1000)
+        operators = list(set([c.get('operator', 'N/A') for c in countings if c.get('operator')]))
+        
+        # Adicionar info de arquivo
+        batch['archived_year'] = batch_date.year
+        batch['archived_month'] = batch_date.month
+        batch['archived_at'] = now.isoformat()
+        batch['operators'] = operators  # Lista de quem fez envase
+        batch['countings_history'] = countings  # Histórico completo
+        
+        await db.archived_product_batches.insert_one(batch)
+        await db.product_batches.delete_one({'id': batch['id']})
+        # Também mover as contagens para histórico
+        if countings:
+            await db.counting.delete_many({'product_batch_id': batch['id']})
+        archived_products += 1
     
     # Mover lotes de matérias-primas finalizados
     rm_batches = await db.raw_material_batches.find({
@@ -1117,14 +1125,13 @@ async def auto_archive_finished_items(current_user = Depends(get_current_user)):
     archived_materials = 0
     for batch in rm_batches:
         batch_date = datetime.fromisoformat(batch['date'])
-        if batch_date.year < now.year or (batch_date.year == now.year and batch_date.month < now.month):
-            batch['archived_year'] = batch_date.year
-            batch['archived_month'] = batch_date.month
-            batch['archived_at'] = now.isoformat()
-            
-            await db.archived_raw_material_batches.insert_one(batch)
-            await db.raw_material_batches.delete_one({'id': batch['id']})
-            archived_materials += 1
+        batch['archived_year'] = batch_date.year
+        batch['archived_month'] = batch_date.month
+        batch['archived_at'] = now.isoformat()
+        
+        await db.archived_raw_material_batches.insert_one(batch)
+        await db.raw_material_batches.delete_one({'id': batch['id']})
+        archived_materials += 1
     
     return {
         'message': 'Auto-archive completed',
