@@ -6,7 +6,24 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Card } from '../components/ui/card';
 import { toast } from 'sonner';
-import { Loader2, FlaskConical, Factory } from 'lucide-react';
+import { Loader2, FlaskConical, Factory, Star } from 'lucide-react';
+
+// Mensagens motivacionais para funcionários da produção
+const mensagensMotivacionais = [
+  (nome) => `Bom trabalho, ${nome}! Sua dedicação faz a diferença! 💪`,
+  (nome) => `${nome}, você é essencial para nossa equipe! Continue assim! ⭐`,
+  (nome) => `Parabéns ${nome}! Seu esforço não passa despercebido! 🏆`,
+  (nome) => `${nome}, sua produtividade inspira todos! Excelente trabalho! 🚀`,
+  (nome) => `Mandou bem, ${nome}! A equipe conta com você! 👏`,
+  (nome) => `${nome}, você está arrasando! Continue firme! 💯`,
+  (nome) => `Ótimo ter você na equipe, ${nome}! Vamos em frente! 🌟`,
+  (nome) => `${nome}, seu comprometimento é admirável! Parabéns! 🎯`,
+];
+
+const getMensagemMotivacional = (nome) => {
+  const index = Math.floor(Math.random() * mensagensMotivacionais.length);
+  return mensagensMotivacionais[index](nome || 'Colaborador');
+};
 
 export const Login = () => {
   const [isLogin, setIsLogin] = useState(true);
