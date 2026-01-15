@@ -900,6 +900,50 @@ async def add_counting(batch_id: str, data: CountingCreate, current_user = Depen
     
     return Counting(**count_doc)
 
+# ========== FUNCIONÁRIO DESTAQUE ==========
+
+class TopOperator(BaseModel):
+    name: str
+    total_bottled: float
+    count_entries: int
+
+@api_router.get('/counting/top-operator/month')
+async def get_top_operator_month(current_user = Depends(get_current_user)):
+    """Retorna o funcionário que mais envasou no mês atual"""
+    now = datetime.now(timezone.utc)
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0).isoformat()
+    
+    # Busca todas as contagens do mês
+    countings = await db.counting.find({
+        'created_at': {'$gte': month_start}
+    }, {'_id': 0}).to_list(10000)
+    
+    if not countings:
+        return None
+    
+    # Agrupa por operador e soma os totais
+    operator_totals = {}
+    for c in countings:
+        operator = c.get('operator', '')
+        if not operator:
+            continue
+        if operator not in operator_totals:
+            operator_totals[operator] = {'total': 0, 'count': 0}
+        operator_totals[operator]['total'] += c.get('total', 0)
+        operator_totals[operator]['count'] += 1
+    
+    if not operator_totals:
+        return None
+    
+    # Encontra o operador com maior total
+    top_operator = max(operator_totals.items(), key=lambda x: x[1]['total'])
+    
+    return {
+        'name': top_operator[0],
+        'total_bottled': round(top_operator[1]['total'], 2),
+        'count_entries': top_operator[1]['count']
+    }
+
 # ========== TEAM ==========
 
 @api_router.get('/team', response_model=List[TeamMember])
