@@ -152,6 +152,48 @@ export const Archives = () => {
     }
   };
 
+  const handleEditBatch = (batch) => {
+    setEditingBatch(batch);
+    setBatchEditForm({
+      batch_number: batch.batch_number || '',
+      planned_liters: batch.planned_liters || 0,
+      total_bottled: batch.total_bottled || 0,
+      operators: batch.operators?.join(', ') || ''
+    });
+  };
+
+  const handleSaveBatchEdit = async () => {
+    if (!editingBatch) return;
+    
+    setSaving(true);
+    try {
+      // Converter operadores de string para array
+      const operatorsArray = batchEditForm.operators
+        .split(',')
+        .map(op => op.trim())
+        .filter(op => op.length > 0);
+
+      await api.put(`/archive/batch/${editingBatch.id}`, {
+        batch_number: batchEditForm.batch_number,
+        planned_liters: parseFloat(batchEditForm.planned_liters) || 0,
+        total_bottled: parseFloat(batchEditForm.total_bottled) || 0,
+        operators: operatorsArray
+      });
+      
+      toast.success('Lote atualizado com sucesso!');
+      setEditingBatch(null);
+      
+      // Recarregar dados do arquivo
+      if (selectedMonth) {
+        await fetchArchiveData(selectedMonth.year, selectedMonth.month);
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Erro ao atualizar lote');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const getProductName = (id) => products.find(p => p.id === id)?.name || 'N/A';
   const getRawMaterialName = (id) => rawMaterials.find(rm => rm.id === id)?.name || 'N/A';
 
