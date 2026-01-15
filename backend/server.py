@@ -1319,6 +1319,50 @@ class CountingEdit(BaseModel):
     one_kg: int = 0
     operator: str
 
+@api_router.get('/archive/operators-summary/{year}/{month}')
+async def get_archive_operators_summary(year: int, month: int, current_user = Depends(get_current_user)):
+    """
+    Retorna o resumo de litragens por funcionário nos lotes arquivados de um mês específico.
+    """
+    batches = await db.archived_product_batches.find({
+        'archived_year': year,
+        'archived_month': month
+    }, {'_id': 0}).to_list(10000)
+    
+    # Agrupar litragens por operador
+    operator_totals = {}
+    
+    for batch in batches:
+        countings = batch.get('countings_history', [])
+        for c in countings:
+            operator = c.get('operator', '').strip()
+            if not operator:
+                continue
+            
+            # Calcular litros (apenas campos de volume)
+            half = c.get('half_liter', 0) or 0
+            one = c.get('one_liter', 0) or 0
+            two = c.get('two_liter', 0) or 0
+            five = c.get('five_liter', 0) or 0
+            
+            litros = (half * 0.5) + (one * 1) + (two * 2) + (five * 5)
+            
+            if operator not in operator_totals:
+                operator_totals[operator] = {'total_litros': 0, 'operacoes': 0}
+            operator_totals[operator]['total_litros'] += litros
+            operator_totals[operator]['operacoes'] += 1
+    
+    # Converter para lista ordenada por total
+    result = []
+    for op, data in sorted(operator_totals.items(), key=lambda x: x[1]['total_litros'], reverse=True):
+        result.append({
+            'operador': op,
+            'total_litros': round(data['total_litros'], 2),
+            'operacoes': data['operacoes']
+        })
+    
+    return result
+
 @api_router.put('/archive/counting/{batch_id}/{counting_id}')
 async def edit_archived_counting(batch_id: str, counting_id: str, data: CountingEdit, current_user = Depends(get_current_user)):
     """
