@@ -71,6 +71,16 @@ export const Login = () => {
             toast.success('Login realizado com sucesso!');
           }
           
+          // Mensagem motivacional para usuários de produção
+          if (result.role === 'producao') {
+            setTimeout(() => {
+              toast(getMensagemMotivacional(result.user?.name), {
+                icon: <Star className="h-5 w-5 text-yellow-500" />,
+                duration: 5000,
+              });
+            }, 1500);
+          }
+          
           setTimeout(() => {
             if (isMountedRef.current) {
               // Redireciona baseado na role
@@ -86,6 +96,15 @@ export const Login = () => {
         await register(email, password, name);
         if (isMountedRef.current) {
           toast.success('Cadastro realizado com sucesso!');
+          
+          // Mensagem de boas-vindas para novos usuários
+          setTimeout(() => {
+            toast(getMensagemMotivacional(name), {
+              icon: <Star className="h-5 w-5 text-yellow-500" />,
+              duration: 5000,
+            });
+          }, 1500);
+          
           setTimeout(() => {
             if (isMountedRef.current) {
               navigate('/counting');
