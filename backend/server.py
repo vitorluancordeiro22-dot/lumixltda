@@ -535,6 +535,30 @@ async def create_product_batch(data: ProductBatchCreate, current_user = Depends(
         'is_custom': bool(data.custom_batch_number)
     }
     await db.product_batches.insert_one(batch_doc)
+    
+    # Verificar se precisa criar amostra (primeiro lote do produto no mês)
+    batch_date = datetime.fromisoformat(data.date)
+    existing_sample = await db.samples.find_one({
+        'product_id': data.product_id,
+        'month': batch_date.month,
+        'year': batch_date.year,
+        'deleted': {'$ne': True}
+    })
+    
+    if not existing_sample:
+        sample_doc = {
+            'id': str(uuid.uuid4()),
+            'product_id': data.product_id,
+            'product_batch_id': batch_id,
+            'month': batch_date.month,
+            'year': batch_date.year,
+            'status': 'pendente',
+            'requested_at': datetime.now(timezone.utc).isoformat(),
+            'collected_by': None,
+            'collected_at': None
+        }
+        await db.samples.insert_one(sample_doc)
+    
     return ProductBatch(**batch_doc)
 
 @api_router.put('/product-batches/{batch_id}', response_model=ProductBatch)
