@@ -576,6 +576,86 @@ export const Archives = () => {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Modal de Edição do Lote */}
+      <Dialog open={!!editingBatch} onOpenChange={() => setEditingBatch(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Settings className="w-5 h-5" />
+              Editar Lote Arquivado
+            </DialogTitle>
+          </DialogHeader>
+          
+          {editingBatch && (
+            <div className="space-y-4">
+              <div className="p-3 rounded-lg bg-muted mb-4">
+                <p className="text-sm text-muted-foreground">Produto:</p>
+                <p className="font-semibold">{getProductName(editingBatch.product_id)}</p>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Número do Lote</Label>
+                <Input
+                  value={batchEditForm.batch_number}
+                  onChange={(e) => setBatchEditForm({...batchEditForm, batch_number: e.target.value})}
+                  placeholder="Ex: 2512001"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Litragem Planejada</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.1"
+                    value={batchEditForm.planned_liters}
+                    onChange={(e) => setBatchEditForm({...batchEditForm, planned_liters: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Litragem Envasada</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.1"
+                    value={batchEditForm.total_bottled}
+                    onChange={(e) => setBatchEditForm({...batchEditForm, total_bottled: e.target.value})}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Operadores (separados por vírgula)</Label>
+                <Input
+                  value={batchEditForm.operators}
+                  onChange={(e) => setBatchEditForm({...batchEditForm, operators: e.target.value})}
+                  placeholder="Ex: João Silva, Maria Santos"
+                />
+              </div>
+
+              <div className="flex gap-2 pt-4">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => setEditingBatch(null)}
+                >
+                  <X className="w-4 h-4 mr-2" />
+                  Cancelar
+                </Button>
+                <Button
+                  className="flex-1"
+                  onClick={handleSaveBatchEdit}
+                  disabled={saving}
+                >
+                  {saving ? 'Salvando...' : 'Salvar'}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
