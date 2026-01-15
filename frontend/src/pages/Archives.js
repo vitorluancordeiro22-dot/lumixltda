@@ -350,6 +350,176 @@ export const Archives = () => {
           )}
         </>
       )}
+
+      {/* Modal de Histórico de Contagens */}
+      <Dialog open={!!selectedBatch} onOpenChange={() => setSelectedBatch(null)}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <History className="w-5 h-5" />
+              Histórico de Contagens - {selectedBatch && getProductName(selectedBatch.product_id)}
+            </DialogTitle>
+          </DialogHeader>
+          
+          {selectedBatch && (
+            <div className="space-y-4">
+              <div className="p-3 rounded-lg bg-muted">
+                <p className="text-sm text-muted-foreground">Lote: {selectedBatch.batch_number}</p>
+                <p className="text-sm font-semibold">Total Envasado: {selectedBatch.total_bottled?.toFixed(1) || 0}L</p>
+              </div>
+
+              <div className="space-y-3">
+                {selectedBatch.countings_history?.map((counting, index) => (
+                  <Card key={counting.id || index} className="p-4 border">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Badge variant="outline">#{index + 1}</Badge>
+                          <span className="text-sm text-muted-foreground">
+                            {new Date(counting.created_at).toLocaleString('pt-BR')}
+                          </span>
+                          {counting.edited_at && (
+                            <Badge variant="secondary" className="text-xs">Editado</Badge>
+                          )}
+                        </div>
+                        <p className="font-semibold text-foreground mb-1">Operador: {counting.operator}</p>
+                        <div className="grid grid-cols-2 gap-2 text-sm">
+                          {counting.half_liter > 0 && <span>500ml: {counting.half_liter}</span>}
+                          {counting.one_liter > 0 && <span>1L: {counting.one_liter}</span>}
+                          {counting.two_liter > 0 && <span>2L: {counting.two_liter}</span>}
+                          {counting.five_liter > 0 && <span>5L: {counting.five_liter}</span>}
+                          {counting.three_thirty_gram > 0 && <span>330g: {counting.three_thirty_gram}</span>}
+                          {counting.five_hundred_gram > 0 && <span>500g: {counting.five_hundred_gram}</span>}
+                          {counting.one_kg > 0 && <span>1Kg: {counting.one_kg}</span>}
+                        </div>
+                        <p className="text-primary font-bold mt-2">Total: {counting.total?.toFixed(2) || 0}L</p>
+                      </div>
+                      {isLabUser && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEditCounting(counting)}
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </Button>
+                      )}
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de Edição de Contagem */}
+      <Dialog open={!!editingCounting} onOpenChange={() => setEditingCounting(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="w-5 h-5" />
+              Editar Contagem
+            </DialogTitle>
+          </DialogHeader>
+          
+          {editingCounting && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Operador</Label>
+                <Input
+                  value={editForm.operator}
+                  onChange={(e) => setEditForm({...editForm, operator: e.target.value})}
+                  placeholder="Nome do operador"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>500ml</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={editForm.half_liter}
+                    onChange={(e) => setEditForm({...editForm, half_liter: parseInt(e.target.value) || 0})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>1L</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={editForm.one_liter}
+                    onChange={(e) => setEditForm({...editForm, one_liter: parseInt(e.target.value) || 0})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>2L</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={editForm.two_liter}
+                    onChange={(e) => setEditForm({...editForm, two_liter: parseInt(e.target.value) || 0})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>5L</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={editForm.five_liter}
+                    onChange={(e) => setEditForm({...editForm, five_liter: parseInt(e.target.value) || 0})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>330g</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={editForm.three_thirty_gram}
+                    onChange={(e) => setEditForm({...editForm, three_thirty_gram: parseInt(e.target.value) || 0})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>500g</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={editForm.five_hundred_gram}
+                    onChange={(e) => setEditForm({...editForm, five_hundred_gram: parseInt(e.target.value) || 0})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>1Kg</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={editForm.one_kg}
+                    onChange={(e) => setEditForm({...editForm, one_kg: parseInt(e.target.value) || 0})}
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-4">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => setEditingCounting(null)}
+                >
+                  <X className="w-4 h-4 mr-2" />
+                  Cancelar
+                </Button>
+                <Button
+                  className="flex-1"
+                  onClick={handleSaveEdit}
+                  disabled={saving}
+                >
+                  {saving ? 'Salvando...' : 'Salvar'}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
