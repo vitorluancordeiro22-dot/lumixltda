@@ -1279,6 +1279,84 @@ async def get_archived_raw_materials(year: int, month: int, current_user = Depen
     
     return batches
 
+# Email do laboratório autorizado a editar
+LAB_EMAIL = 'laboratoriolumix@outlook.com'
+
+class CountingEdit(BaseModel):
+    half_liter: int = 0
+    one_liter: int = 0
+    two_liter: int = 0
+    five_liter: int = 0
+    three_thirty_gram: int = 0
+    five_hundred_gram: int = 0
+    one_kg: int = 0
+    operator: str
+
+@api_router.put('/archive/counting/{batch_id}/{counting_id}')
+async def edit_archived_counting(batch_id: str, counting_id: str, data: CountingEdit, current_user = Depends(get_current_user)):
+    """
+    Edita uma contagem arquivada. Apenas disponível para o email do laboratório.
+    """
+    # Verificar se é o usuário do laboratório
+    if current_user.get('email', '').lower() != LAB_EMAIL.lower():
+        raise HTTPException(status_code=403, detail='Apenas o laboratório pode editar contagens arquivadas')
+    
+    # Buscar o lote arquivado
+    batch = await db.archived_product_batches.find_one({'id': batch_id})
+    if not batch:
+        raise HTTPException(status_code=404, detail='Lote arquivado não encontrado')
+    
+    # Encontrar a contagem no histórico
+    countings = batch.get('countings_history', [])
+    counting_index = None
+    old_total = 0
+    
+    for i, c in enumerate(countings):
+        if c.get('id') == counting_id:
+            counting_index = i
+            old_total = c.get('total', 0)
+            break
+    
+    if counting_index is None:
+        raise HTTPException(status_code=404, detail='Contagem não encontrada')
+    
+    # Calcular novo total
+    volume_total = (data.half_liter * 0.5) + (data.one_liter * 1) + (data.two_liter * 2) + (data.five_liter * 5)
+    weight_total = (data.three_thirty_gram * 0.33) + (data.five_hundred_gram * 0.5) + (data.one_kg * 1)
+    new_total = volume_total + weight_total
+    
+    # Atualizar a contagem no histórico
+    countings[counting_index]['half_liter'] = data.half_liter
+    countings[counting_index]['one_liter'] = data.one_liter
+    countings[counting_index]['two_liter'] = data.two_liter
+    countings[counting_index]['five_liter'] = data.five_liter
+    countings[counting_index]['three_thirty_gram'] = data.three_thirty_gram
+    countings[counting_index]['five_hundred_gram'] = data.five_hundred_gram
+    countings[counting_index]['one_kg'] = data.one_kg
+    countings[counting_index]['operator'] = data.operator
+    countings[counting_index]['total'] = new_total
+    countings[counting_index]['edited_at'] = datetime.now(timezone.utc).isoformat()
+    countings[counting_index]['edited_by'] = current_user.get('email')
+    
+    # Recalcular total envasado do lote
+    total_diff = new_total - old_total
+    new_batch_total = batch.get('total_bottled', 0) + total_diff
+    
+    # Atualizar operadores (recalcular lista única)
+    operators = list(set([c.get('operator', '') for c in countings if c.get('operator')]))
+    
+    # Salvar no banco
+    await db.archived_product_batches.update_one(
+        {'id': batch_id},
+        {'$set': {
+            'countings_history': countings,
+            'total_bottled': new_batch_total,
+            'operators': operators
+        }}
+    )
+    
+    return {'message': 'Contagem atualizada com sucesso', 'new_total': new_batch_total}
+
 # ========== DASHBOARD ==========
 
 @api_router.get('/dashboard/summary', response_model=DashboardSummary)
