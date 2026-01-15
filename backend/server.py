@@ -914,20 +914,20 @@ async def add_counting(batch_id: str, data: CountingCreate, current_user = Depen
 
 @api_router.get('/counting/top-operator/month')
 async def get_top_operator_month(current_user = Depends(get_current_user)):
-    """Retorna o funcionário que mais envasou no mês atual (apenas Litros)"""
+    """Retorna o funcionário que mais envasou no mês atual (apenas Litros)
+    Inclui tanto contagens ativas quanto arquivadas do mês."""
     now = datetime.now(timezone.utc)
     month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0).isoformat()
-    
-    # Busca todas as contagens do mês
-    countings = await db.counting.find({
-        'created_at': {'$gte': month_start}
-    }, {'_id': 0}).to_list(10000)
-    
-    if not countings:
-        return None
+    current_year = now.year
+    current_month = now.month
     
     # Agrupa por operador e soma os litros
     operator_totals = {}
+    
+    # 1. Buscar contagens ATIVAS do mês
+    countings = await db.counting.find({
+        'created_at': {'$gte': month_start}
+    }, {'_id': 0}).to_list(10000)
     
     for c in countings:
         operator = c.get('operator', '').strip()
@@ -946,6 +946,32 @@ async def get_top_operator_month(current_user = Depends(get_current_user)):
             operator_totals[operator] = {'total': 0, 'count': 0}
         operator_totals[operator]['total'] += total_litros
         operator_totals[operator]['count'] += 1
+    
+    # 2. Buscar contagens dos lotes ARQUIVADOS do mês atual
+    archived_batches = await db.archived_product_batches.find({
+        'archived_year': current_year,
+        'archived_month': current_month
+    }, {'_id': 0}).to_list(10000)
+    
+    for batch in archived_batches:
+        countings_history = batch.get('countings_history', [])
+        for c in countings_history:
+            operator = c.get('operator', '').strip()
+            if not operator:
+                continue
+            
+            # Calcular total em LITROS apenas
+            half = c.get('half_liter', 0) or 0
+            one = c.get('one_liter', 0) or 0
+            two = c.get('two_liter', 0) or 0
+            five = c.get('five_liter', 0) or 0
+            
+            total_litros = (half * 0.5) + (one * 1) + (two * 2) + (five * 5)
+            
+            if operator not in operator_totals:
+                operator_totals[operator] = {'total': 0, 'count': 0}
+            operator_totals[operator]['total'] += total_litros
+            operator_totals[operator]['count'] += 1
     
     if not operator_totals:
         return None
