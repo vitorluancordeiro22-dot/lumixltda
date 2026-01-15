@@ -1186,7 +1186,7 @@ async def get_employee_history(member_id: str, current_user = Depends(get_curren
         product = archived_product_map.get(batch.get('product_id'))
         
         for c in countings_history:
-            if c.get('operator', '').strip() != member['name']:
+            if c.get('operator', '').strip() != member_name:
                 continue
             
             half = c.get('half_liter', 0) or 0
