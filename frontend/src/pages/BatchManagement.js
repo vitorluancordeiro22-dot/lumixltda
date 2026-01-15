@@ -277,7 +277,7 @@ export const BatchManagement = () => {
                         <p className="font-semibold text-foreground">{product?.name || 'Produto desconhecido'}</p>
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                           <Calendar className="w-4 h-4" />
-                          {new Date(batch.date).toLocaleDateString('pt-BR')}
+                          {formatDateBR(batch.date)}
                         </div>
                         <div className="text-sm">
                           <span className="text-muted-foreground">Planejado: </span>
@@ -351,7 +351,7 @@ export const BatchManagement = () => {
                         <p className="font-semibold text-foreground">{rm?.name || 'Matéria-prima desconhecida'}</p>
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                           <Calendar className="w-4 h-4" />
-                          {new Date(batch.date).toLocaleDateString('pt-BR')}
+                          {formatDateBR(batch.date)}
                         </div>
                         <div className="text-sm">
                           <span className="text-muted-foreground">Quantidade: </span>
@@ -430,7 +430,7 @@ export const BatchManagement = () => {
                       <p className="text-sm text-muted-foreground">Data de Criação</p>
                       <div className="flex items-center gap-2 mt-1">
                         <Calendar className="w-4 h-4 text-muted-foreground" />
-                        <p className="text-foreground">{new Date(selectedBatch.date).toLocaleDateString('pt-BR')}</p>
+                        <p className="text-foreground">{formatDateBR(selectedBatch.date)}</p>
                       </div>
                     </div>
                     <div>
@@ -466,7 +466,7 @@ export const BatchManagement = () => {
                                   <div>
                                     <span className="font-mono text-primary">{rmBatch.batch_number}</span>
                                     <span className="text-muted-foreground ml-2">
-                                      {new Date(rmBatch.date).toLocaleDateString('pt-BR')}
+                                      {formatDateBR(rmBatch.date)}
                                     </span>
                                   </div>
                                   <span className="font-semibold text-foreground">{rmBatch.quantity} {recipe.raw_material?.type}</span>
@@ -522,7 +522,7 @@ export const BatchManagement = () => {
                       <p className="text-sm text-muted-foreground">Data de Chegada</p>
                     </div>
                     <p className="text-foreground font-semibold text-lg">
-                      {new Date(selectedBatch.date).toLocaleDateString('pt-BR')}
+                      {formatDateBR(selectedBatch.date)}
                     </p>
                   </div>
 
@@ -553,7 +553,7 @@ export const BatchManagement = () => {
                         <p className="text-sm text-muted-foreground">Data de Validade</p>
                       </div>
                       <p className="text-foreground font-semibold text-lg">
-                        {new Date(selectedBatch.expiry_date).toLocaleDateString('pt-BR')}
+                        {formatDateBR(selectedBatch.expiry_date)}
                       </p>
                     </div>
                   )}
