@@ -73,7 +73,7 @@ export const AuthProvider = ({ children }) => {
   const hasAccess = (path) => {
     if (role === 'laboratorio') return true;
     // Rotas permitidas para produção
-    const producaoRoutes = ['/counting', '/samples', '/dashboard'];
+    const producaoRoutes = ['/counting', '/samples', '/archives', '/dashboard'];
     return producaoRoutes.some(route => path.startsWith(route));
   };
 
