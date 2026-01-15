@@ -231,17 +231,13 @@ export const Team = () => {
             <div className="text-foreground p-8 text-center">Carregando histórico...</div>
           ) : memberHistory ? (
             <div className="space-y-6">
-              {/* Summary */}
-              <div className="grid grid-cols-3 gap-4">
-                <Card className="p-4  border">
-                  <p className="text-sm text-muted-foreground mb-1">Total em Litros</p>
-                  <p className="text-3xl font-bold text-blue-500">{memberHistory.total_liters_bottled?.toFixed(1) || 0}L</p>
+              {/* Summary - Apenas Litros */}
+              <div className="grid grid-cols-2 gap-4">
+                <Card className="p-4 border">
+                  <p className="text-sm text-muted-foreground mb-1">Total em Litros (Mês Atual)</p>
+                  <p className="text-3xl font-bold text-primary">{memberHistory.total_litros || 0}L</p>
                 </Card>
-                <Card className="p-4  border">
-                  <p className="text-sm text-muted-foreground mb-1">Total em Kg</p>
-                  <p className="text-3xl font-bold text-orange-500">{memberHistory.total_kg_bottled?.toFixed(1) || 0}Kg</p>
-                </Card>
-                <Card className="p-4  border">
+                <Card className="p-4 border">
                   <p className="text-sm text-muted-foreground mb-1">Operações</p>
                   <p className="text-3xl font-bold text-foreground">{memberHistory.total_operations}</p>
                 </Card>
@@ -249,12 +245,12 @@ export const Team = () => {
 
               {/* History List */}
               <div className="space-y-3">
-                <h3 className="text-lg font-semibold text-foreground">Histórico Detalhado</h3>
+                <h3 className="text-lg font-semibold text-foreground">Histórico do Mês</h3>
                 {memberHistory.history.length === 0 ? (
-                  <p className="text-muted-foreground text-center py-8">Nenhuma operação de envasamento registrada</p>
+                  <p className="text-muted-foreground text-center py-8">Nenhuma operação de envasamento neste mês</p>
                 ) : (
                   memberHistory.history.map((item) => (
-                    <Card key={item.id} className="p-4  border">
+                    <Card key={item.id} className="p-4 border">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
                           <p className="text-foreground font-semibold">{item.product_name}</p>
@@ -263,25 +259,15 @@ export const Team = () => {
                             {new Date(item.date).toLocaleString('pt-BR')}
                           </p>
                           <div className="mt-2 flex flex-wrap gap-3 text-sm text-muted-foreground">
-                            {item.unit === 'Kg' ? (
-                              <>
-                                {item.three_thirty_gram > 0 && <span>330g: {item.three_thirty_gram}</span>}
-                                {item.five_hundred_gram > 0 && <span>500g: {item.five_hundred_gram}</span>}
-                                {item.one_kg > 0 && <span>1Kg: {item.one_kg}</span>}
-                              </>
-                            ) : (
-                              <>
-                                {item.half_liter > 0 && <span>500ml: {item.half_liter}</span>}
-                                {item.one_liter > 0 && <span>1L: {item.one_liter}</span>}
-                                {item.two_liter > 0 && <span>2L: {item.two_liter}</span>}
-                                {item.five_liter > 0 && <span>5L: {item.five_liter}</span>}
-                              </>
-                            )}
+                            {item.half_liter > 0 && <span>500ml: {item.half_liter}</span>}
+                            {item.one_liter > 0 && <span>1L: {item.one_liter}</span>}
+                            {item.two_liter > 0 && <span>2L: {item.two_liter}</span>}
+                            {item.five_liter > 0 && <span>5L: {item.five_liter}</span>}
                           </div>
                         </div>
                         <div className="text-right">
-                          <p className={`text-2xl font-bold ${item.unit === 'Kg' ? 'text-orange-500' : 'text-blue-500'}`}>
-                            {item.total?.toFixed(1)}{item.unit}
+                          <p className="text-2xl font-bold text-primary">
+                            {item.total_litros?.toFixed(1)}L
                           </p>
                         </div>
                       </div>
