@@ -1095,15 +1095,21 @@ async def delete_supplier(supplier_id: str, current_user = Depends(get_current_u
 async def get_employee_history(member_id: str, current_user = Depends(get_current_user)):
     """
     Retorna o histórico de envasamento de um funcionário (apenas LITROS do mês atual).
+    Inclui tanto contagens ativas quanto arquivadas do mês.
     """
     member = await db.team.find_one({'id': member_id}, {'_id': 0})
     if not member:
         raise HTTPException(status_code=404, detail='Team member not found')
     
-    # Buscar contagens do mês atual deste operador
     now = datetime.now(timezone.utc)
     month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0).isoformat()
+    current_year = now.year
+    current_month = now.month
     
+    history = []
+    total_litros = 0
+    
+    # 1. Buscar contagens ATIVAS do mês atual deste operador
     countings = await db.counting.find(
         {
             'operator': member['name'],
@@ -1130,16 +1136,11 @@ async def get_employee_history(member_id: str, current_user = Depends(get_curren
     
     product_map = {p['id']: p for p in products}
     
-    # Montar histórico
-    history = []
-    total_litros = 0
-    
     for counting in countings:
         batch = batch_map.get(counting['product_batch_id'])
         if batch:
             product = product_map.get(batch.get('product_id'))
             
-            # Calcular litros (apenas campos de volume)
             half = counting.get('half_liter', 0) or 0
             one = counting.get('one_liter', 0) or 0
             two = counting.get('two_liter', 0) or 0
@@ -1156,10 +1157,59 @@ async def get_employee_history(member_id: str, current_user = Depends(get_curren
                 'one_liter': one,
                 'two_liter': two,
                 'five_liter': five,
-                'total_litros': litros
+                'total_litros': litros,
+                'archived': False
             })
             
             total_litros += litros
+    
+    # 2. Buscar contagens dos lotes ARQUIVADOS do mês atual
+    archived_batches = await db.archived_product_batches.find({
+        'archived_year': current_year,
+        'archived_month': current_month
+    }, {'_id': 0}).to_list(10000)
+    
+    # Buscar produtos para os arquivados
+    archived_product_ids = list(set([b.get('product_id') for b in archived_batches if b.get('product_id')]))
+    archived_products = await db.products.find(
+        {'id': {'$in': archived_product_ids}},
+        {'_id': 0}
+    ).to_list(1000)
+    
+    archived_product_map = {p['id']: p for p in archived_products}
+    
+    for batch in archived_batches:
+        countings_history = batch.get('countings_history', [])
+        product = archived_product_map.get(batch.get('product_id'))
+        
+        for c in countings_history:
+            if c.get('operator', '').strip() != member['name']:
+                continue
+            
+            half = c.get('half_liter', 0) or 0
+            one = c.get('one_liter', 0) or 0
+            two = c.get('two_liter', 0) or 0
+            five = c.get('five_liter', 0) or 0
+            
+            litros = (half * 0.5) + (one * 1) + (two * 2) + (five * 5)
+            
+            history.append({
+                'id': c.get('id', ''),
+                'date': c.get('created_at', ''),
+                'product_name': product['name'] if product else 'N/A',
+                'batch_number': batch['batch_number'],
+                'half_liter': half,
+                'one_liter': one,
+                'two_liter': two,
+                'five_liter': five,
+                'total_litros': litros,
+                'archived': True
+            })
+            
+            total_litros += litros
+    
+    # Ordenar por data (mais recente primeiro)
+    history.sort(key=lambda x: x.get('date', ''), reverse=True)
     
     return {
         'member': member,
