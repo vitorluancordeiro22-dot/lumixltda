@@ -22,7 +22,8 @@ import {
   FileText,
   FileCheck,
   Smartphone,
-  Monitor
+  Monitor,
+  FlaskConical
 } from 'lucide-react';
 
 const menuItems = [
