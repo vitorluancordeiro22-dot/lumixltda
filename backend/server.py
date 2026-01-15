@@ -230,6 +230,18 @@ class SupplierCreate(BaseModel):
     email: str = ''
     address: str = ''
 
+# ========== AMOSTRAS MODELS ==========
+class Sample(BaseModel):
+    id: str
+    product_id: str
+    product_batch_id: str
+    month: int
+    year: int
+    status: str  # 'pendente' ou 'retirado'
+    requested_at: str
+    collected_by: Optional[str] = None
+    collected_at: Optional[str] = None
+
 # ========== LAUDOS MODELS ==========
 class LaudoFolder(BaseModel):
     id: str
