@@ -67,7 +67,6 @@ function App() {
               <Route path="archives" element={<Archives />} />
               <Route path="batches" element={<RoleRoute allowedRoles={['laboratorio']}><Batches /></RoleRoute>} />
               <Route path="suppliers" element={<RoleRoute allowedRoles={['laboratorio']}><Suppliers /></RoleRoute>} />
-              <Route path="archives" element={<RoleRoute allowedRoles={['laboratorio']}><Archives /></RoleRoute>} />
               <Route path="industrial-ops" element={<RoleRoute allowedRoles={['laboratorio']}><IndustrialOPs /></RoleRoute>} />
               <Route path="laudos" element={<RoleRoute allowedRoles={['laboratorio']}><Laudos /></RoleRoute>} />
               <Route path="batch-management" element={<RoleRoute allowedRoles={['laboratorio']}><BatchManagement /></RoleRoute>} />
