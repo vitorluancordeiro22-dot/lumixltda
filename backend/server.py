@@ -1357,6 +1357,42 @@ async def edit_archived_counting(batch_id: str, counting_id: str, data: Counting
     
     return {'message': 'Contagem atualizada com sucesso', 'new_total': new_batch_total}
 
+class ArchivedBatchEdit(BaseModel):
+    batch_number: str
+    planned_liters: float
+    total_bottled: float
+    operators: List[str] = []
+
+@api_router.put('/archive/batch/{batch_id}')
+async def edit_archived_batch(batch_id: str, data: ArchivedBatchEdit, current_user = Depends(get_current_user)):
+    """
+    Edita um lote arquivado (número do lote, litragem planejada/envasada, operadores).
+    Apenas disponível para o email do laboratório.
+    """
+    # Verificar se é o usuário do laboratório
+    if current_user.get('email', '').lower() != LAB_EMAIL.lower():
+        raise HTTPException(status_code=403, detail='Apenas o laboratório pode editar lotes arquivados')
+    
+    # Buscar o lote arquivado
+    batch = await db.archived_product_batches.find_one({'id': batch_id})
+    if not batch:
+        raise HTTPException(status_code=404, detail='Lote arquivado não encontrado')
+    
+    # Atualizar os dados
+    await db.archived_product_batches.update_one(
+        {'id': batch_id},
+        {'$set': {
+            'batch_number': data.batch_number,
+            'planned_liters': data.planned_liters,
+            'total_bottled': data.total_bottled,
+            'operators': data.operators,
+            'edited_at': datetime.now(timezone.utc).isoformat(),
+            'edited_by': current_user.get('email')
+        }}
+    )
+    
+    return {'message': 'Lote atualizado com sucesso'}
+
 # ========== DASHBOARD ==========
 
 @api_router.get('/dashboard/summary', response_model=DashboardSummary)
