@@ -33,6 +33,7 @@ const menuItems = [
   { path: '/production-orders', icon: ClipboardList, label: 'Ordens de Produção' },
   { path: '/industrial-ops', icon: FileText, label: 'OP Industrial' },
   { path: '/counting', icon: Calculator, label: 'Contagem' },
+  { path: '/samples', icon: FlaskConical, label: 'Amostras' },
   { path: '/batch-management', icon: ListChecks, label: 'Gerenciar Lotes' },
   { path: '/suppliers', icon: Truck, label: 'Fornecedores' },
   { path: '/laudos', icon: FileCheck, label: 'Laudos' },
