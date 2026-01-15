@@ -1393,6 +1393,73 @@ async def delete_laudo_file(
     
     return {'message': 'Arquivo deletado com sucesso'}
 
+# ========== AMOSTRAS ROUTES ==========
+
+@api_router.get('/samples')
+async def get_samples(current_user = Depends(get_current_user)):
+    """Retorna todas as amostras pendentes e retiradas"""
+    samples = await db.samples.find({'deleted': {'$ne': True}}, {'_id': 0}).to_list(1000)
+    return samples
+
+@api_router.post('/samples/check-new/{batch_id}')
+async def check_and_create_sample(batch_id: str, current_user = Depends(get_current_user)):
+    """Verifica se é o primeiro lote do produto no mês e cria amostra se necessário"""
+    import uuid
+    
+    # Buscar o lote
+    batch = await db.product_batches.find_one({'id': batch_id}, {'_id': 0})
+    if not batch:
+        return {'created': False, 'reason': 'Lote não encontrado'}
+    
+    batch_date = datetime.fromisoformat(batch['date'])
+    month = batch_date.month
+    year = batch_date.year
+    product_id = batch['product_id']
+    
+    # Verificar se já existe amostra para este produto neste mês
+    existing = await db.samples.find_one({
+        'product_id': product_id,
+        'month': month,
+        'year': year,
+        'deleted': {'$ne': True}
+    })
+    
+    if existing:
+        return {'created': False, 'reason': 'Já existe amostra para este produto neste mês'}
+    
+    # Criar nova solicitação de amostra
+    sample = {
+        'id': str(uuid.uuid4()),
+        'product_id': product_id,
+        'product_batch_id': batch_id,
+        'month': month,
+        'year': year,
+        'status': 'pendente',
+        'requested_at': datetime.now(timezone.utc).isoformat(),
+        'collected_by': None,
+        'collected_at': None
+    }
+    
+    await db.samples.insert_one(sample)
+    return {'created': True, 'sample': sample}
+
+@api_router.put('/samples/{sample_id}/collect')
+async def collect_sample(sample_id: str, collected_by: str, current_user = Depends(get_current_user)):
+    """Marca amostra como retirada"""
+    result = await db.samples.update_one(
+        {'id': sample_id},
+        {'$set': {
+            'status': 'retirado',
+            'collected_by': collected_by,
+            'collected_at': datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail='Amostra não encontrada')
+    
+    return {'message': 'Amostra marcada como retirada'}
+
 # ========== DOCUMENT GENERATION ROUTES ==========
 
 @api_router.post('/industrial-ops/{op_id}/generate-documents')
