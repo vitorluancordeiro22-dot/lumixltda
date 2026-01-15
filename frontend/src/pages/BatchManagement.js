@@ -9,6 +9,13 @@ import { Package, Beaker, Eye, Calendar, Building2, Clock, AlertCircle, Edit, Tr
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 
+// Função para formatar data sem problema de timezone
+const formatDateBR = (dateStr) => {
+  if (!dateStr) return 'N/A';
+  const [year, month, day] = dateStr.split('T')[0].split('-');
+  return `${day}/${month}/${year}`;
+};
+
 export const BatchManagement = () => {
   const [productBatches, setProductBatches] = useState([]);
   const [rmBatches, setRmBatches] = useState([]);
