@@ -285,7 +285,7 @@ export const Archives = () => {
                           <div className="p-3 rounded-lg bg-muted">
                             <p className="text-xs text-muted-foreground">Planejado / Envasado</p>
                             <p className="text-lg font-bold text-foreground">
-                              {batch.planned_liters}L / {batch.total_bottled}L
+                              {batch.planned_liters}L / {batch.total_bottled?.toFixed(1) || 0}L
                             </p>
                           </div>
                           {batch.operators && batch.operators.length > 0 && (
@@ -293,6 +293,18 @@ export const Archives = () => {
                               <p className="text-xs text-muted-foreground mb-1">Operadores do Envase:</p>
                               <p className="text-sm font-semibold text-foreground">{batch.operators.join(', ')}</p>
                             </div>
+                          )}
+                          {/* Botão para ver histórico de contagens */}
+                          {batch.countings_history && batch.countings_history.length > 0 && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="w-full mt-2"
+                              onClick={() => setSelectedBatch(batch)}
+                            >
+                              <History className="w-4 h-4 mr-2" />
+                              Ver Contagens ({batch.countings_history.length})
+                            </Button>
                           )}
                         </div>
                       </Card>
