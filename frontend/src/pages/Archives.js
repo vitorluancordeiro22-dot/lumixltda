@@ -242,6 +242,12 @@ export const Archives = () => {
                               {batch.planned_liters}L / {batch.total_bottled}L
                             </p>
                           </div>
+                          {batch.operators && batch.operators.length > 0 && (
+                            <div className="p-3 rounded-lg bg-primary/10 border border-primary/30">
+                              <p className="text-xs text-muted-foreground mb-1">Operadores do Envase:</p>
+                              <p className="text-sm font-semibold text-foreground">{batch.operators.join(', ')}</p>
+                            </div>
+                          )}
                         </div>
                       </Card>
                     ))}
