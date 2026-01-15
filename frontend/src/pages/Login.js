@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/ui/button';
@@ -15,16 +15,27 @@ export const Login = () => {
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login, register } = useAuth();
+  const [checkingSession, setCheckingSession] = useState(true);
+  const { user, role, login, register } = useAuth();
   const navigate = useNavigate();
   const isMountedRef = React.useRef(true);
 
-  React.useEffect(() => {
+  // Verificar sessão existente e redirecionar automaticamente
+  useEffect(() => {
     isMountedRef.current = true;
+    
+    // Se já tem usuário logado, redireciona
+    if (user && role) {
+      const targetPath = role === 'producao' ? '/counting' : '/dashboard';
+      navigate(targetPath, { replace: true });
+    } else {
+      setCheckingSession(false);
+    }
+    
     return () => {
       isMountedRef.current = false;
     };
-  }, []);
+  }, [user, role, navigate]);
 
   const handleModeSelect = (mode) => {
     setSelectedMode(mode);
@@ -36,6 +47,18 @@ export const Login = () => {
     setPassword('');
     setName('');
   };
+
+  // Mostra loading enquanto verifica sessão
+  if (checkingSession) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary mb-2" />
+          <p className="text-muted-foreground">Verificando sessão...</p>
+        </div>
+      </div>
+    );
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault();
