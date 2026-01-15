@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { toast } from 'sonner';
-import { Archive, Package, Boxes, Calendar, Search, Pencil, X, History, Settings } from 'lucide-react';
+import { Archive, Package, Boxes, Calendar, Search, Pencil, X, History, Settings, Users, Trophy } from 'lucide-react';
 
 export const Archives = () => {
   const { user } = useAuth();
@@ -20,6 +20,7 @@ export const Archives = () => {
   const [rawMaterialBatches, setRawMaterialBatches] = useState([]);
   const [products, setProducts] = useState([]);
   const [rawMaterials, setRawMaterials] = useState([]);
+  const [operatorsSummary, setOperatorsSummary] = useState([]);
   const [loading, setLoading] = useState(true);
   const [archiving, setArchiving] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
