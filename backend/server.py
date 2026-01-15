@@ -859,12 +859,22 @@ async def get_counting(batch_id: str, current_user = Depends(get_current_user)):
 async def add_counting(batch_id: str, data: CountingCreate, current_user = Depends(get_current_user)):
     import uuid
     
-    # Calculate total - volume (Litros)
-    volume_total = (data.half_liter * 0.5) + (data.one_liter * 1) + (data.two_liter * 2) + (data.five_liter * 5)
-    # Calculate total - weight (Kg)
-    weight_total = (data.three_thirty_gram * 0.33) + (data.five_hundred_gram * 0.5) + (data.one_kg * 1)
+    # Buscar o lote e o produto para saber a unidade
+    batch = await db.product_batches.find_one({'id': batch_id}, {'_id': 0})
+    if not batch:
+        raise HTTPException(status_code=404, detail='Lote não encontrado')
     
-    total = volume_total + weight_total
+    product = await db.products.find_one({'id': batch.get('product_id')}, {'_id': 0})
+    unit = (product.get('unit', 'L') if product else 'L').lower()
+    is_weight = 'kg' in unit or 'g' in unit or 'quilo' in unit
+    
+    # Calculate total baseado na unidade do produto
+    if is_weight:
+        # Produto em Kg - usa apenas campos de peso
+        total = (data.three_thirty_gram * 0.33) + (data.five_hundred_gram * 0.5) + (data.one_kg * 1)
+    else:
+        # Produto em Litros - usa apenas campos de volume
+        total = (data.half_liter * 0.5) + (data.one_liter * 1) + (data.two_liter * 2) + (data.five_liter * 5)
     
     count_doc = {
         'id': str(uuid.uuid4()),
@@ -877,26 +887,25 @@ async def add_counting(batch_id: str, data: CountingCreate, current_user = Depen
         'five_hundred_gram': data.five_hundred_gram,
         'one_kg': data.one_kg,
         'total': float(total),
+        'unit': 'Kg' if is_weight else 'L',  # Salvar a unidade
         'operator': data.operator,
         'created_at': datetime.now(timezone.utc).isoformat()
     }
     await db.counting.insert_one(count_doc)
     
     # Update batch total
-    batch = await db.product_batches.find_one({'id': batch_id}, {'_id': 0})
-    if batch:
-        new_total = batch.get('total_bottled', 0.0) + total
+    new_total = batch.get('total_bottled', 0.0) + total
+    await db.product_batches.update_one(
+        {'id': batch_id},
+        {'$set': {'total_bottled': new_total}}
+    )
+    
+    # Check if batch is complete
+    if new_total >= batch['planned_liters']:
         await db.product_batches.update_one(
             {'id': batch_id},
-            {'$set': {'total_bottled': new_total}}
+            {'$set': {'status': 'finalizado'}}
         )
-        
-        # Check if batch is complete
-        if new_total >= batch['planned_liters']:
-            await db.product_batches.update_one(
-                {'id': batch_id},
-                {'$set': {'status': 'finalizado'}}
-            )
     
     return Counting(**count_doc)
 
