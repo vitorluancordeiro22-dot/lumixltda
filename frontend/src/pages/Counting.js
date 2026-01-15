@@ -83,6 +83,17 @@ export const Counting = () => {
     }
   };
 
+  const fetchTopOperator = async () => {
+    try {
+      const response = await api.get('/counting/top-operator/month');
+      if (response.data) {
+        setTopOperator(response.data);
+      }
+    } catch (error) {
+      console.error('Error loading top operator:', error);
+    }
+  };
+
   const fetchCountings = async (batchId) => {
     try {
       const response = await api.get(`/counting/${batchId}`);
