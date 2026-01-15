@@ -1121,7 +1121,7 @@ async def get_employee_history(member_id: str, current_user = Depends(get_curren
     batch_map = {b['id']: b for b in batches}
     
     # Buscar produtos
-    product_ids = [b['product_id'] for b in batches]
+    product_ids = list(set([b.get('product_id') for b in batches if b.get('product_id')]))
     products = await db.products.find(
         {'id': {'$in': product_ids}},
         {'_id': 0}
@@ -1132,11 +1132,20 @@ async def get_employee_history(member_id: str, current_user = Depends(get_curren
     # Montar histórico
     history = []
     total_liters = 0
+    total_kg = 0
     
     for counting in countings:
         batch = batch_map.get(counting['product_batch_id'])
         if batch:
-            product = product_map.get(batch['product_id'])
+            product = product_map.get(batch.get('product_id'))
+            
+            # Determinar unidade do produto
+            unit = counting.get('unit', 'L')  # Usar unidade salva na contagem
+            if not counting.get('unit') and product:
+                # Se a contagem não tem unidade, inferir do produto
+                prod_unit = (product.get('unit', 'L') or 'L').lower()
+                unit = 'Kg' if ('kg' in prod_unit or 'g' in prod_unit or 'quilo' in prod_unit) else 'L'
+            
             history.append({
                 'id': counting['id'],
                 'date': counting['created_at'],
@@ -1149,13 +1158,19 @@ async def get_employee_history(member_id: str, current_user = Depends(get_curren
                 'three_thirty_gram': counting.get('three_thirty_gram', 0),
                 'five_hundred_gram': counting.get('five_hundred_gram', 0),
                 'one_kg': counting.get('one_kg', 0),
-                'total_liters': counting['total']
+                'total': counting['total'],
+                'unit': unit
             })
-            total_liters += counting['total']
+            
+            if unit == 'Kg':
+                total_kg += counting['total']
+            else:
+                total_liters += counting['total']
     
     return {
         'member': member,
         'total_liters_bottled': total_liters,
+        'total_kg_bottled': total_kg,
         'total_operations': len(history),
         'history': history
     }
