@@ -916,10 +916,11 @@ class TopOperator(BaseModel):
     name: str
     total_bottled: float
     count_entries: int
+    unit: str = 'L'
 
 @api_router.get('/counting/top-operator/month')
 async def get_top_operator_month(current_user = Depends(get_current_user)):
-    """Retorna o funcionário que mais envasou no mês atual"""
+    """Retorna o funcionário que mais envasou no mês atual (separado por L e Kg)"""
     now = datetime.now(timezone.utc)
     month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0).isoformat()
     
@@ -931,28 +932,61 @@ async def get_top_operator_month(current_user = Depends(get_current_user)):
     if not countings:
         return None
     
-    # Agrupa por operador e soma os totais
-    operator_totals = {}
+    # Agrupa por operador, separando Litros e Kg
+    operator_totals_l = {}  # Total em Litros
+    operator_totals_kg = {}  # Total em Kg
+    
     for c in countings:
         operator = c.get('operator', '')
         if not operator:
             continue
-        if operator not in operator_totals:
-            operator_totals[operator] = {'total': 0, 'count': 0}
-        operator_totals[operator]['total'] += c.get('total', 0)
-        operator_totals[operator]['count'] += 1
+        
+        unit = c.get('unit', 'L')
+        total = c.get('total', 0)
+        
+        if unit == 'Kg':
+            if operator not in operator_totals_kg:
+                operator_totals_kg[operator] = {'total': 0, 'count': 0}
+            operator_totals_kg[operator]['total'] += total
+            operator_totals_kg[operator]['count'] += 1
+        else:
+            if operator not in operator_totals_l:
+                operator_totals_l[operator] = {'total': 0, 'count': 0}
+            operator_totals_l[operator]['total'] += total
+            operator_totals_l[operator]['count'] += 1
     
-    if not operator_totals:
-        return None
+    # Encontra o melhor em Litros
+    top_l = None
+    if operator_totals_l:
+        top = max(operator_totals_l.items(), key=lambda x: x[1]['total'])
+        top_l = {
+            'name': top[0],
+            'total_bottled': round(top[1]['total'], 2),
+            'count_entries': top[1]['count'],
+            'unit': 'L'
+        }
     
-    # Encontra o operador com maior total
-    top_operator = max(operator_totals.items(), key=lambda x: x[1]['total'])
+    # Encontra o melhor em Kg
+    top_kg = None
+    if operator_totals_kg:
+        top = max(operator_totals_kg.items(), key=lambda x: x[1]['total'])
+        top_kg = {
+            'name': top[0],
+            'total_bottled': round(top[1]['total'], 2),
+            'count_entries': top[1]['count'],
+            'unit': 'Kg'
+        }
     
-    return {
-        'name': top_operator[0],
-        'total_bottled': round(top_operator[1]['total'], 2),
-        'count_entries': top_operator[1]['count']
-    }
+    # Retorna o que tiver mais total (priorizando volume se empate)
+    if top_l and top_kg:
+        # Retorna ambos para o frontend decidir como mostrar
+        return {'litros': top_l, 'kg': top_kg}
+    elif top_l:
+        return {'litros': top_l, 'kg': None}
+    elif top_kg:
+        return {'litros': None, 'kg': top_kg}
+    
+    return None
 
 # ========== TEAM ==========
 
