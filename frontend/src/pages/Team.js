@@ -232,10 +232,14 @@ export const Team = () => {
           ) : memberHistory ? (
             <div className="space-y-6">
               {/* Summary */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <Card className="p-4  border">
-                  <p className="text-sm text-muted-foreground mb-1">Total Envasado</p>
-                  <p className="text-3xl font-bold text-primary">{memberHistory.total_liters_bottled.toFixed(1)}L</p>
+                  <p className="text-sm text-muted-foreground mb-1">Total em Litros</p>
+                  <p className="text-3xl font-bold text-blue-500">{memberHistory.total_liters_bottled?.toFixed(1) || 0}L</p>
+                </Card>
+                <Card className="p-4  border">
+                  <p className="text-sm text-muted-foreground mb-1">Total em Kg</p>
+                  <p className="text-3xl font-bold text-orange-500">{memberHistory.total_kg_bottled?.toFixed(1) || 0}Kg</p>
                 </Card>
                 <Card className="p-4  border">
                   <p className="text-sm text-muted-foreground mb-1">Operações</p>
@@ -258,14 +262,27 @@ export const Team = () => {
                           <p className="text-xs text-muted-foreground/70">
                             {new Date(item.date).toLocaleString('pt-BR')}
                           </p>
-                          <div className="mt-2 flex gap-4 text-sm text-muted-foreground">
-                            <span>1L: {item.one_liter}</span>
-                            <span>2L: {item.two_liter}</span>
-                            <span>5L: {item.five_liter}</span>
+                          <div className="mt-2 flex flex-wrap gap-3 text-sm text-muted-foreground">
+                            {item.unit === 'Kg' ? (
+                              <>
+                                {item.three_thirty_gram > 0 && <span>330g: {item.three_thirty_gram}</span>}
+                                {item.five_hundred_gram > 0 && <span>500g: {item.five_hundred_gram}</span>}
+                                {item.one_kg > 0 && <span>1Kg: {item.one_kg}</span>}
+                              </>
+                            ) : (
+                              <>
+                                {item.half_liter > 0 && <span>500ml: {item.half_liter}</span>}
+                                {item.one_liter > 0 && <span>1L: {item.one_liter}</span>}
+                                {item.two_liter > 0 && <span>2L: {item.two_liter}</span>}
+                                {item.five_liter > 0 && <span>5L: {item.five_liter}</span>}
+                              </>
+                            )}
                           </div>
                         </div>
                         <div className="text-right">
-                          <p className="text-2xl font-bold text-primary">{item.total_liters}L</p>
+                          <p className={`text-2xl font-bold ${item.unit === 'Kg' ? 'text-orange-500' : 'text-blue-500'}`}>
+                            {item.total?.toFixed(1)}{item.unit}
+                          </p>
                         </div>
                       </div>
                     </Card>
