@@ -38,7 +38,7 @@ const allMenuItems = [
   { path: '/batch-management', icon: ListChecks, label: 'Gerenciar Lotes', roles: ['laboratorio'] },
   { path: '/suppliers', icon: Truck, label: 'Fornecedores', roles: ['laboratorio'] },
   { path: '/laudos', icon: FileCheck, label: 'Laudos', roles: ['laboratorio'] },
-  { path: '/archives', icon: Archive, label: 'Arquivos', roles: ['laboratorio'] },
+  { path: '/archives', icon: Archive, label: 'Arquivos', roles: ['laboratorio', 'producao'] },
   { path: '/team', icon: Users, label: 'Equipe', roles: ['laboratorio'] },
   { path: '/trash', icon: Trash2, label: 'Lixeira', roles: ['laboratorio'] },
   { path: '/settings', icon: Settings, label: 'Configurações', roles: ['laboratorio'] },
