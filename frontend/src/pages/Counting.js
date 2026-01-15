@@ -39,6 +39,7 @@ export const Counting = () => {
     fetchBatches();
     fetchProducts();
     fetchTeamMembers();
+    fetchTopOperator();
     
     return () => {
       isMountedRef.current = false;
