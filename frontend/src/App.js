@@ -36,6 +36,19 @@ const PrivateRoute = ({ children }) => {
   return user ? children : <Navigate to="/login" replace />;
 };
 
+// Componente para proteger rotas baseado na role
+const RoleRoute = ({ children, allowedRoles }) => {
+  const { role } = useAuth();
+  
+  // Se a role do usuário está na lista de permitidas, renderiza o componente
+  if (allowedRoles.includes(role)) {
+    return children;
+  }
+  
+  // Caso contrário, redireciona para a página de contagem (acessível para todos)
+  return <Navigate to="/counting" replace />;
+};
+
 function App() {
   return (
     <AuthProvider>
@@ -44,22 +57,22 @@ function App() {
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/" element={<PrivateRoute><Layout /></PrivateRoute>}>
-              <Route index element={<Navigate to="/dashboard" replace />} />
-              <Route path="dashboard" element={<Dashboard />} />
-              <Route path="products" element={<Products />} />
-              <Route path="raw-materials" element={<RawMaterials />} />
-              <Route path="production-orders" element={<ProductionOrders />} />
+              <Route index element={<Navigate to="/counting" replace />} />
+              <Route path="dashboard" element={<RoleRoute allowedRoles={['laboratorio']}><Dashboard /></RoleRoute>} />
+              <Route path="products" element={<RoleRoute allowedRoles={['laboratorio']}><Products /></RoleRoute>} />
+              <Route path="raw-materials" element={<RoleRoute allowedRoles={['laboratorio']}><RawMaterials /></RoleRoute>} />
+              <Route path="production-orders" element={<RoleRoute allowedRoles={['laboratorio']}><ProductionOrders /></RoleRoute>} />
               <Route path="counting" element={<Counting />} />
               <Route path="samples" element={<Samples />} />
-              <Route path="batches" element={<Batches />} />
-              <Route path="suppliers" element={<Suppliers />} />
-              <Route path="archives" element={<Archives />} />
-              <Route path="industrial-ops" element={<IndustrialOPs />} />
-              <Route path="laudos" element={<Laudos />} />
-              <Route path="batch-management" element={<BatchManagement />} />
-              <Route path="team" element={<Team />} />
-              <Route path="trash" element={<Trash />} />
-              <Route path="settings" element={<Settings />} />
+              <Route path="batches" element={<RoleRoute allowedRoles={['laboratorio']}><Batches /></RoleRoute>} />
+              <Route path="suppliers" element={<RoleRoute allowedRoles={['laboratorio']}><Suppliers /></RoleRoute>} />
+              <Route path="archives" element={<RoleRoute allowedRoles={['laboratorio']}><Archives /></RoleRoute>} />
+              <Route path="industrial-ops" element={<RoleRoute allowedRoles={['laboratorio']}><IndustrialOPs /></RoleRoute>} />
+              <Route path="laudos" element={<RoleRoute allowedRoles={['laboratorio']}><Laudos /></RoleRoute>} />
+              <Route path="batch-management" element={<RoleRoute allowedRoles={['laboratorio']}><BatchManagement /></RoleRoute>} />
+              <Route path="team" element={<RoleRoute allowedRoles={['laboratorio']}><Team /></RoleRoute>} />
+              <Route path="trash" element={<RoleRoute allowedRoles={['laboratorio']}><Trash /></RoleRoute>} />
+              <Route path="settings" element={<RoleRoute allowedRoles={['laboratorio']}><Settings /></RoleRoute>} />
             </Route>
           </Routes>
         </BrowserRouter>
