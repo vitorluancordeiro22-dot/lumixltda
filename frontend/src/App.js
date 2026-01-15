@@ -64,6 +64,7 @@ function App() {
               <Route path="production-orders" element={<RoleRoute allowedRoles={['laboratorio']}><ProductionOrders /></RoleRoute>} />
               <Route path="counting" element={<Counting />} />
               <Route path="samples" element={<Samples />} />
+              <Route path="archives" element={<Archives />} />
               <Route path="batches" element={<RoleRoute allowedRoles={['laboratorio']}><Batches /></RoleRoute>} />
               <Route path="suppliers" element={<RoleRoute allowedRoles={['laboratorio']}><Suppliers /></RoleRoute>} />
               <Route path="archives" element={<RoleRoute allowedRoles={['laboratorio']}><Archives /></RoleRoute>} />
