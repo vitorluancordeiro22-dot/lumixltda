@@ -192,6 +192,26 @@ export const Counting = () => {
         <p className="text-lg text-muted-foreground">Registre as quantidades envasadas</p>
       </div>
 
+      {/* Funcionário Destaque do Mês */}
+      {topOperator && (
+        <Card className="p-4 border-2 border-yellow-400/50 bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-full bg-yellow-400/20 flex items-center justify-center">
+              <Trophy className="h-6 w-6 text-yellow-600" />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm text-muted-foreground">Destaque do Mês</p>
+              <p className="text-lg font-bold text-foreground">
+                Parabéns, {topOperator.name}! 🎉
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Mais dedicado com <span className="font-semibold text-yellow-600">{topOperator.total_bottled}L</span> envasados em {topOperator.count_entries} registros
+              </p>
+            </div>
+          </div>
+        </Card>
+      )}
+
       {/* Batch Selection */}
       <Card className="p-6 border">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
