@@ -7,7 +7,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Badge } from '../components/ui/badge';
 import { toast } from 'sonner';
-import { Plus, Search } from 'lucide-react';
+import { Plus, Search, Trophy } from 'lucide-react';
 
 export const Counting = () => {
   const [batches, setBatches] = useState([]);
@@ -17,6 +17,7 @@ export const Counting = () => {
   const [countings, setCountings] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [topOperator, setTopOperator] = useState(null);
   const isMountedRef = useRef(true);
   const formRef = useRef(null);
   
