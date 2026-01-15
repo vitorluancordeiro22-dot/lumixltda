@@ -1142,7 +1142,6 @@ async def get_employee_history(member_id: str, current_user = Depends(get_curren
         'total_operations': len(history),
         'history': history
     }
-    }
 
 # ========== TRASH ==========
 
