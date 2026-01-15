@@ -1,15 +1,19 @@
 import React, { useEffect, useState, useRef } from 'react';
 import api from '../lib/api';
+import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { toast } from 'sonner';
-import { Archive, Package, Boxes, Calendar, Search } from 'lucide-react';
+import { Archive, Package, Boxes, Calendar, Search, Pencil, X, History } from 'lucide-react';
 
 export const Archives = () => {
+  const { user } = useAuth();
   const [months, setMonths] = useState([]);
   const [selectedMonth, setSelectedMonth] = useState(null);
   const [productBatches, setProductBatches] = useState([]);
@@ -19,7 +23,14 @@ export const Archives = () => {
   const [loading, setLoading] = useState(true);
   const [archiving, setArchiving] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedBatch, setSelectedBatch] = useState(null);
+  const [editingCounting, setEditingCounting] = useState(null);
+  const [editForm, setEditForm] = useState({});
+  const [saving, setSaving] = useState(false);
   const isMountedRef = useRef(true);
+
+  // Verifica se é o usuário do laboratório
+  const isLabUser = user?.email?.toLowerCase() === 'laboratoriolumix@outlook.com';
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -101,6 +112,41 @@ export const Archives = () => {
       if (isMountedRef.current) {
         setArchiving(false);
       }
+    }
+  };
+
+  const handleEditCounting = (counting) => {
+    setEditingCounting(counting);
+    setEditForm({
+      half_liter: counting.half_liter || 0,
+      one_liter: counting.one_liter || 0,
+      two_liter: counting.two_liter || 0,
+      five_liter: counting.five_liter || 0,
+      three_thirty_gram: counting.three_thirty_gram || 0,
+      five_hundred_gram: counting.five_hundred_gram || 0,
+      one_kg: counting.one_kg || 0,
+      operator: counting.operator || ''
+    });
+  };
+
+  const handleSaveEdit = async () => {
+    if (!selectedBatch || !editingCounting) return;
+    
+    setSaving(true);
+    try {
+      await api.put(`/archive/counting/${selectedBatch.id}/${editingCounting.id}`, editForm);
+      
+      toast.success('Contagem atualizada com sucesso!');
+      setEditingCounting(null);
+      
+      // Recarregar dados do arquivo
+      if (selectedMonth) {
+        await fetchArchiveData(selectedMonth.year, selectedMonth.month);
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Erro ao atualizar contagem');
+    } finally {
+      setSaving(false);
     }
   };
 
