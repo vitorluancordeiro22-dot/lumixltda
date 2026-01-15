@@ -1101,6 +1101,8 @@ async def get_employee_history(member_id: str, current_user = Depends(get_curren
     if not member:
         raise HTTPException(status_code=404, detail='Team member not found')
     
+    member_name = member['name'].strip()  # Remover espaços extras
+    
     now = datetime.now(timezone.utc)
     month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0).isoformat()
     current_year = now.year
@@ -1110,13 +1112,14 @@ async def get_employee_history(member_id: str, current_user = Depends(get_curren
     total_litros = 0
     
     # 1. Buscar contagens ATIVAS do mês atual deste operador
-    countings = await db.counting.find(
-        {
-            'operator': member['name'],
-            'created_at': {'$gte': month_start}
-        },
+    # Buscar todas as contagens do mês e filtrar pelo nome (com strip)
+    all_countings = await db.counting.find(
+        {'created_at': {'$gte': month_start}},
         {'_id': 0}
     ).sort('created_at', -1).to_list(1000)
+    
+    # Filtrar pelo operador (comparando com strip)
+    countings = [c for c in all_countings if c.get('operator', '').strip() == member_name]
     
     # Buscar informações dos lotes relacionados
     batch_ids = list(set([c['product_batch_id'] for c in countings]))
