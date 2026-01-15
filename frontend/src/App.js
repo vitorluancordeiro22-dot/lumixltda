@@ -50,6 +50,7 @@ function App() {
               <Route path="raw-materials" element={<RawMaterials />} />
               <Route path="production-orders" element={<ProductionOrders />} />
               <Route path="counting" element={<Counting />} />
+              <Route path="samples" element={<Samples />} />
               <Route path="batches" element={<Batches />} />
               <Route path="suppliers" element={<Suppliers />} />
               <Route path="archives" element={<Archives />} />
