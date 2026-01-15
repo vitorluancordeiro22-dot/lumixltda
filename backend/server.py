@@ -188,6 +188,7 @@ class Counting(BaseModel):
     five_hundred_gram: int = 0  # 500g
     one_kg: int = 0             # 1Kg
     total: float = 0.0
+    unit: str = 'L'  # Unidade: 'L' ou 'Kg'
     operator: str
     created_at: str
 
