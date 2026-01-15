@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { toast } from 'sonner';
-import { Archive, Package, Boxes, Calendar, Search, Pencil, X, History } from 'lucide-react';
+import { Archive, Package, Boxes, Calendar, Search, Pencil, X, History, Settings } from 'lucide-react';
 
 export const Archives = () => {
   const { user } = useAuth();
@@ -25,7 +25,9 @@ export const Archives = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedBatch, setSelectedBatch] = useState(null);
   const [editingCounting, setEditingCounting] = useState(null);
+  const [editingBatch, setEditingBatch] = useState(null);
   const [editForm, setEditForm] = useState({});
+  const [batchEditForm, setBatchEditForm] = useState({});
   const [saving, setSaving] = useState(false);
   const isMountedRef = useRef(true);
 
