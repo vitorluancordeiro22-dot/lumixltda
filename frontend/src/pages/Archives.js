@@ -314,7 +314,19 @@ export const Archives = () => {
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {filteredProductBatches.map(batch => (
-                      <Card key={batch.id} className="p-6  border">
+                      <Card key={batch.id} className="p-6  border relative">
+                        {/* Botão de editar lote - apenas para laboratório */}
+                        {isLabUser && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="absolute top-2 right-2"
+                            onClick={() => handleEditBatch(batch)}
+                            title="Editar lote"
+                          >
+                            <Settings className="w-4 h-4" />
+                          </Button>
+                        )}
                         <div className="mb-4">
                           <Badge className="bg-emerald-600 mb-2">Finalizado</Badge>
                           <h3 className="text-xl font-bold text-foreground mb-1">{getProductName(batch.product_id)}</h3>
