@@ -193,49 +193,24 @@ export const Counting = () => {
         <p className="text-lg text-muted-foreground">Registre as quantidades envasadas</p>
       </div>
 
-      {/* Funcionário Destaque do Mês */}
-      {topOperator && (topOperator.litros || topOperator.kg) && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Destaque em Litros */}
-          {topOperator.litros && (
-            <Card className="p-4 border-2 border-blue-400/50 bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-full bg-blue-400/20 flex items-center justify-center">
-                  <Trophy className="h-6 w-6 text-blue-600" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm text-muted-foreground">Destaque em Litros</p>
-                  <p className="text-lg font-bold text-foreground">
-                    Parabéns, {topOperator.litros.name}! 🎉
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    <span className="font-semibold text-blue-600">{topOperator.litros.total_bottled}L</span> envasados em {topOperator.litros.count_entries} registros
-                  </p>
-                </div>
-              </div>
-            </Card>
-          )}
-          
-          {/* Destaque em Kg */}
-          {topOperator.kg && (
-            <Card className="p-4 border-2 border-orange-400/50 bg-gradient-to-r from-orange-50 to-yellow-50 dark:from-orange-900/20 dark:to-yellow-900/20">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-full bg-orange-400/20 flex items-center justify-center">
-                  <Trophy className="h-6 w-6 text-orange-600" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm text-muted-foreground">Destaque em Quilos</p>
-                  <p className="text-lg font-bold text-foreground">
-                    Parabéns, {topOperator.kg.name}! 🎉
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    <span className="font-semibold text-orange-600">{topOperator.kg.total_bottled}Kg</span> envasados em {topOperator.kg.count_entries} registros
-                  </p>
-                </div>
-              </div>
-            </Card>
-          )}
-        </div>
+      {/* Funcionário Destaque do Mês - Apenas Litros */}
+      {topOperator && topOperator.total_litros > 0 && (
+        <Card className="p-4 border-2 border-yellow-400/50 bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-full bg-yellow-400/20 flex items-center justify-center">
+              <Trophy className="h-6 w-6 text-yellow-600" />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm text-muted-foreground">🏆 Destaque do Mês</p>
+              <p className="text-lg font-bold text-foreground">
+                Parabéns, {topOperator.name}! 🎉
+              </p>
+              <p className="text-sm text-muted-foreground">
+                <span className="font-semibold text-yellow-600">{topOperator.total_litros}L</span> envasados em {topOperator.count_entries} {topOperator.count_entries === 1 ? 'registro' : 'registros'}
+              </p>
+            </div>
+          </div>
+        </Card>
       )}
 
       {/* Batch Selection */}
