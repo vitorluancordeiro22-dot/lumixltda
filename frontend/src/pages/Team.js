@@ -253,7 +253,12 @@ export const Team = () => {
                     <Card key={item.id} className="p-4 border">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
-                          <p className="text-foreground font-semibold">{item.product_name}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="text-foreground font-semibold">{item.product_name}</p>
+                            {item.archived && (
+                              <Badge variant="secondary" className="text-xs">Arquivado</Badge>
+                            )}
+                          </div>
                           <p className="text-sm text-muted-foreground">Lote: {item.batch_number}</p>
                           <p className="text-xs text-muted-foreground/70">
                             {new Date(item.date).toLocaleString('pt-BR')}
