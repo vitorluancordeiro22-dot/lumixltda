@@ -1068,27 +1068,31 @@ async def delete_supplier(supplier_id: str, current_user = Depends(get_current_u
 @api_router.get('/team/{member_id}/history')
 async def get_employee_history(member_id: str, current_user = Depends(get_current_user)):
     """
-    Retorna o histórico de envasamento de um funcionário.
-    Inclui todas as contagens onde ele foi o operador.
+    Retorna o histórico de envasamento de um funcionário (apenas LITROS do mês atual).
     """
     member = await db.team.find_one({'id': member_id}, {'_id': 0})
     if not member:
         raise HTTPException(status_code=404, detail='Team member not found')
     
-    # Buscar todas as contagens deste operador
+    # Buscar contagens do mês atual deste operador
+    now = datetime.now(timezone.utc)
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0).isoformat()
+    
     countings = await db.counting.find(
-        {'operator': member['name']},
+        {
+            'operator': member['name'],
+            'created_at': {'$gte': month_start}
+        },
         {'_id': 0}
     ).sort('created_at', -1).to_list(1000)
     
     # Buscar informações dos lotes relacionados
-    batch_ids = [c['product_batch_id'] for c in countings]
+    batch_ids = list(set([c['product_batch_id'] for c in countings]))
     batches = await db.product_batches.find(
         {'id': {'$in': batch_ids}},
         {'_id': 0}
     ).to_list(1000)
     
-    # Mapear batches
     batch_map = {b['id']: b for b in batches}
     
     # Buscar produtos
@@ -1102,48 +1106,42 @@ async def get_employee_history(member_id: str, current_user = Depends(get_curren
     
     # Montar histórico
     history = []
-    total_liters = 0
-    total_kg = 0
+    total_litros = 0
     
     for counting in countings:
         batch = batch_map.get(counting['product_batch_id'])
         if batch:
             product = product_map.get(batch.get('product_id'))
             
-            # Determinar unidade do produto
-            unit = counting.get('unit', 'L')  # Usar unidade salva na contagem
-            if not counting.get('unit') and product:
-                # Se a contagem não tem unidade, inferir do produto
-                prod_unit = (product.get('unit', 'L') or 'L').lower()
-                unit = 'Kg' if ('kg' in prod_unit or 'g' in prod_unit or 'quilo' in prod_unit) else 'L'
+            # Calcular litros (apenas campos de volume)
+            half = counting.get('half_liter', 0) or 0
+            one = counting.get('one_liter', 0) or 0
+            two = counting.get('two_liter', 0) or 0
+            five = counting.get('five_liter', 0) or 0
+            
+            litros = (half * 0.5) + (one * 1) + (two * 2) + (five * 5)
             
             history.append({
                 'id': counting['id'],
                 'date': counting['created_at'],
                 'product_name': product['name'] if product else 'N/A',
                 'batch_number': batch['batch_number'],
-                'half_liter': counting.get('half_liter', 0),
-                'one_liter': counting.get('one_liter', 0),
-                'two_liter': counting.get('two_liter', 0),
-                'five_liter': counting.get('five_liter', 0),
-                'three_thirty_gram': counting.get('three_thirty_gram', 0),
-                'five_hundred_gram': counting.get('five_hundred_gram', 0),
-                'one_kg': counting.get('one_kg', 0),
-                'total': counting['total'],
-                'unit': unit
+                'half_liter': half,
+                'one_liter': one,
+                'two_liter': two,
+                'five_liter': five,
+                'total_litros': litros
             })
             
-            if unit == 'Kg':
-                total_kg += counting['total']
-            else:
-                total_liters += counting['total']
+            total_litros += litros
     
     return {
         'member': member,
-        'total_liters_bottled': total_liters,
-        'total_kg_bottled': total_kg,
+        'mes_atual': now.strftime('%B/%Y'),
+        'total_litros': round(total_litros, 2),
         'total_operations': len(history),
         'history': history
+    }
     }
 
 # ========== TRASH ==========
