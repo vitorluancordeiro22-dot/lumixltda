@@ -164,6 +164,14 @@ export const Counting = () => {
   const totalCount = countings.reduce((sum, c) => sum + c.total, 0);
   const unitLabel = isWeightProduct() ? 'Kg' : 'L';
 
+  // Filtra lotes pela pesquisa (nome do produto ou número do lote)
+  const filteredBatches = batches.filter(batch => {
+    const productName = getProductName(batch.product_id).toLowerCase();
+    const batchNumber = batch.batch_number?.toLowerCase() || '';
+    const search = searchTerm.toLowerCase();
+    return productName.includes(search) || batchNumber.includes(search);
+  });
+
   return (
     <div className="space-y-6">
       <div>
@@ -173,9 +181,28 @@ export const Counting = () => {
 
       {/* Batch Selection */}
       <Card className="p-6 border">
-        <Label className="text-foreground text-lg mb-3 block">Selecione o Lote em Aberto</Label>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {batches.map(batch => {
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+          <Label className="text-foreground text-lg">Selecione o Lote em Aberto</Label>
+          {/* Barra de Pesquisa */}
+          <div className="relative w-full sm:w-72">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              data-testid="search-batches"
+              placeholder="Buscar por produto ou lote..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+        </div>
+        
+        {filteredBatches.length === 0 ? (
+          <p className="text-muted-foreground text-center py-8">
+            {searchTerm ? 'Nenhum lote encontrado para essa busca.' : 'Nenhum lote em aberto.'}
+          </p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredBatches.map(batch => {
             const product = getProduct(batch.product_id);
             const unit = product?.unit || 'L';
             const isWeight = unit.toLowerCase().includes('kg') || unit.toLowerCase().includes('g');
