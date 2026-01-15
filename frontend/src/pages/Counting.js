@@ -232,7 +232,8 @@ export const Counting = () => {
               </button>
             );
           })}
-        </div>
+          </div>
+        )}
       </Card>
 
       {selectedBatch && (
