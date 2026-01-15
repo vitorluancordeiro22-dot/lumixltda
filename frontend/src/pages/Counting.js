@@ -123,6 +123,7 @@ export const Counting = () => {
         });
         fetchCountings(selectedBatch.id);
         await fetchBatches();
+        fetchTopOperator(); // Atualiza o destaque após nova contagem
         toast.success('Contagem registrada!');
       }
     } catch (error) {
