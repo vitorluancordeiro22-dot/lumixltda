@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useMobile } from '../context/MobileContext';
@@ -23,29 +23,33 @@ import {
   FileCheck,
   Smartphone,
   Monitor,
-  FlaskConical
+  FlaskConical,
+  Factory
 } from 'lucide-react';
 
-const menuItems = [
-  { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { path: '/products', icon: Package, label: 'Produtos' },
-  { path: '/raw-materials', icon: Boxes, label: 'Matérias-Primas' },
-  { path: '/production-orders', icon: ClipboardList, label: 'Ordens de Produção' },
-  { path: '/industrial-ops', icon: FileText, label: 'OP Industrial' },
-  { path: '/counting', icon: Calculator, label: 'Contagem' },
-  { path: '/samples', icon: FlaskConical, label: 'Amostras' },
-  { path: '/batch-management', icon: ListChecks, label: 'Gerenciar Lotes' },
-  { path: '/suppliers', icon: Truck, label: 'Fornecedores' },
-  { path: '/laudos', icon: FileCheck, label: 'Laudos' },
-  { path: '/archives', icon: Archive, label: 'Arquivos' },
-  { path: '/team', icon: Users, label: 'Equipe' },
-  { path: '/trash', icon: Trash2, label: 'Lixeira' },
-  { path: '/settings', icon: Settings, label: 'Configurações' },
+const allMenuItems = [
+  { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', roles: ['laboratorio'] },
+  { path: '/products', icon: Package, label: 'Produtos', roles: ['laboratorio'] },
+  { path: '/raw-materials', icon: Boxes, label: 'Matérias-Primas', roles: ['laboratorio'] },
+  { path: '/production-orders', icon: ClipboardList, label: 'Ordens de Produção', roles: ['laboratorio'] },
+  { path: '/industrial-ops', icon: FileText, label: 'OP Industrial', roles: ['laboratorio'] },
+  { path: '/counting', icon: Calculator, label: 'Contagem', roles: ['laboratorio', 'producao'] },
+  { path: '/samples', icon: FlaskConical, label: 'Amostras', roles: ['laboratorio', 'producao'] },
+  { path: '/batch-management', icon: ListChecks, label: 'Gerenciar Lotes', roles: ['laboratorio'] },
+  { path: '/suppliers', icon: Truck, label: 'Fornecedores', roles: ['laboratorio'] },
+  { path: '/laudos', icon: FileCheck, label: 'Laudos', roles: ['laboratorio'] },
+  { path: '/archives', icon: Archive, label: 'Arquivos', roles: ['laboratorio'] },
+  { path: '/team', icon: Users, label: 'Equipe', roles: ['laboratorio'] },
+  { path: '/trash', icon: Trash2, label: 'Lixeira', roles: ['laboratorio'] },
+  { path: '/settings', icon: Settings, label: 'Configurações', roles: ['laboratorio'] },
 ];
 
 const Sidebar = ({ mobile = false, onItemClick }) => {
   const location = useLocation();
-  const { user, logout } = useAuth();
+  const { user, role, logout } = useAuth();
+
+  // Filtra itens do menu baseado na role do usuário
+  const menuItems = allMenuItems.filter(item => item.roles.includes(role || 'producao'));
 
   return (
     <div className="flex flex-col h-full">
@@ -59,6 +63,15 @@ const Sidebar = ({ mobile = false, onItemClick }) => {
             <h2 className="text-xl font-bold text-foreground">Lumix</h2>
             <p className="text-xs text-muted-foreground">By Vitor</p>
           </div>
+        </div>
+        {/* Role Badge */}
+        <div className={`mt-3 inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium ${
+          role === 'laboratorio' 
+            ? 'bg-primary/10 text-primary' 
+            : 'bg-orange-500/10 text-orange-600'
+        }`}>
+          {role === 'laboratorio' ? <FlaskConical className="h-3 w-3" /> : <Factory className="h-3 w-3" />}
+          {role === 'laboratorio' ? 'Laboratório' : 'Produção'}
         </div>
       </div>
 
