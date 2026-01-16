@@ -264,11 +264,31 @@ export const Team = () => {
                           <p className="text-xs text-muted-foreground/70">
                             {new Date(item.date).toLocaleString('pt-BR')}
                           </p>
-                          <div className="mt-2 flex flex-wrap gap-3 text-sm text-muted-foreground">
-                            {item.half_liter > 0 && <span>500ml: {item.half_liter}</span>}
-                            {item.one_liter > 0 && <span>1L: {item.one_liter}</span>}
-                            {item.two_liter > 0 && <span>2L: {item.two_liter}</span>}
-                            {item.five_liter > 0 && <span>5L: {item.five_liter}</span>}
+                          <div className="mt-2 space-y-1 text-sm bg-muted/50 p-2 rounded-lg">
+                            {item.half_liter > 0 && (
+                              <div className="flex justify-between">
+                                <span>500ml: {item.half_liter} un</span>
+                                <span className="font-semibold text-primary">= {(item.half_liter * 0.5).toFixed(1)}L</span>
+                              </div>
+                            )}
+                            {item.one_liter > 0 && (
+                              <div className="flex justify-between">
+                                <span>1L: {item.one_liter} un</span>
+                                <span className="font-semibold text-primary">= {(item.one_liter * 1).toFixed(1)}L</span>
+                              </div>
+                            )}
+                            {item.two_liter > 0 && (
+                              <div className="flex justify-between">
+                                <span>2L: {item.two_liter} un</span>
+                                <span className="font-semibold text-primary">= {(item.two_liter * 2).toFixed(1)}L</span>
+                              </div>
+                            )}
+                            {item.five_liter > 0 && (
+                              <div className="flex justify-between">
+                                <span>5L: {item.five_liter} un</span>
+                                <span className="font-semibold text-primary">= {(item.five_liter * 5).toFixed(1)}L</span>
+                              </div>
+                            )}
                           </div>
                         </div>
                         <div className="text-right">
