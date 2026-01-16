@@ -51,6 +51,7 @@ export const Products = () => {
     isMountedRef.current = true;
     fetchProducts();
     fetchRawMaterials();
+    fetchBatches();
     
     return () => {
       isMountedRef.current = false;
@@ -71,6 +72,17 @@ export const Products = () => {
       if (isMountedRef.current) {
         setLoading(false);
       }
+    }
+  };
+
+  const fetchBatches = async () => {
+    try {
+      const response = await api.get('/product-batches');
+      if (isMountedRef.current) {
+        setBatches(response.data);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar lotes:', error);
     }
   };
 
