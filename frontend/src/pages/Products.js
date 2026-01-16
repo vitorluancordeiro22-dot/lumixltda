@@ -559,6 +559,44 @@ export const Products = () => {
           )}
         </div>
       )}
+
+      {/* Dialog de confirmação para lote duplicado */}
+      <AlertDialog open={confirmBatchDialogOpen} onOpenChange={setConfirmBatchDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-yellow-500" />
+              Lote em Aberto Existente
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-left">
+              {existingBatchInfo && (
+                <>
+                  <p className="mb-3">
+                    Já existe um lote em aberto para o produto <strong>{existingBatchInfo.productName}</strong>:
+                  </p>
+                  <div className="bg-muted p-3 rounded-lg mb-3">
+                    <p><strong>Lote:</strong> {existingBatchInfo.batch.batch_number}</p>
+                    <p><strong>Status:</strong> {existingBatchInfo.batch.status}</p>
+                    <p><strong>Planejado:</strong> {existingBatchInfo.batch.planned_liters}L</p>
+                  </div>
+                  <p>Deseja criar um novo lote mesmo assim?</p>
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {
+              setConfirmBatchDialogOpen(false);
+              setExistingBatchInfo(null);
+            }}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={createBatch} className="bg-primary">
+              Sim, Criar Novo Lote
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
