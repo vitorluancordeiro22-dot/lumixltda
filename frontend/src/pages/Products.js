@@ -150,8 +150,42 @@ export const Products = () => {
     }
   };
 
+  // Verificar se existe lote em aberto do mesmo produto
+  const checkExistingBatch = () => {
+    const productId = batchFormData.product_id;
+    if (!productId) return null;
+    
+    // Buscar lotes em aberto do mesmo produto
+    const existingBatch = batches.find(b => 
+      b.product_id === productId && 
+      b.status !== 'finalizado' && 
+      !b.deleted
+    );
+    
+    return existingBatch;
+  };
+
   const handleBatchSubmit = async (e) => {
     e.preventDefault();
+    if (submitting) return;
+    
+    // Verificar se já existe lote em aberto
+    const existingBatch = checkExistingBatch();
+    if (existingBatch) {
+      const product = products.find(p => p.id === batchFormData.product_id);
+      setExistingBatchInfo({
+        batch: existingBatch,
+        productName: product?.name || 'Produto'
+      });
+      setConfirmBatchDialogOpen(true);
+      return;
+    }
+    
+    // Se não existe, criar direto
+    await createBatch();
+  };
+
+  const createBatch = async () => {
     if (submitting) return;
     
     setSubmitting(true);
@@ -175,6 +209,7 @@ export const Products = () => {
         setBatchProduct(product);
         
         setBatchDialogOpen(false);
+        setConfirmBatchDialogOpen(false);
         setBatchFormData({
           product_id: '',
           date: new Date().toISOString().split('T')[0],
@@ -183,6 +218,8 @@ export const Products = () => {
           custom_batch_number: ''
         });
         setEditingBatchNumber(false);
+        setExistingBatchInfo(null);
+        fetchBatches(); // Atualizar lista de lotes
         toast.success('Lote criado! Próximos lotes seguirão essa sequência.');
       }
     } catch (error) {
