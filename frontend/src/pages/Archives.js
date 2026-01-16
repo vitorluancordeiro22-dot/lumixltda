@@ -440,16 +440,51 @@ export const Archives = () => {
                           )}
                         </div>
                         <p className="font-semibold text-foreground mb-1">Operador: {counting.operator}</p>
-                        <div className="grid grid-cols-2 gap-2 text-sm">
-                          {counting.half_liter > 0 && <span>500ml: {counting.half_liter}</span>}
-                          {counting.one_liter > 0 && <span>1L: {counting.one_liter}</span>}
-                          {counting.two_liter > 0 && <span>2L: {counting.two_liter}</span>}
-                          {counting.five_liter > 0 && <span>5L: {counting.five_liter}</span>}
-                          {counting.three_thirty_gram > 0 && <span>330g: {counting.three_thirty_gram}</span>}
-                          {counting.five_hundred_gram > 0 && <span>500g: {counting.five_hundred_gram}</span>}
-                          {counting.one_kg > 0 && <span>1Kg: {counting.one_kg}</span>}
+                        <div className="space-y-1 text-sm bg-muted/50 p-2 rounded-lg">
+                          {counting.half_liter > 0 && (
+                            <div className="flex justify-between">
+                              <span>500ml: {counting.half_liter} un</span>
+                              <span className="font-semibold text-primary">= {(counting.half_liter * 0.5).toFixed(1)}L</span>
+                            </div>
+                          )}
+                          {counting.one_liter > 0 && (
+                            <div className="flex justify-between">
+                              <span>1L: {counting.one_liter} un</span>
+                              <span className="font-semibold text-primary">= {(counting.one_liter * 1).toFixed(1)}L</span>
+                            </div>
+                          )}
+                          {counting.two_liter > 0 && (
+                            <div className="flex justify-between">
+                              <span>2L: {counting.two_liter} un</span>
+                              <span className="font-semibold text-primary">= {(counting.two_liter * 2).toFixed(1)}L</span>
+                            </div>
+                          )}
+                          {counting.five_liter > 0 && (
+                            <div className="flex justify-between">
+                              <span>5L: {counting.five_liter} un</span>
+                              <span className="font-semibold text-primary">= {(counting.five_liter * 5).toFixed(1)}L</span>
+                            </div>
+                          )}
+                          {counting.three_thirty_gram > 0 && (
+                            <div className="flex justify-between">
+                              <span>330g: {counting.three_thirty_gram} un</span>
+                              <span className="font-semibold text-orange-500">= {(counting.three_thirty_gram * 0.33).toFixed(2)}Kg</span>
+                            </div>
+                          )}
+                          {counting.five_hundred_gram > 0 && (
+                            <div className="flex justify-between">
+                              <span>500g: {counting.five_hundred_gram} un</span>
+                              <span className="font-semibold text-orange-500">= {(counting.five_hundred_gram * 0.5).toFixed(1)}Kg</span>
+                            </div>
+                          )}
+                          {counting.one_kg > 0 && (
+                            <div className="flex justify-between">
+                              <span>1Kg: {counting.one_kg} un</span>
+                              <span className="font-semibold text-orange-500">= {(counting.one_kg * 1).toFixed(1)}Kg</span>
+                            </div>
+                          )}
                         </div>
-                        <p className="text-primary font-bold mt-2">Total: {counting.total?.toFixed(2) || 0}L</p>
+                        <p className="text-primary font-bold mt-2 text-lg">Total: {counting.total?.toFixed(2) || 0}L</p>
                       </div>
                       {isLabUser && (
                         <Button
