@@ -362,14 +362,16 @@ export const BatchManagement = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {filteredRmBatches.map(batch => {
                   const rm = rawMaterials.find(r => r.id === batch.raw_material_id);
+                  const isZerado = batch.quantity <= 0;
+                  const canFinalize = batch.status === 'em_aberto';
                   return (
-                    <Card key={batch.id} className="p-4 hover:shadow-lg transition-shadow cursor-pointer">
+                    <Card key={batch.id} className={`p-4 hover:shadow-lg transition-shadow cursor-pointer ${isZerado ? 'border-orange-500 border-2' : ''}`}>
                       <div className="flex justify-between items-start mb-3">
                         <div>
                           <p className="text-xs text-muted-foreground">Lote</p>
                           <p className="text-2xl font-bold text-primary">{batch.batch_number}</p>
                         </div>
-                        {getStatusBadge(batch.status)}
+                        {getStatusBadge(batch.status, batch.quantity)}
                       </div>
                       
                       <div className="space-y-2 mb-4">
@@ -380,19 +382,34 @@ export const BatchManagement = () => {
                         </div>
                         <div className="text-sm">
                           <span className="text-muted-foreground">Quantidade: </span>
-                          <span className="font-semibold text-foreground">{batch.quantity} {rm?.type}</span>
+                          <span className={`font-semibold ${isZerado ? 'text-orange-600' : 'text-foreground'}`}>
+                            {batch.quantity} {rm?.type}
+                          </span>
                         </div>
                       </div>
 
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 flex-wrap">
                         <Button 
                           onClick={() => viewRawMaterialBatchDetails(batch)}
                           className="flex-1"
                           variant="outline"
+                          size="sm"
                         >
-                          <Eye className="w-4 h-4 mr-2" />
-                          Ver Detalhes
+                          <Eye className="w-4 h-4 mr-1" />
+                          Detalhes
                         </Button>
+                        {canFinalize && (
+                          <Button 
+                            onClick={() => handleFinalizeRmBatch(batch)}
+                            size="sm"
+                            variant="outline"
+                            className="text-green-600 hover:bg-green-50"
+                            title="Finalizar lote"
+                          >
+                            <CheckCircle className="w-4 h-4 mr-1" />
+                            Finalizar
+                          </Button>
+                        )}
                         <Button 
                           onClick={() => openEditDialog(batch, 'raw_material')}
                           size="icon"
