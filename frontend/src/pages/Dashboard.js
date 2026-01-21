@@ -91,15 +91,28 @@ export const Dashboard = () => {
           <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-2">Dashboard</h1>
           <p className="text-lg text-muted-foreground">Visão geral da produção</p>
         </div>
-        <Button
-          onClick={handleResetLiters}
-          disabled={resetting}
-          variant="outline"
-          className="border-border text-foreground hover:bg-muted shrink-0"
-        >
-          <RotateCcw className="w-4 h-4 mr-2" />
-          {resetting ? 'Resetando...' : 'Resetar Litros'}
-        </Button>
+        <div className="flex gap-2 flex-wrap">
+          <Button
+            onClick={handleRecalculateLiters}
+            disabled={recalculating}
+            variant="default"
+            data-testid="recalculate-liters-btn"
+            className="bg-emerald-600 hover:bg-emerald-700 text-white shrink-0"
+          >
+            <Calculator className="w-4 h-4 mr-2" />
+            {recalculating ? 'Calculando...' : 'Recalcular Litragem Mensal'}
+          </Button>
+          <Button
+            onClick={handleResetLiters}
+            disabled={resetting}
+            variant="outline"
+            data-testid="reset-liters-btn"
+            className="border-border text-foreground hover:bg-muted shrink-0"
+          >
+            <RotateCcw className="w-4 h-4 mr-2" />
+            {resetting ? 'Resetando...' : 'Resetar Litros'}
+          </Button>
+        </div>
       </div>
 
       {/* Stats Grid */}
