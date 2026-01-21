@@ -1582,6 +1582,63 @@ async def reset_liters_counter(current_user = Depends(get_current_user)):
         'deleted_count': result.deleted_count
     }
 
+@api_router.post('/dashboard/recalculate-liters')
+async def recalculate_liters_counter(current_user = Depends(get_current_user)):
+    """
+    Recalcula a litragem total do mês atual somando:
+    1. Contagens ativas do mês
+    2. Contagens de lotes arquivados do mês
+    
+    Retorna o total calculado (apenas LITROS, não Kg).
+    """
+    now = datetime.now(timezone.utc)
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0).isoformat()
+    current_year = now.year
+    current_month = now.month
+    
+    total_from_active = 0
+    total_from_archived = 0
+    
+    # 1. Somar contagens ATIVAS do mês (apenas Litros)
+    active_counts = await db.counting.find(
+        {'created_at': {'$gte': month_start}},
+        {'_id': 0}
+    ).to_list(10000)
+    
+    for c in active_counts:
+        # Calcular apenas campos de volume (Litros)
+        half = c.get('half_liter', 0) or 0
+        one = c.get('one_liter', 0) or 0
+        two = c.get('two_liter', 0) or 0
+        five = c.get('five_liter', 0) or 0
+        total_from_active += (half * 0.5) + (one * 1) + (two * 2) + (five * 5)
+    
+    # 2. Somar contagens de lotes ARQUIVADOS do mês atual (apenas Litros)
+    archived_batches = await db.archived_product_batches.find({
+        'archived_year': current_year,
+        'archived_month': current_month
+    }, {'_id': 0}).to_list(10000)
+    
+    for batch in archived_batches:
+        countings_history = batch.get('countings_history', [])
+        for c in countings_history:
+            half = c.get('half_liter', 0) or 0
+            one = c.get('one_liter', 0) or 0
+            two = c.get('two_liter', 0) or 0
+            five = c.get('five_liter', 0) or 0
+            total_from_archived += (half * 0.5) + (one * 1) + (two * 2) + (five * 5)
+    
+    total_liters = total_from_active + total_from_archived
+    
+    return {
+        'message': 'Litragem recalculada com sucesso',
+        'total_liters': round(total_liters, 2),
+        'from_active': round(total_from_active, 2),
+        'from_archived': round(total_from_archived, 2),
+        'month': current_month,
+        'year': current_year
+    }
+
 # ========== LAUDOS ROUTES ==========
 
 @api_router.get('/laudos/folders')
