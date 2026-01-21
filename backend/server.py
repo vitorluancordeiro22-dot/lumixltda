@@ -1550,21 +1550,47 @@ async def get_dashboard_summary(current_user = Depends(get_current_user)):
     open_batches = await db.product_batches.count_documents({'status': 'em_aberto', 'deleted': False})
     in_production = await db.production_orders.count_documents({'status': 'em_producao', 'deleted': False})
     
-    # Calculate liters bottled this month
+    # Calculate liters bottled this month (APENAS LITROS)
+    # Incluindo tanto contagens ativas quanto arquivadas do mês
     now = datetime.now(timezone.utc)
     month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0).isoformat()
+    current_year = now.year
+    current_month = now.month
     
-    counts = await db.counting.find(
+    total_liters = 0
+    
+    # 1. Contagens ativas do mês
+    active_counts = await db.counting.find(
         {'created_at': {'$gte': month_start}},
-        {'_id': 0, 'total': 1}
+        {'_id': 0}
     ).to_list(10000)
     
-    liters_month = sum(c.get('total', 0) for c in counts)
+    for c in active_counts:
+        half = c.get('half_liter', 0) or 0
+        one = c.get('one_liter', 0) or 0
+        two = c.get('two_liter', 0) or 0
+        five = c.get('five_liter', 0) or 0
+        total_liters += (half * 0.5) + (one * 1) + (two * 2) + (five * 5)
+    
+    # 2. Contagens de lotes arquivados do mês atual
+    archived_batches = await db.archived_product_batches.find({
+        'archived_year': current_year,
+        'archived_month': current_month
+    }, {'_id': 0}).to_list(10000)
+    
+    for batch in archived_batches:
+        countings_history = batch.get('countings_history', [])
+        for c in countings_history:
+            half = c.get('half_liter', 0) or 0
+            one = c.get('one_liter', 0) or 0
+            two = c.get('two_liter', 0) or 0
+            five = c.get('five_liter', 0) or 0
+            total_liters += (half * 0.5) + (one * 1) + (two * 2) + (five * 5)
     
     return DashboardSummary(
         open_batches=open_batches,
         in_production_orders=in_production,
-        liters_bottled_month=liters_month
+        liters_bottled_month=total_liters
     )
 
 @api_router.post('/dashboard/reset-liters')
