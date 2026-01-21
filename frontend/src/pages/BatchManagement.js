@@ -215,10 +215,16 @@ export const BatchManagement = () => {
     }
   };
 
-  const getStatusBadge = (status) => {
+  const getStatusBadge = (status, quantity = null) => {
+    // Se quantidade é 0 ou menor, mostrar como zerado
+    if (quantity !== null && quantity <= 0 && status === 'em_aberto') {
+      return <Badge className="bg-orange-500">Zerado</Badge>;
+    }
+    
     const statusMap = {
       'em_aberto': { label: 'Em Aberto', className: 'bg-blue-500' },
       'em_producao': { label: 'Em Produção', className: 'bg-yellow-500' },
+      'finalizado': { label: 'Finalizado', className: 'bg-green-500' },
       'concluido': { label: 'Concluído', className: 'bg-green-500' },
       'cancelado': { label: 'Cancelado', className: 'bg-red-500' }
     };
