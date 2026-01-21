@@ -111,6 +111,7 @@ export const Products = () => {
   React.useEffect(() => {
     if (batchDialogOpen && batchFormData.date) {
       fetchNextBatchNumber(batchFormData.date);
+      fetchBatches(); // Atualizar lista de lotes ao abrir dialog
     }
   }, [batchDialogOpen, batchFormData.date]);
 
