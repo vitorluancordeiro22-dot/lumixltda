@@ -798,6 +798,23 @@ async def delete_raw_material_batch(batch_id: str, current_user = Depends(get_cu
     await db.raw_material_batches.update_one({'id': batch_id}, {'$set': {'deleted': True}})
     return {'message': 'Batch moved to trash'}
 
+@api_router.post('/raw-material-batches/{batch_id}/finalize')
+async def finalize_raw_material_batch(batch_id: str, current_user = Depends(get_current_user)):
+    """Finaliza um lote de matéria-prima manualmente"""
+    batch = await db.raw_material_batches.find_one({'id': batch_id, 'deleted': False}, {'_id': 0})
+    if not batch:
+        raise HTTPException(status_code=404, detail='Lote não encontrado')
+    
+    if batch.get('status') == 'finalizado':
+        raise HTTPException(status_code=400, detail='Lote já está finalizado')
+    
+    await db.raw_material_batches.update_one(
+        {'id': batch_id},
+        {'$set': {'status': 'finalizado'}}
+    )
+    
+    return {'message': 'Lote finalizado com sucesso'}
+
 # ========== PRODUCTION ORDERS ==========
 
 @api_router.get('/production-orders', response_model=List[ProductionOrder])
