@@ -1302,9 +1302,12 @@ async def auto_archive_finished_items(current_user = Depends(get_current_user)):
             await db.counting.delete_many({'product_batch_id': batch['id']})
         archived_products += 1
     
-    # Mover lotes de matérias-primas finalizados
+    # Mover lotes de matérias-primas finalizados OU zerados
     rm_batches = await db.raw_material_batches.find({
-        'status': 'finalizado',
+        '$or': [
+            {'status': 'finalizado'},
+            {'quantity': {'$lte': 0}}  # Incluir lotes zerados
+        ],
         'deleted': False
     }, {'_id': 0}).to_list(10000)
     
