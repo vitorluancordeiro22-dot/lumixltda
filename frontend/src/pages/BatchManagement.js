@@ -196,6 +196,25 @@ export const BatchManagement = () => {
     }
   };
 
+  const handleFinalizeRmBatch = async (batch) => {
+    if (!window.confirm(`Finalizar o lote ${batch.batch_number}? Isso permitirá arquivá-lo.`)) {
+      return;
+    }
+
+    try {
+      await api.post(`/raw-material-batches/${batch.id}/finalize`);
+      
+      if (isMountedRef.current) {
+        toast.success('Lote finalizado! Agora pode ser arquivado.');
+        await fetchData();
+      }
+    } catch (error) {
+      if (isMountedRef.current) {
+        toast.error(error.response?.data?.detail || 'Erro ao finalizar lote');
+      }
+    }
+  };
+
   const getStatusBadge = (status) => {
     const statusMap = {
       'em_aberto': { label: 'Em Aberto', className: 'bg-blue-500' },
