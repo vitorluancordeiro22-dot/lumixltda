@@ -51,8 +51,8 @@ const Sidebar = ({ mobile = false, onItemClick }) => {
   // Filtra itens do menu baseado na role do usuário
   const menuItems = allMenuItems.filter(item => item.roles.includes(role || 'producao'));
 
-  // URL da logo
-  const logoUrl = "https://customer-assets.emergentagent.com/job_factoryops-7/artifacts/uo7x95nu_images.png";
+  // URL da logo oficial Lumix
+  const logoUrl = "https://customer-assets.emergentagent.com/job_prodman-lumix/artifacts/aod9p9yw_images.png";
 
   return (
     <div className="flex flex-col h-full">
@@ -61,13 +61,9 @@ const Sidebar = ({ mobile = false, onItemClick }) => {
         <div className="flex items-center gap-3">
           <img 
             src={logoUrl} 
-            alt="Lumix Logo" 
-            className="w-12 h-12 rounded-lg object-contain"
+            alt="Lumix - Produtos de Limpeza" 
+            className="h-16 w-auto object-contain"
           />
-          <div>
-            <h2 className="text-xl font-bold text-foreground">Lumix</h2>
-            <p className="text-xs text-muted-foreground">By Vitor</p>
-          </div>
         </div>
         {/* Role Badge */}
         <div className={`mt-3 inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium ${

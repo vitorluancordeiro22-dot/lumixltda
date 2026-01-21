@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import api from '../lib/api';
 import { Card } from '../components/ui/card';
 import { Button } from '../components/ui/button';
-import { Package, ClipboardList, Droplets, RotateCcw } from 'lucide-react';
+import { Package, ClipboardList, Droplets, RotateCcw, Calculator } from 'lucide-react';
 import { Skeleton } from '../components/ui/skeleton';
 import { toast } from 'sonner';
 
@@ -10,6 +10,7 @@ export const Dashboard = () => {
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [resetting, setResetting] = useState(false);
+  const [recalculating, setRecalculating] = useState(false);
 
   const fetchSummary = async () => {
     try {
@@ -41,6 +42,20 @@ export const Dashboard = () => {
       toast.error('Erro ao resetar contador');
     } finally {
       setResetting(false);
+    }
+  };
+
+  const handleRecalculateLiters = async () => {
+    setRecalculating(true);
+    try {
+      const response = await api.post('/dashboard/recalculate-liters');
+      toast.success(`Litragem recalculada! Total: ${response.data.total_liters.toFixed(1)}L (${response.data.from_active} ativas + ${response.data.from_archived} arquivadas)`);
+      await fetchSummary();
+    } catch (error) {
+      console.error('Error recalculating liters:', error);
+      toast.error('Erro ao recalcular litragem');
+    } finally {
+      setRecalculating(false);
     }
   };
 
