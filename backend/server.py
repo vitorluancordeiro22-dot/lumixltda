@@ -602,6 +602,29 @@ async def update_product_batch(batch_id: str, data: ProductBatchUpdate, current_
     updated = await db.product_batches.find_one({'id': batch_id}, {'_id': 0})
     return ProductBatch(**updated)
 
+@api_router.get('/product-batches/check-open/{product_id}')
+async def check_open_batch(product_id: str, current_user = Depends(get_current_user)):
+    """
+    Verifica se existe um lote em aberto para o produto especificado.
+    Retorna o lote existente ou null.
+    """
+    existing_batch = await db.product_batches.find_one({
+        'product_id': product_id,
+        'status': {'$ne': 'finalizado'},
+        'deleted': False
+    }, {'_id': 0})
+    
+    if existing_batch:
+        return {
+            'has_open_batch': True,
+            'batch': existing_batch
+        }
+    
+    return {
+        'has_open_batch': False,
+        'batch': None
+    }
+
 @api_router.delete('/product-batches/{batch_id}')
 async def delete_product_batch(batch_id: str, current_user = Depends(get_current_user)):
     batch = await db.product_batches.find_one({'id': batch_id}, {'_id': 0})
