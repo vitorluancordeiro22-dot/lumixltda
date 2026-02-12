@@ -52,6 +52,27 @@ export const Archives = () => {
     }
   }, [selectedMonth]);
 
+  // Quando filtro por produto mudar, buscar lotes desse produto
+  useEffect(() => {
+    if (filterByProduct) {
+      fetchByProduct(filterByProduct);
+    } else {
+      setProductFilteredBatches([]);
+    }
+  }, [filterByProduct]);
+
+  const fetchByProduct = async (productId) => {
+    try {
+      const response = await api.get(`/archive/by-product/${productId}`);
+      if (isMountedRef.current) {
+        setProductFilteredBatches(response.data);
+      }
+    } catch (error) {
+      console.error('Erro ao buscar por produto:', error);
+      setProductFilteredBatches([]);
+    }
+  };
+
   const fetchData = async () => {
     try {
       const [monthsRes, prodsRes, rmsRes] = await Promise.all([
