@@ -366,20 +366,32 @@ export const Archives = () => {
             />
           </div>
 
-          {selectedMonth && (
+          {(selectedMonth || filterByProduct) && (
             <Tabs defaultValue="products" className="space-y-6">
               <TabsList className="bg-muted border border-border">
                 <TabsTrigger value="products" className="data-[state=active]:bg-primary">
                   <Package className="w-4 h-4 mr-2" />
                   Produtos ({filteredProductBatches.length})
                 </TabsTrigger>
-                <TabsTrigger value="materials" className="data-[state=active]:bg-primary">
-                  <Boxes className="w-4 h-4 mr-2" />
-                  Matérias-Primas ({filteredRawMaterialBatches.length})
-                </TabsTrigger>
+                {!filterByProduct && (
+                  <TabsTrigger value="materials" className="data-[state=active]:bg-primary">
+                    <Boxes className="w-4 h-4 mr-2" />
+                    Matérias-Primas ({filteredRawMaterialBatches.length})
+                  </TabsTrigger>
+                )}
               </TabsList>
 
               <TabsContent value="products" className="space-y-4">
+                {filterByProduct && (
+                  <div className="p-4 rounded-lg bg-primary/10 border border-primary/30 mb-4">
+                    <p className="text-sm font-semibold text-foreground">
+                      Histórico completo de: {products.find(p => p.id === filterByProduct)?.name}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {filteredProductBatches.length} lote(s) arquivado(s) encontrado(s)
+                    </p>
+                  </div>
+                )}
                 {filteredProductBatches.length === 0 ? (
                   <Card className="p-12  border text-center">
                     <Package className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
