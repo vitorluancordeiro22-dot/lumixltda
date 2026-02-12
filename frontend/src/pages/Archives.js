@@ -416,7 +416,14 @@ export const Archives = () => {
                           </Button>
                         )}
                         <div className="mb-4">
-                          <Badge className="bg-emerald-600 mb-2">Finalizado</Badge>
+                          <div className="flex items-center gap-2 mb-2">
+                            <Badge className="bg-emerald-600">Finalizado</Badge>
+                            {filterByProduct && batch.archived_month && batch.archived_year && (
+                              <Badge variant="outline" className="text-xs">
+                                {String(batch.archived_month).padStart(2, '0')}/{batch.archived_year}
+                              </Badge>
+                            )}
+                          </div>
                           <h3 className="text-xl font-bold text-foreground mb-1">{getProductName(batch.product_id)}</h3>
                           <p className="text-sm text-muted-foreground">Lote: {batch.batch_number}</p>
                           <p className="text-xs text-muted-foreground/70">{formatBatchNumber(batch.batch_number)}</p>
