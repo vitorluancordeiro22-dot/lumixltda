@@ -30,6 +30,8 @@ export const Archives = () => {
   const [editForm, setEditForm] = useState({});
   const [batchEditForm, setBatchEditForm] = useState({});
   const [saving, setSaving] = useState(false);
+  const [filterByProduct, setFilterByProduct] = useState(''); // Filtro por produto
+  const [productFilteredBatches, setProductFilteredBatches] = useState([]); // Lotes filtrados por produto
   const isMountedRef = useRef(true);
 
   // Verifica se é o usuário do laboratório
