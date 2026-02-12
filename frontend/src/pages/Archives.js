@@ -314,16 +314,16 @@ export const Archives = () => {
                 <div className="flex-1">
                   <p className="text-sm text-muted-foreground mb-2">Ou filtrar por Produto:</p>
                   <Select 
-                    value={filterByProduct}
+                    value={filterByProduct || "all"}
                     onValueChange={(value) => {
-                      setFilterByProduct(value);
+                      setFilterByProduct(value === "all" ? "" : value);
                     }}
                   >
                     <SelectTrigger className="bg-input border-border text-foreground h-12 text-lg">
                       <SelectValue placeholder="Todos os produtos" />
                     </SelectTrigger>
                     <SelectContent className="bg-card border-border max-h-[300px]">
-                      <SelectItem value="" className="text-foreground">
+                      <SelectItem value="all" className="text-foreground">
                         Todos os produtos (por mês)
                       </SelectItem>
                       {products.map((p) => (
