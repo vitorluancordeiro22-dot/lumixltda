@@ -145,6 +145,29 @@ export const Archives = () => {
     }
   };
 
+  // Função para obter as matérias-primas usadas em um produto
+  const getProductRecipes = (productId) => {
+    const product = products.find(p => p.id === productId);
+    if (!product || !product.recipes) return [];
+    
+    return product.recipes.map(recipe => {
+      const rm = rawMaterials.find(r => r.id === recipe.raw_material_id);
+      // Buscar lotes dessa matéria-prima para pegar o mais recente
+      const rmBatches = allRmBatches.filter(b => b.raw_material_id === recipe.raw_material_id);
+      const latestBatch = rmBatches.length > 0 
+        ? rmBatches.sort((a, b) => new Date(b.date) - new Date(a.date))[0] 
+        : null;
+      
+      return {
+        name: rm?.name || 'Desconhecida',
+        batch_number: latestBatch?.batch_number || '-',
+        expiry_date: latestBatch?.expiry_date ? new Date(latestBatch.expiry_date).toLocaleDateString('pt-BR') : '-',
+        quantity: recipe.quantity_per_liter,
+        unit: recipe.unit || 'L'
+      };
+    });
+  };
+
   const handleEditCounting = (counting) => {
     setEditingCounting(counting);
     setEditForm({
