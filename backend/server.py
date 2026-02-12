@@ -617,6 +617,31 @@ async def delete_product_batch(batch_id: str, current_user = Depends(get_current
     await db.product_batches.update_one({'id': batch_id}, {'$set': {'deleted': True}})
     return {'message': 'Batch moved to trash'}
 
+@api_router.post('/product-batches/{batch_id}/finalize')
+async def finalize_product_batch(batch_id: str, current_user = Depends(get_current_user)):
+    """
+    Finaliza um lote de produto mesmo que não tenha atingido a meta de litragem.
+    Útil para encerrar lotes parcialmente completados.
+    """
+    batch = await db.product_batches.find_one({'id': batch_id, 'deleted': False}, {'_id': 0})
+    if not batch:
+        raise HTTPException(status_code=404, detail='Lote não encontrado')
+    
+    if batch.get('status') == 'finalizado':
+        raise HTTPException(status_code=400, detail='Lote já está finalizado')
+    
+    await db.product_batches.update_one(
+        {'id': batch_id},
+        {'$set': {'status': 'finalizado'}}
+    )
+    
+    return {
+        'message': 'Lote finalizado com sucesso',
+        'batch_number': batch.get('batch_number'),
+        'total_bottled': batch.get('total_bottled', 0),
+        'planned_liters': batch.get('planned_liters', 0)
+    }
+
 # ========== RAW MATERIALS ==========
 
 @api_router.get('/raw-materials', response_model=List[RawMaterial])
