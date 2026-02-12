@@ -828,6 +828,70 @@ export const Archives = () => {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Modal de Detalhes - Matérias-Primas Usadas */}
+      <Dialog open={!!detailsBatch} onOpenChange={() => setDetailsBatch(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Info className="w-5 h-5 text-blue-600" />
+              Detalhes do Lote - Matérias-Primas
+            </DialogTitle>
+          </DialogHeader>
+          
+          {detailsBatch && (
+            <div className="space-y-4">
+              {/* Informações do lote */}
+              <div className="p-3 rounded-lg bg-muted">
+                <p className="text-sm text-muted-foreground">Produto</p>
+                <p className="text-lg font-bold text-foreground">{getProductName(detailsBatch.product_id)}</p>
+                <p className="text-sm text-muted-foreground">Lote: {detailsBatch.batch_number}</p>
+              </div>
+
+              {/* Lista de Matérias-Primas */}
+              <div>
+                <p className="text-sm font-semibold text-foreground mb-3">Matérias-Primas Utilizadas:</p>
+                <div className="space-y-2">
+                  {getProductRecipes(detailsBatch.product_id).length > 0 ? (
+                    <div className="border rounded-lg overflow-hidden">
+                      <table className="w-full text-sm">
+                        <thead className="bg-muted">
+                          <tr>
+                            <th className="px-3 py-2 text-left font-semibold text-foreground">Matéria-Prima</th>
+                            <th className="px-3 py-2 text-left font-semibold text-foreground">Lote</th>
+                            <th className="px-3 py-2 text-left font-semibold text-foreground">Validade</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y">
+                          {getProductRecipes(detailsBatch.product_id).map((recipe, index) => (
+                            <tr key={index} className="hover:bg-muted/50">
+                              <td className="px-3 py-2 font-medium text-foreground">{recipe.name}</td>
+                              <td className="px-3 py-2 text-muted-foreground">{recipe.batch_number}</td>
+                              <td className="px-3 py-2 text-muted-foreground">{recipe.expiry_date}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <p className="text-muted-foreground text-center py-4">
+                      Nenhuma matéria-prima cadastrada para este produto.
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => setDetailsBatch(null)}
+              >
+                Fechar
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
