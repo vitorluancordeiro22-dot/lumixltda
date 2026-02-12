@@ -32,6 +32,8 @@ export const Archives = () => {
   const [saving, setSaving] = useState(false);
   const [filterByProduct, setFilterByProduct] = useState(''); // Filtro por produto
   const [productFilteredBatches, setProductFilteredBatches] = useState([]); // Lotes filtrados por produto
+  const [detailsBatch, setDetailsBatch] = useState(null); // Lote para mostrar detalhes de matérias-primas
+  const [allRmBatches, setAllRmBatches] = useState([]); // Todos os lotes de matérias-primas (para buscar detalhes)
   const isMountedRef = useRef(true);
 
   // Verifica se é o usuário do laboratório
