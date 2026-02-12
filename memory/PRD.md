@@ -13,7 +13,6 @@ Sistema de gestão de produção industrial com controle de lotes, matérias-pri
 - [x] Dashboard com visão geral
 - [x] Gerenciamento de Produtos (CRUD + duplicação)
 - [x] Gerenciamento de Matérias-Primas
-- [x] Ordens de Produção
 - [x] Contagem de Produtos (com auto-scroll e opções dinâmicas g/Kg ou ml/L)
 - [x] Amostras - Rastreamento automático de amostras mensais
 - [x] Gerenciamento de Lotes
@@ -34,8 +33,12 @@ Sistema de gestão de produção industrial com controle de lotes, matérias-pri
 - [x] **Barra de busca na página de Contagem**
 - [x] **Cálculo de Litros Corrigido** - Agora separa Litros de Kg nas contagens
 - [x] **Finalizar Lotes de Matérias-Primas** (01/2026) - Botão para finalizar MP zeradas
-- [x] **Encerrar Lote na Contagem** (01/2026) - Permite encerrar lote antes de atingir meta, com confirmação
+- [x] **Encerrar Lote na Contagem** (01/2026) - Botão grande para encerrar lote antes de atingir meta
 - [x] **Filtro por Produto nos Arquivos** (01/2026) - Ver histórico completo de um produto específico
+- [x] **Confirmação de Lote Duplicado** (01/2026) - Alerta ao criar lote para produto com lote em aberto
+- [x] **Operador Obrigatório** (01/2026) - Campo obrigatório na contagem
+- [x] **Detalhes de Matérias-Primas nos Arquivos** (01/2026) - Mostra MP usadas com lote e validade
+- [x] **Menu Simplificado** (01/2026) - Removidas abas "OP Industrial" e "Ordens de Produção"
 
 ### Regras de Negócio
 - **Cálculo de Matéria-Prima**: `(receita_quantidade / produto_litros_esperados) * lote_litros_planejados`
@@ -43,6 +46,7 @@ Sistema de gestão de produção industrial com controle de lotes, matérias-pri
 - **Litragem Mensal**: Soma contagens ativas + arquivadas do mês (apenas Litros, não Kg)
 - **Reset Mensal**: Contagens resetam no início de cada mês
 - **Arquivamento**: Lotes finalizados ou zerados são arquivados automaticamente
+- **Operador Obrigatório**: Não é possível registrar contagem sem selecionar operador
 
 ## Stack Técnica
 - **Frontend**: React + Shadcn/UI + Tailwind CSS
@@ -55,13 +59,12 @@ Sistema de gestão de produção industrial com controle de lotes, matérias-pri
 - `POST /api/product-batches/{batch_id}/finalize` - Finaliza lote de produto
 - `POST /api/raw-material-batches/{batch_id}/finalize` - Finaliza lote de MP
 - `GET /api/archive/by-product/{product_id}` - Todos os lotes arquivados de um produto
+- `GET /api/product-batches/check-open/{product_id}` - Verifica se há lote em aberto
 
 ## Credenciais de Teste
 - **Laboratório**: laboratoriolumix@outlook.com / Lumix2002
 - **Produção**: teste@teste.com / password
 
-## Backlog (P0/P1/P2)
-- [ ] (P0) Confirmação de lote duplicado - Alertar ao criar lote para produto que já tem lote em aberto
+## Backlog (P1/P2)
 - [ ] (P1) Upload de PDF na seção Laudos
-- [ ] (P2) Workflow completo de OP Industrial
 - [ ] (P2) Atualizar/remover WhatsAppSender.js antigo
