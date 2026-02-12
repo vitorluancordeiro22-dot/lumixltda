@@ -582,20 +582,22 @@ export const Products = () => {
               <AlertTriangle className="h-5 w-5 text-yellow-500" />
               Lote em Aberto Existente
             </AlertDialogTitle>
-            <AlertDialogDescription className="text-left">
-              {existingBatchInfo && (
-                <>
-                  <p className="mb-3">
-                    Já existe um lote em aberto para o produto <strong>{existingBatchInfo.productName}</strong>:
-                  </p>
-                  <div className="bg-muted p-3 rounded-lg mb-3">
-                    <p><strong>Lote:</strong> {existingBatchInfo.batch.batch_number}</p>
-                    <p><strong>Status:</strong> {existingBatchInfo.batch.status}</p>
-                    <p><strong>Planejado:</strong> {existingBatchInfo.batch.planned_liters}L</p>
-                  </div>
-                  <p>Deseja criar um novo lote mesmo assim?</p>
-                </>
-              )}
+            <AlertDialogDescription asChild>
+              <div className="text-left">
+                {existingBatchInfo && (
+                  <>
+                    <span className="block mb-3">
+                      Já existe um lote em aberto para o produto <strong>{existingBatchInfo.productName}</strong>:
+                    </span>
+                    <div className="bg-muted p-3 rounded-lg mb-3">
+                      <span className="block"><strong>Lote:</strong> {existingBatchInfo.batch.batch_number}</span>
+                      <span className="block"><strong>Status:</strong> {existingBatchInfo.batch.status}</span>
+                      <span className="block"><strong>Planejado:</strong> {existingBatchInfo.batch.planned_liters}L</span>
+                    </div>
+                    <span className="block">Deseja criar um novo lote mesmo assim?</span>
+                  </>
+                )}
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
