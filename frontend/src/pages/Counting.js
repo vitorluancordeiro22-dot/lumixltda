@@ -110,6 +110,20 @@ export const Counting = () => {
       toast.error('Selecione um lote');
       return;
     }
+    
+    // VALIDAÇÃO: Operador é obrigatório
+    if (!formData.operator || formData.operator.trim() === '') {
+      toast.error('Selecione o operador responsável pelo envase!');
+      return;
+    }
+    
+    // VALIDAÇÃO: Pelo menos uma quantidade preenchida
+    const hasQuantity = calculateTotal() > 0;
+    if (!hasQuantity) {
+      toast.error('Preencha pelo menos uma quantidade para registrar a contagem!');
+      return;
+    }
+    
     if (submitting) return;
     
     setSubmitting(true);
