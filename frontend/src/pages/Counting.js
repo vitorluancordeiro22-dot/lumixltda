@@ -328,57 +328,13 @@ export const Counting = () => {
                 />
               </div>
             </div>
-            <div className="flex items-center justify-between">
-              {selectedBatch.total_bottled >= selectedBatch.planned_liters ? (
-                <Badge className="bg-emerald-600">Lote Finalizado!</Badge>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  Faltam {(selectedBatch.planned_liters - selectedBatch.total_bottled).toFixed(1)}{unitLabel} para completar
-                </p>
-              )}
-              
-              {/* Botão Encerrar Lote com Confirmação */}
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    className="border-orange-500 text-orange-600 hover:bg-orange-50"
-                    disabled={submitting}
-                  >
-                    <StopCircle className="w-4 h-4 mr-2" />
-                    Encerrar Lote
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>⚠️ Confirmar Encerramento do Lote</AlertDialogTitle>
-                    <AlertDialogDescription className="space-y-3">
-                      <p>Você está prestes a <strong>encerrar</strong> o lote <strong>{selectedBatch.batch_number}</strong>.</p>
-                      <div className="p-3 rounded-lg bg-orange-50 border border-orange-200">
-                        <p className="font-semibold text-orange-800">Progresso atual:</p>
-                        <p className="text-orange-700">
-                          {selectedBatch.total_bottled.toFixed(1)}{unitLabel} de {selectedBatch.planned_liters}{unitLabel} planejados
-                          ({((selectedBatch.total_bottled / selectedBatch.planned_liters) * 100).toFixed(1)}%)
-                        </p>
-                      </div>
-                      <p className="text-red-600 font-medium">
-                        Esta ação não pode ser desfeita. O lote será marcado como finalizado e poderá ser arquivado.
-                      </p>
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                    <AlertDialogAction 
-                      onClick={handleFinalizeBatch}
-                      className="bg-orange-600 hover:bg-orange-700"
-                    >
-                      Sim, Encerrar Lote
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            </div>
+            {selectedBatch.total_bottled >= selectedBatch.planned_liters ? (
+              <Badge className="bg-emerald-600">Lote Finalizado!</Badge>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Faltam {(selectedBatch.planned_liters - selectedBatch.total_bottled).toFixed(1)}{unitLabel} para completar
+              </p>
+            )}
           </Card>
 
           {/* Counting Form */}
