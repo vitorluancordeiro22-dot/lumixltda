@@ -230,7 +230,10 @@ export const Archives = () => {
   };
 
   // Filtrar lotes de produtos pela pesquisa
-  const filteredProductBatches = productBatches.filter(batch => {
+  // Se filterByProduct estiver ativo, usar productFilteredBatches, senão usar productBatches do mês
+  const batchesSource = filterByProduct ? productFilteredBatches : productBatches;
+  
+  const filteredProductBatches = batchesSource.filter(batch => {
     const productName = getProductName(batch.product_id).toLowerCase();
     const batchNumber = batch.batch_number?.toLowerCase() || '';
     const search = searchTerm.toLowerCase();
