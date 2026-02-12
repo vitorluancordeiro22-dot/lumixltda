@@ -472,18 +472,33 @@ export const Archives = () => {
                               <p className="text-sm font-semibold text-foreground">{batch.operators.join(', ')}</p>
                             </div>
                           )}
-                          {/* Botão para ver histórico de contagens */}
-                          {batch.countings_history && batch.countings_history.length > 0 && (
+                          
+                          {/* Botões de ação */}
+                          <div className="flex gap-2 mt-3">
+                            {/* Botão Detalhes - Matérias-Primas */}
                             <Button
                               variant="outline"
                               size="sm"
-                              className="w-full mt-2"
-                              onClick={() => setSelectedBatch(batch)}
+                              className="flex-1"
+                              onClick={() => setDetailsBatch(batch)}
                             >
-                              <History className="w-4 h-4 mr-2" />
-                              Ver Contagens ({batch.countings_history.length})
+                              <Info className="w-4 h-4 mr-2" />
+                              Detalhes
                             </Button>
-                          )}
+                            
+                            {/* Botão para ver histórico de contagens */}
+                            {batch.countings_history && batch.countings_history.length > 0 && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="flex-1"
+                                onClick={() => setSelectedBatch(batch)}
+                              >
+                                <History className="w-4 h-4 mr-2" />
+                                Contagens ({batch.countings_history.length})
+                              </Button>
+                            )}
+                          </div>
                         </div>
                       </Card>
                     ))}
