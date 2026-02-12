@@ -491,10 +491,13 @@ export const Counting = () => {
               </div>
 
               <div>
-                <Label className="text-foreground">Operador</Label>
+                <Label className="text-foreground flex items-center gap-2">
+                  Operador <span className="text-red-500">*</span>
+                  <span className="text-xs text-muted-foreground font-normal">(obrigatório)</span>
+                </Label>
                 <Select value={formData.operator} onValueChange={(v) => setFormData({...formData, operator: v})}>
-                  <SelectTrigger className="bg-input border-border text-foreground h-12">
-                    <SelectValue placeholder="Quem fez o envase?" />
+                  <SelectTrigger className={`bg-input border-border text-foreground h-12 ${!formData.operator ? 'border-red-300' : ''}`}>
+                    <SelectValue placeholder="Quem fez o envase? (obrigatório)" />
                   </SelectTrigger>
                   <SelectContent className="bg-card border-border">
                     {teamMembers.map(m => (
