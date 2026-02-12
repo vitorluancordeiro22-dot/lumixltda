@@ -1418,6 +1418,18 @@ async def get_archived_products(year: int, month: int, current_user = Depends(ge
     
     return batches
 
+@api_router.get('/archive/by-product/{product_id}')
+async def get_archived_by_product(product_id: str, current_user = Depends(get_current_user)):
+    """
+    Retorna TODOS os lotes arquivados de um produto específico, independente do mês.
+    """
+    batches = await db.archived_product_batches.find({
+        'product_id': product_id
+    }, {'_id': 0}).sort('archived_at', -1).to_list(10000)
+    
+    return batches
+
+
 @api_router.get('/archive/raw-materials/{year}/{month}')
 async def get_archived_raw_materials(year: int, month: int, current_user = Depends(get_current_user)):
     """
