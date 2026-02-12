@@ -467,6 +467,50 @@ export const Counting = () => {
                 <Plus className="w-5 h-5 mr-2" />
                 Registrar Contagem
               </Button>
+
+              {/* Botão Encerrar Lote - Grande e Visível */}
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button 
+                    type="button"
+                    variant="outline" 
+                    className="w-full h-14 text-lg border-2 border-orange-500 text-orange-600 hover:bg-orange-50 hover:text-orange-700"
+                    disabled={submitting}
+                  >
+                    <StopCircle className="w-5 h-5 mr-2" />
+                    Encerrar Lote (Finalizar sem completar)
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>⚠️ Confirmar Encerramento do Lote</AlertDialogTitle>
+                    <AlertDialogDescription asChild>
+                      <div className="space-y-3">
+                        <p>Você está prestes a <strong>encerrar</strong> o lote <strong>{selectedBatch.batch_number}</strong>.</p>
+                        <div className="p-3 rounded-lg bg-orange-50 border border-orange-200">
+                          <p className="font-semibold text-orange-800">Progresso atual:</p>
+                          <p className="text-orange-700">
+                            {selectedBatch.total_bottled.toFixed(1)}{unitLabel} de {selectedBatch.planned_liters}{unitLabel} planejados
+                            ({((selectedBatch.total_bottled / selectedBatch.planned_liters) * 100).toFixed(1)}%)
+                          </p>
+                        </div>
+                        <p className="text-red-600 font-medium">
+                          Esta ação não pode ser desfeita. O lote será marcado como finalizado e poderá ser arquivado.
+                        </p>
+                      </div>
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction 
+                      onClick={handleFinalizeBatch}
+                      className="bg-orange-600 hover:bg-orange-700"
+                    >
+                      Sim, Encerrar Lote
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </form>
           </Card>
 
