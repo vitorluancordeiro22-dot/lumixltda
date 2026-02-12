@@ -138,6 +138,31 @@ export const Counting = () => {
     }
   };
 
+  const handleFinalizeBatch = async () => {
+    if (!selectedBatch) return;
+    
+    setSubmitting(true);
+    try {
+      const response = await api.post(`/product-batches/${selectedBatch.id}/finalize`);
+      
+      if (isMountedRef.current) {
+        toast.success(`Lote ${response.data.batch_number} encerrado! Envasado: ${response.data.total_bottled}L de ${response.data.planned_liters}L planejados.`);
+        setSelectedBatch(null);
+        setCountings([]);
+        await fetchBatches();
+        fetchTopOperator();
+      }
+    } catch (error) {
+      if (isMountedRef.current) {
+        toast.error(error.response?.data?.detail || 'Erro ao encerrar lote');
+      }
+    } finally {
+      if (isMountedRef.current) {
+        setSubmitting(false);
+      }
+    }
+  };
+
   const getProductName = (id) => products.find(p => p.id === id)?.name || 'N/A';
   const getProduct = (id) => products.find(p => p.id === id);
   
