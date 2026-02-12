@@ -274,32 +274,81 @@ export const Archives = () => {
         </Card>
       ) : (
         <>
-          {/* Month Selector */}
+          {/* Month Selector e Filtro por Produto */}
           <Card className="p-6  border">
-            <div className="flex items-center gap-4">
-              <Calendar className="w-6 h-6 text-primary" />
-              <div className="flex-1">
-                <p className="text-sm text-muted-foreground mb-2">Selecionar Mês:</p>
-                <Select 
-                  value={selectedMonth ? `${selectedMonth.year}-${selectedMonth.month}` : ''}
-                  onValueChange={(value) => {
-                    const [year, month] = value.split('-');
-                    setSelectedMonth({ year: parseInt(year), month: parseInt(month), month_name: months.find(m => m.year === parseInt(year) && m.month === parseInt(month))?.month_name });
-                  }}
-                >
-                  <SelectTrigger className="bg-input border-border text-foreground h-12 text-lg">
-                    <SelectValue placeholder="Selecione o mês" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-card border-border">
-                    {months.map((m) => (
-                      <SelectItem key={`${m.year}-${m.month}`} value={`${m.year}-${m.month}`} className="text-foreground">
-                        {m.month_name}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Filtro por Mês */}
+              <div className="flex items-center gap-4">
+                <Calendar className="w-6 h-6 text-primary shrink-0" />
+                <div className="flex-1">
+                  <p className="text-sm text-muted-foreground mb-2">Filtrar por Mês:</p>
+                  <Select 
+                    value={selectedMonth ? `${selectedMonth.year}-${selectedMonth.month}` : ''}
+                    onValueChange={(value) => {
+                      const [year, month] = value.split('-');
+                      setSelectedMonth({ year: parseInt(year), month: parseInt(month), month_name: months.find(m => m.year === parseInt(year) && m.month === parseInt(month))?.month_name });
+                      setFilterByProduct(''); // Limpar filtro por produto ao selecionar mês
+                    }}
+                    disabled={!!filterByProduct}
+                  >
+                    <SelectTrigger className={`bg-input border-border text-foreground h-12 text-lg ${filterByProduct ? 'opacity-50' : ''}`}>
+                      <SelectValue placeholder="Selecione o mês" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-card border-border">
+                      {months.map((m) => (
+                        <SelectItem key={`${m.year}-${m.month}`} value={`${m.year}-${m.month}`} className="text-foreground">
+                          {m.month_name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Filtro por Produto */}
+              <div className="flex items-center gap-4">
+                <Filter className="w-6 h-6 text-amber-600 shrink-0" />
+                <div className="flex-1">
+                  <p className="text-sm text-muted-foreground mb-2">Ou filtrar por Produto:</p>
+                  <Select 
+                    value={filterByProduct}
+                    onValueChange={(value) => {
+                      setFilterByProduct(value);
+                    }}
+                  >
+                    <SelectTrigger className="bg-input border-border text-foreground h-12 text-lg">
+                      <SelectValue placeholder="Todos os produtos" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-card border-border max-h-[300px]">
+                      <SelectItem value="" className="text-foreground">
+                        Todos os produtos (por mês)
                       </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                      {products.map((p) => (
+                        <SelectItem key={p.id} value={p.id} className="text-foreground">
+                          {p.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </div>
+            
+            {filterByProduct && (
+              <div className="mt-4 p-3 rounded-lg bg-amber-50 border border-amber-200">
+                <p className="text-sm text-amber-800">
+                  <strong>Filtro ativo:</strong> Mostrando todos os lotes arquivados de "{products.find(p => p.id === filterByProduct)?.name}" (todos os meses)
+                </p>
+                <Button 
+                  variant="link" 
+                  size="sm" 
+                  className="p-0 h-auto text-amber-600"
+                  onClick={() => setFilterByProduct('')}
+                >
+                  Limpar filtro
+                </Button>
+              </div>
+            )}
           </Card>
 
           {/* Campo de Pesquisa */}
