@@ -151,45 +151,52 @@ export const Products = () => {
     }
   };
 
-  // Verificar se existe lote em aberto do mesmo produto
-  const checkExistingBatch = () => {
-    const productId = batchFormData.product_id;
+  // Verificar se existe lote em aberto do mesmo produto - USANDO BACKEND
+  const checkExistingBatch = async (productId) => {
     if (!productId) return null;
     
-    // Buscar lotes em aberto do mesmo produto
-    const existingBatch = batches.find(b => 
-      b.product_id === productId && 
-      b.status !== 'finalizado' && 
-      !b.deleted
-    );
-    
-    return existingBatch;
+    try {
+      const response = await api.get(`/product-batches/check-open/${productId}`);
+      if (response.data.has_open_batch) {
+        return response.data.batch;
+      }
+      return null;
+    } catch (error) {
+      console.error('Erro ao verificar lote existente:', error);
+      return null;
+    }
   };
 
   const handleBatchSubmit = async (e) => {
     e.preventDefault();
     if (submitting) return;
     
-    // Verificar se já existe lote em aberto
-    const existingBatch = checkExistingBatch();
+    if (!batchFormData.product_id) {
+      toast.error('Selecione um produto');
+      return;
+    }
+    
+    setSubmitting(true);
+    
+    // Verificar se já existe lote em aberto - USANDO BACKEND
+    const existingBatch = await checkExistingBatch(batchFormData.product_id);
+    
     if (existingBatch) {
       const product = products.find(p => p.id === batchFormData.product_id);
       setExistingBatchInfo({
         batch: existingBatch,
         productName: product?.name || 'Produto'
       });
+      setSubmitting(false);
       setConfirmBatchDialogOpen(true);
       return;
     }
     
     // Se não existe, criar direto
-    await createBatch();
+    await createBatchInternal();
   };
 
-  const createBatch = async () => {
-    if (submitting) return;
-    
-    setSubmitting(true);
+  const createBatchInternal = async () => {
     try {
       const payload = {
         ...batchFormData,
@@ -232,6 +239,12 @@ export const Products = () => {
         setSubmitting(false);
       }
     }
+  };
+
+  const createBatch = async () => {
+    if (submitting) return;
+    setSubmitting(true);
+    await createBatchInternal();
   };
 
   const handleDelete = async (id) => {
