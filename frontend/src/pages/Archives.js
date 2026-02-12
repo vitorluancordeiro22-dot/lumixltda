@@ -77,16 +77,18 @@ export const Archives = () => {
 
   const fetchData = async () => {
     try {
-      const [monthsRes, prodsRes, rmsRes] = await Promise.all([
+      const [monthsRes, prodsRes, rmsRes, rmBatchesRes] = await Promise.all([
         api.get('/archive/months'),
         api.get('/products'),
-        api.get('/raw-materials')
+        api.get('/raw-materials'),
+        api.get('/raw-material-batches') // Buscar todos os lotes de MP para detalhes
       ]);
 
       if (isMountedRef.current) {
         setMonths(monthsRes.data);
         setProducts(prodsRes.data);
         setRawMaterials(rmsRes.data);
+        setAllRmBatches(rmBatchesRes.data);
         
         if (monthsRes.data.length > 0) {
           setSelectedMonth(monthsRes.data[0]);
