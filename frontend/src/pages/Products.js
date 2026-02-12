@@ -188,7 +188,12 @@ export const Products = () => {
         productName: product?.name || 'Produto'
       });
       setSubmitting(false);
-      setConfirmBatchDialogOpen(true);
+      // Fechar o Dialog de Soltar Lote ANTES de abrir o AlertDialog
+      setBatchDialogOpen(false);
+      // Usar timeout para garantir que o Dialog fechou antes de abrir o AlertDialog
+      setTimeout(() => {
+        setConfirmBatchDialogOpen(true);
+      }, 200);
       return;
     }
     
