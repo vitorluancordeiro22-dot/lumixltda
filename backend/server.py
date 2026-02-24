@@ -665,6 +665,74 @@ async def finalize_product_batch(batch_id: str, current_user = Depends(get_curre
         'planned_liters': batch.get('planned_liters', 0)
     }
 
+@api_router.post('/product-batches/{batch_id}/reopen')
+async def reopen_product_batch(batch_id: str, current_user = Depends(get_current_user)):
+    """
+    Reabre um lote finalizado (não arquivado), mudando o status de volta para 'em_aberto'.
+    """
+    batch = await db.product_batches.find_one({'id': batch_id, 'deleted': False}, {'_id': 0})
+    if not batch:
+        raise HTTPException(status_code=404, detail='Lote não encontrado')
+    
+    if batch.get('status') != 'finalizado':
+        raise HTTPException(status_code=400, detail='Apenas lotes finalizados podem ser reabertos')
+    
+    await db.product_batches.update_one(
+        {'id': batch_id},
+        {'$set': {'status': 'em_aberto'}}
+    )
+    
+    return {
+        'message': 'Lote reaberto com sucesso',
+        'batch_number': batch.get('batch_number')
+    }
+
+@api_router.post('/archive/reopen/{batch_id}')
+async def reopen_archived_batch(batch_id: str, current_user = Depends(get_current_user)):
+    """
+    Reabre um lote arquivado, movendo-o de volta para a coleção de lotes ativos.
+    Remove da coleção archived_product_batches e insere em product_batches com status 'em_aberto'.
+    """
+    # Buscar o lote arquivado
+    archived_batch = await db.archived_product_batches.find_one({'id': batch_id}, {'_id': 0})
+    if not archived_batch:
+        raise HTTPException(status_code=404, detail='Lote arquivado não encontrado')
+    
+    # Preparar o lote para reinserção (remover campos de arquivamento)
+    batch_to_restore = {
+        'id': archived_batch['id'],
+        'product_id': archived_batch['product_id'],
+        'batch_number': archived_batch['batch_number'],
+        'date': archived_batch['date'],
+        'unit': archived_batch.get('unit', 'Litros'),
+        'planned_liters': archived_batch['planned_liters'],
+        'status': 'em_aberto',  # Reabrir como em_aberto
+        'total_bottled': archived_batch.get('total_bottled', 0),
+        'created_at': archived_batch.get('created_at', datetime.now(timezone.utc).isoformat()),
+        'deleted': False,
+        'reopened_at': datetime.now(timezone.utc).isoformat(),
+        'reopened_from_archive': True
+    }
+    
+    # Inserir de volta na coleção de lotes ativos
+    await db.product_batches.insert_one(batch_to_restore)
+    
+    # Restaurar as contagens do histórico
+    countings_history = archived_batch.get('countings_history', [])
+    if countings_history:
+        for counting in countings_history:
+            counting['batch_id'] = batch_id
+            await db.counting.insert_one(counting)
+    
+    # Remover da coleção de arquivados
+    await db.archived_product_batches.delete_one({'id': batch_id})
+    
+    return {
+        'message': 'Lote reaberto com sucesso',
+        'batch_number': archived_batch.get('batch_number'),
+        'countings_restored': len(countings_history)
+    }
+
 # ========== RAW MATERIALS ==========
 
 @api_router.get('/raw-materials', response_model=List[RawMaterial])
