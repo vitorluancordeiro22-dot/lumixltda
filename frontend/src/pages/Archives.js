@@ -147,6 +147,33 @@ export const Archives = () => {
     }
   };
 
+  // Função para reabrir um lote arquivado
+  const handleReopenBatch = async (batch) => {
+    setReopening(true);
+    try {
+      const response = await api.post(`/archive/reopen/${batch.id}`);
+      
+      if (isMountedRef.current) {
+        toast.success(`Lote ${response.data.batch_number} reaberto com sucesso! ${response.data.countings_restored} contagens restauradas.`);
+        // Atualizar a lista de arquivados
+        if (selectedMonth) {
+          await fetchArchiveData(selectedMonth.year, selectedMonth.month);
+        }
+        if (filterByProduct) {
+          await fetchByProduct(filterByProduct);
+        }
+      }
+    } catch (error) {
+      if (isMountedRef.current) {
+        toast.error(error.response?.data?.detail || 'Erro ao reabrir lote');
+      }
+    } finally {
+      if (isMountedRef.current) {
+        setReopening(false);
+      }
+    }
+  };
+
   // Função para obter as matérias-primas usadas em um produto
   const getProductRecipes = (productId) => {
     const product = products.find(p => p.id === productId);
