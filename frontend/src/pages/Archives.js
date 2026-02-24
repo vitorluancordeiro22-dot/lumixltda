@@ -24,6 +24,7 @@ export const Archives = () => {
   const [operatorsSummary, setOperatorsSummary] = useState([]);
   const [loading, setLoading] = useState(true);
   const [archiving, setArchiving] = useState(false);
+  const [reopening, setReopening] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedBatch, setSelectedBatch] = useState(null);
   const [editingCounting, setEditingCounting] = useState(null);
