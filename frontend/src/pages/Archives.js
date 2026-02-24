@@ -9,8 +9,9 @@ import { Label } from '../components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '../components/ui/alert-dialog';
 import { toast } from 'sonner';
-import { Archive, Package, Boxes, Calendar, Search, Pencil, X, History, Settings, Users, Trophy, Filter, Info } from 'lucide-react';
+import { Archive, Package, Boxes, Calendar, Search, Pencil, X, History, Settings, Users, Trophy, Filter, Info, RotateCcw } from 'lucide-react';
 
 export const Archives = () => {
   const { user } = useAuth();
