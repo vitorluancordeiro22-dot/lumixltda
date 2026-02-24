@@ -503,7 +503,7 @@ export const Archives = () => {
                           )}
                           
                           {/* Botões de ação */}
-                          <div className="flex gap-2 mt-3">
+                          <div className="flex gap-2 mt-3 flex-wrap">
                             {/* Botão Detalhes - Matérias-Primas */}
                             <Button
                               variant="outline"
@@ -528,6 +528,57 @@ export const Archives = () => {
                               </Button>
                             )}
                           </div>
+                          
+                          {/* Botão Reabrir Lote - apenas para laboratório */}
+                          {isLabUser && (
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="w-full mt-2 border-blue-500 text-blue-600 hover:bg-blue-50"
+                                  disabled={reopening}
+                                >
+                                  <RotateCcw className="w-4 h-4 mr-2" />
+                                  {reopening ? 'Reabrindo...' : 'Reabrir Lote'}
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle className="flex items-center gap-2">
+                                    <RotateCcw className="w-5 h-5 text-blue-600" />
+                                    Reabrir Lote Arquivado
+                                  </AlertDialogTitle>
+                                  <AlertDialogDescription asChild>
+                                    <div className="space-y-3">
+                                      <p>Você está prestes a reabrir o lote <strong>{batch.batch_number}</strong>.</p>
+                                      <div className="p-3 rounded-lg bg-blue-50 border border-blue-200">
+                                        <p className="font-semibold text-blue-800">O que acontecerá:</p>
+                                        <ul className="text-sm text-blue-700 list-disc list-inside mt-1">
+                                          <li>O lote voltará para a lista de lotes ativos</li>
+                                          <li>Status será alterado para "Em Aberto"</li>
+                                          <li>As contagens serão restauradas</li>
+                                          <li>O lote poderá receber novas contagens</li>
+                                        </ul>
+                                      </div>
+                                      <p className="text-sm text-muted-foreground">
+                                        Deseja continuar?
+                                      </p>
+                                    </div>
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                  <AlertDialogAction 
+                                    onClick={() => handleReopenBatch(batch)}
+                                    className="bg-blue-600 hover:bg-blue-700"
+                                  >
+                                    Sim, Reabrir Lote
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          )}
                         </div>
                       </Card>
                     ))}
