@@ -234,6 +234,117 @@ export const RawMaterials = () => {
     material.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  // Função para selecionar/deselecionar lote para impressão
+  const toggleBatchForPrint = (batchId) => {
+    setSelectedBatchesForPrint(prev => 
+      prev.includes(batchId) 
+        ? prev.filter(id => id !== batchId)
+        : [...prev, batchId]
+    );
+  };
+
+  // Função para selecionar todos os lotes
+  const selectAllBatches = () => {
+    if (selectedBatchesForPrint.length === batches.length) {
+      setSelectedBatchesForPrint([]);
+    } else {
+      setSelectedBatchesForPrint(batches.map(b => b.id));
+    }
+  };
+
+  // Função para imprimir etiquetas
+  const handlePrintLabels = () => {
+    const selectedBatchData = batches.filter(b => selectedBatchesForPrint.includes(b.id));
+    
+    if (selectedBatchData.length === 0) {
+      toast.error('Selecione pelo menos um lote para imprimir');
+      return;
+    }
+
+    // Criar janela de impressão
+    const printWindow = window.open('', '_blank');
+    
+    // Gerar HTML das etiquetas
+    const labelsHtml = selectedBatchData.map(batch => {
+      const material = materials.find(m => m.id === batch.raw_material_id);
+      const supplier = suppliers.find(s => s.id === material?.supplier_id);
+      
+      const formatDate = (dateStr) => {
+        if (!dateStr) return '-';
+        return new Date(dateStr).toLocaleDateString('pt-BR');
+      };
+
+      return `
+        <div class="label">
+          <div class="label-name">${material?.name || 'N/A'}</div>
+          <div class="label-row"><span class="label-field">DATA:</span> ${formatDate(batch.date)}</div>
+          <div class="label-row"><span class="label-field">LOTE:</span> ${batch.batch_number}</div>
+          <div class="label-row"><span class="label-field">FORN.:</span> ${supplier?.name || 'N/A'} (${batch.supplier_batch_number || '-'})</div>
+          <div class="label-row"><span class="label-field">VALIDADE:</span> ${formatDate(batch.expiry_date)}</div>
+        </div>
+      `;
+    }).join('');
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Etiquetas de Matérias-Primas - Lumix</title>
+        <style>
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { font-family: Arial, sans-serif; padding: 10mm; }
+          .labels-container {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 5mm;
+          }
+          .label {
+            border: 1px solid #000;
+            padding: 3mm;
+            page-break-inside: avoid;
+            height: 35mm;
+            width: 60mm;
+          }
+          .label-name {
+            font-weight: bold;
+            font-size: 11pt;
+            text-align: center;
+            margin-bottom: 2mm;
+            border-bottom: 1px solid #000;
+            padding-bottom: 1mm;
+          }
+          .label-row {
+            font-size: 9pt;
+            margin: 1mm 0;
+          }
+          .label-field {
+            font-weight: bold;
+          }
+          @media print {
+            body { padding: 5mm; }
+            .label { 
+              border: 1px solid #000 !important; 
+              -webkit-print-color-adjust: exact;
+            }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="labels-container">
+          ${labelsHtml}
+        </div>
+        <script>
+          window.onload = function() { window.print(); }
+        </script>
+      </body>
+      </html>
+    `);
+    
+    printWindow.document.close();
+    setPrintDialogOpen(false);
+    setSelectedBatchesForPrint([]);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
