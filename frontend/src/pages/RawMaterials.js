@@ -47,11 +47,23 @@ export const RawMaterials = () => {
     isMountedRef.current = true;
     fetchMaterials();
     fetchSuppliers();
+    fetchBatches();
     
     return () => {
       isMountedRef.current = false;
     };
   }, []);
+
+  const fetchBatches = async () => {
+    try {
+      const response = await api.get('/raw-material-batches');
+      if (isMountedRef.current) {
+        setBatches(response.data);
+      }
+    } catch (error) {
+      console.error('Error loading batches:', error);
+    }
+  };
 
   const fetchSuppliers = async () => {
     try {
