@@ -353,6 +353,88 @@ export const RawMaterials = () => {
           <p className="text-lg text-muted-foreground">Gerencie o estoque de matérias-primas</p>
         </div>
         <div className="flex flex-wrap gap-3">
+          {/* Botão Imprimir Etiquetas */}
+          <Dialog open={printDialogOpen} onOpenChange={setPrintDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="bg-blue-600 hover:bg-blue-700">
+                <Printer className="w-4 h-4 mr-2" />
+                Imprimir Etiquetas
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="bg-card border-border max-w-2xl max-h-[80vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle className="text-foreground flex items-center gap-2">
+                  <Printer className="w-5 h-5" />
+                  Imprimir Etiquetas de Matérias-Primas
+                </DialogTitle>
+              </DialogHeader>
+              
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-muted-foreground">
+                    Selecione os lotes para imprimir ({selectedBatchesForPrint.length} selecionados)
+                  </p>
+                  <Button variant="outline" size="sm" onClick={selectAllBatches}>
+                    {selectedBatchesForPrint.length === batches.length ? 'Desmarcar Todos' : 'Selecionar Todos'}
+                  </Button>
+                </div>
+
+                <div className="border rounded-lg divide-y max-h-[400px] overflow-y-auto">
+                  {batches.length === 0 ? (
+                    <p className="text-center text-muted-foreground py-8">
+                      Nenhum lote de matéria-prima cadastrado
+                    </p>
+                  ) : (
+                    batches.map(batch => {
+                      const material = materials.find(m => m.id === batch.raw_material_id);
+                      const isSelected = selectedBatchesForPrint.includes(batch.id);
+                      return (
+                        <div 
+                          key={batch.id} 
+                          className={`p-3 flex items-center gap-3 cursor-pointer hover:bg-muted/50 ${isSelected ? 'bg-primary/10' : ''}`}
+                          onClick={() => toggleBatchForPrint(batch.id)}
+                        >
+                          <Checkbox 
+                            checked={isSelected}
+                            onCheckedChange={() => toggleBatchForPrint(batch.id)}
+                          />
+                          <div className="flex-1">
+                            <p className="font-semibold text-foreground">{material?.name || 'N/A'}</p>
+                            <p className="text-sm text-muted-foreground">
+                              Lote: {batch.batch_number} | Data: {new Date(batch.date).toLocaleDateString('pt-BR')}
+                              {batch.expiry_date && ` | Val: ${new Date(batch.expiry_date).toLocaleDateString('pt-BR')}`}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+
+                <div className="flex gap-2 pt-4">
+                  <Button 
+                    variant="outline" 
+                    className="flex-1"
+                    onClick={() => {
+                      setPrintDialogOpen(false);
+                      setSelectedBatchesForPrint([]);
+                    }}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button 
+                    className="flex-1 bg-blue-600 hover:bg-blue-700"
+                    onClick={handlePrintLabels}
+                    disabled={selectedBatchesForPrint.length === 0}
+                  >
+                    <Printer className="w-4 h-4 mr-2" />
+                    Imprimir ({selectedBatchesForPrint.length})
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+
           <Dialog open={batchDialogOpen} onOpenChange={setBatchDialogOpen}>
             <DialogTrigger asChild>
               <Button data-testid="release-material-batch-button" className="bg-amber-600 hover:bg-amber-700">
