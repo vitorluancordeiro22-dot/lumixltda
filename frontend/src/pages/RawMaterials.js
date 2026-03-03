@@ -13,13 +13,16 @@ import { Plus, Edit, Trash2, Boxes, Package, Search, Printer } from 'lucide-reac
 
 export const RawMaterials = () => {
   const [materials, setMaterials] = useState([]);
+  const [batches, setBatches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [batchDialogOpen, setBatchDialogOpen] = useState(false);
+  const [printDialogOpen, setPrintDialogOpen] = useState(false);
   const [selectedMaterial, setSelectedMaterial] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const isMountedRef = React.useRef(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedBatchesForPrint, setSelectedBatchesForPrint] = useState([]);
   
   const [suppliers, setSuppliers] = useState([]);
   const [formData, setFormData] = useState({
