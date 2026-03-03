@@ -7,8 +7,9 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Combobox } from '../components/ui/combobox';
+import { Checkbox } from '../components/ui/checkbox';
 import { toast } from 'sonner';
-import { Plus, Edit, Trash2, Boxes, Package, Search } from 'lucide-react';
+import { Plus, Edit, Trash2, Boxes, Package, Search, Printer } from 'lucide-react';
 
 export const RawMaterials = () => {
   const [materials, setMaterials] = useState([]);
