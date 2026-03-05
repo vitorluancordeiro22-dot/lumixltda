@@ -1813,6 +1813,124 @@ async def recalculate_liters_counter(current_user = Depends(get_current_user)):
         'year': current_year
     }
 
+@api_router.get('/dashboard/chart/daily')
+async def get_daily_production_chart(current_user = Depends(get_current_user)):
+    """
+    Retorna dados de produção diária dos últimos 30 dias para o gráfico.
+    """
+    from collections import defaultdict
+    
+    now = datetime.now(timezone.utc)
+    thirty_days_ago = (now - timedelta(days=30)).isoformat()
+    
+    daily_totals = defaultdict(float)
+    
+    # Buscar contagens dos últimos 30 dias
+    counts = await db.counting.find(
+        {'created_at': {'$gte': thirty_days_ago}},
+        {'_id': 0}
+    ).to_list(10000)
+    
+    for c in counts:
+        created_at = c.get('created_at', '')[:10]  # Pegar apenas a data YYYY-MM-DD
+        half = c.get('half_liter', 0) or 0
+        one = c.get('one_liter', 0) or 0
+        two = c.get('two_liter', 0) or 0
+        five = c.get('five_liter', 0) or 0
+        total = (half * 0.5) + (one * 1) + (two * 2) + (five * 5)
+        daily_totals[created_at] += total
+    
+    # Converter para lista ordenada por data
+    result = []
+    for date_str, total in sorted(daily_totals.items()):
+        day = datetime.fromisoformat(date_str).strftime('%d/%m')
+        result.append({
+            'date': date_str,
+            'day': day,
+            'liters': round(total, 1)
+        })
+    
+    return result
+
+@api_router.get('/dashboard/chart/monthly')
+async def get_monthly_production_chart(current_user = Depends(get_current_user)):
+    """
+    Retorna dados de produção mensal dos últimos 12 meses para o gráfico.
+    Inclui contagens ativas e arquivadas.
+    """
+    from collections import defaultdict
+    
+    now = datetime.now(timezone.utc)
+    current_year = now.year
+    current_month = now.month
+    
+    monthly_totals = defaultdict(float)
+    
+    # Gerar os últimos 12 meses
+    months_data = []
+    for i in range(11, -1, -1):
+        month = current_month - i
+        year = current_year
+        while month <= 0:
+            month += 12
+            year -= 1
+        months_data.append({'year': year, 'month': month})
+    
+    # Buscar todas as contagens ativas
+    all_counts = await db.counting.find({}, {'_id': 0}).to_list(50000)
+    
+    for c in all_counts:
+        created_at = c.get('created_at', '')
+        if not created_at:
+            continue
+        try:
+            dt = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+            key = f"{dt.year}-{dt.month:02d}"
+            half = c.get('half_liter', 0) or 0
+            one = c.get('one_liter', 0) or 0
+            two = c.get('two_liter', 0) or 0
+            five = c.get('five_liter', 0) or 0
+            total = (half * 0.5) + (one * 1) + (two * 2) + (five * 5)
+            monthly_totals[key] += total
+        except:
+            continue
+    
+    # Buscar contagens arquivadas
+    archived_batches = await db.archived_product_batches.find({}, {'_id': 0}).to_list(10000)
+    
+    for batch in archived_batches:
+        countings_history = batch.get('countings_history', [])
+        archived_year = batch.get('archived_year')
+        archived_month = batch.get('archived_month')
+        
+        if archived_year and archived_month:
+            key = f"{archived_year}-{archived_month:02d}"
+            for c in countings_history:
+                half = c.get('half_liter', 0) or 0
+                one = c.get('one_liter', 0) or 0
+                two = c.get('two_liter', 0) or 0
+                five = c.get('five_liter', 0) or 0
+                total = (half * 0.5) + (one * 1) + (two * 2) + (five * 5)
+                monthly_totals[key] += total
+    
+    # Formatar resultado
+    month_names = {
+        1: 'Jan', 2: 'Fev', 3: 'Mar', 4: 'Abr', 5: 'Mai', 6: 'Jun',
+        7: 'Jul', 8: 'Ago', 9: 'Set', 10: 'Out', 11: 'Nov', 12: 'Dez'
+    }
+    
+    result = []
+    for m in months_data:
+        key = f"{m['year']}-{m['month']:02d}"
+        result.append({
+            'month': f"{month_names[m['month']]}/{str(m['year'])[2:]}",
+            'year': m['year'],
+            'month_num': m['month'],
+            'liters': round(monthly_totals.get(key, 0), 1)
+        })
+    
+    return result
+
 # ========== LAUDOS ROUTES ==========
 
 @api_router.get('/laudos/folders')
