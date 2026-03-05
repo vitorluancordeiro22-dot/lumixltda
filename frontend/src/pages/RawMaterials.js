@@ -23,6 +23,15 @@ export const RawMaterials = () => {
   const isMountedRef = React.useRef(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedBatchesForPrint, setSelectedBatchesForPrint] = useState([]);
+  const [batchQuantities, setBatchQuantities] = useState({}); // Armazenar quantidade de etiquetas por lote
+  
+  // Estados para filtro de datas
+  const [dateFilter, setDateFilter] = useState({
+    startDate: '',
+    endDate: new Date().toISOString().split('T')[0]
+  });
+
+  const [filteredBatchesByDate, setFilteredBatchesByDate] = useState([]);
   
   const [suppliers, setSuppliers] = useState([]);
   const [formData, setFormData] = useState({
@@ -53,6 +62,26 @@ export const RawMaterials = () => {
       isMountedRef.current = false;
     };
   }, []);
+
+  // Efeito para filtrar lotes por data
+  useEffect(() => {
+    filterBatchesByDate();
+  }, [batches, dateFilter]);
+
+  const filterBatchesByDate = () => {
+    const filtered = batches.filter(batch => {
+      const batchDate = new Date(batch.date);
+      const start = dateFilter.startDate ? new Date(dateFilter.startDate) : null;
+      const end = dateFilter.endDate ? new Date(dateFilter.endDate) : null;
+
+      if (start && batchDate < start) return false;
+      if (end && batchDate > end) return false;
+      
+      return true;
+    });
+
+    setFilteredBatchesByDate(filtered);
+  };
 
   const fetchBatches = async () => {
     try {
@@ -157,7 +186,6 @@ export const RawMaterials = () => {
         quantity: parseFloat(batchFormData.quantity)
       };
       
-      // Se tem número customizado, enviar
       if (batchFormData.custom_batch_number) {
         payload.custom_batch_number = batchFormData.custom_batch_number;
       }
@@ -229,32 +257,51 @@ export const RawMaterials = () => {
 
   const getSupplierName = (id) => suppliers.find(s => s.id === id)?.name || 'Sem fornecedor';
 
-  // Filtrar matérias-primas pela pesquisa
   const filteredMaterials = materials.filter(material => 
     material.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Função para selecionar/deselecionar lote para impressão
   const toggleBatchForPrint = (batchId) => {
     setSelectedBatchesForPrint(prev => 
       prev.includes(batchId) 
         ? prev.filter(id => id !== batchId)
         : [...prev, batchId]
     );
-  };
-
-  // Função para selecionar todos os lotes
-  const selectAllBatches = () => {
-    if (selectedBatchesForPrint.length === batches.length) {
-      setSelectedBatchesForPrint([]);
-    } else {
-      setSelectedBatchesForPrint(batches.map(b => b.id));
+    // Inicializar quantidade padrão como 1 se não existir
+    if (!batchQuantities[batchId]) {
+      setBatchQuantities(prev => ({
+        ...prev,
+        [batchId]: 1
+      }));
     }
   };
 
-  // Função para imprimir etiquetas
+  const selectAllBatches = () => {
+    if (selectedBatchesForPrint.length === filteredBatchesByDate.length) {
+      setSelectedBatchesForPrint([]);
+      setBatchQuantities({});
+    } else {
+      const allIds = filteredBatchesByDate.map(b => b.id);
+      setSelectedBatchesForPrint(allIds);
+      
+      const newQuantities = {};
+      allIds.forEach(id => {
+        newQuantities[id] = 1;
+      });
+      setBatchQuantities(newQuantities);
+    }
+  };
+
+  const updateBatchQuantity = (batchId, quantity) => {
+    const qty = Math.max(1, parseInt(quantity) || 1);
+    setBatchQuantities(prev => ({
+      ...prev,
+      [batchId]: qty
+    }));
+  };
+
   const handlePrintLabels = () => {
-    const selectedBatchData = batches.filter(b => selectedBatchesForPrint.includes(b.id));
+    const selectedBatchData = filteredBatchesByDate.filter(b => selectedBatchesForPrint.includes(b.id));
     
     if (selectedBatchData.length === 0) {
       toast.error('Selecione pelo menos um lote para imprimir');
@@ -264,25 +311,31 @@ export const RawMaterials = () => {
     // Criar janela de impressão
     const printWindow = window.open('', '_blank');
     
-    // Gerar HTML das etiquetas
+    // Gerar HTML das etiquetas com repetição baseada na quantidade
     const labelsHtml = selectedBatchData.map(batch => {
       const material = materials.find(m => m.id === batch.raw_material_id);
       const supplier = suppliers.find(s => s.id === material?.supplier_id);
+      const quantity = batchQuantities[batch.id] || 1;
       
       const formatDate = (dateStr) => {
         if (!dateStr) return '-';
         return new Date(dateStr).toLocaleDateString('pt-BR');
       };
 
-      return `
-        <div class="label">
-          <div class="label-name">${material?.name || 'N/A'}</div>
-          <div class="label-row"><span class="label-field">DATA:</span> ${formatDate(batch.date)}</div>
-          <div class="label-row"><span class="label-field">LOTE:</span> ${batch.batch_number}</div>
-          <div class="label-row"><span class="label-field">FORN.:</span> ${supplier?.name || 'N/A'} (${batch.supplier_batch_number || '-'})</div>
-          <div class="label-row"><span class="label-field">VALIDADE:</span> ${formatDate(batch.expiry_date)}</div>
-        </div>
-      `;
+      // Repetir a etiqueta conforme a quantidade selecionada
+      let labelHtml = '';
+      for (let i = 0; i < quantity; i++) {
+        labelHtml += `
+          <div class="label">
+            <div class="label-name">${material?.name || 'N/A'}</div>
+            <div class="label-row"><span class="label-field">DATA:</span> ${formatDate(batch.date)}</div>
+            <div class="label-row"><span class="label-field">LOTE:</span> ${batch.batch_number}</div>
+            <div class="label-row"><span class="label-field">FORN.:</span> ${supplier?.name || 'N/A'} (${batch.supplier_batch_number || '-'})</div>
+            <div class="label-row"><span class="label-field">VALIDADE:</span> ${formatDate(batch.expiry_date)}</div>
+          </div>
+        `;
+      }
+      return labelHtml;
     }).join('');
 
     printWindow.document.write(`
@@ -343,6 +396,7 @@ export const RawMaterials = () => {
     printWindow.document.close();
     setPrintDialogOpen(false);
     setSelectedBatchesForPrint([]);
+    setBatchQuantities({});
   };
 
   return (
@@ -361,7 +415,7 @@ export const RawMaterials = () => {
                 Imprimir Etiquetas
               </Button>
             </DialogTrigger>
-            <DialogContent className="bg-card border-border max-w-2xl max-h-[80vh] overflow-y-auto">
+            <DialogContent className="bg-card border-border max-w-3xl max-h-[85vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle className="text-foreground flex items-center gap-2">
                   <Printer className="w-5 h-5" />
@@ -370,46 +424,102 @@ export const RawMaterials = () => {
               </DialogHeader>
               
               <div className="space-y-4">
+                {/* Filtro por Datas - ALTERADO PARA DEIXAR CLARO QUE É DATA DO LOTE */}
+                <div className="border rounded-lg p-4 bg-muted/30">
+                  <p className="text-sm font-semibold text-foreground mb-3">🗓️ Filtrar Lotes por Data de Registro</p>
+                  <p className="text-xs text-muted-foreground mb-3">Selecione o período para filtrar os lotes por data de entrada/criação</p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-foreground text-sm font-medium">Data Inicial do Lote</Label>
+                      <Input 
+                        type="date" 
+                        value={dateFilter.startDate}
+                        onChange={(e) => setDateFilter({...dateFilter, startDate: e.target.value})}
+                        className="bg-input border-border text-foreground mt-1"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">Desde quando</p>
+                    </div>
+                    <div>
+                      <Label className="text-foreground text-sm font-medium">Data Final do Lote</Label>
+                      <Input 
+                        type="date" 
+                        value={dateFilter.endDate}
+                        onChange={(e) => setDateFilter({...dateFilter, endDate: e.target.value})}
+                        className="bg-input border-border text-foreground mt-1"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">Até quando</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Seleção de Lotes */}
                 <div className="flex items-center justify-between">
                   <p className="text-sm text-muted-foreground">
-                    Selecione os lotes para imprimir ({selectedBatchesForPrint.length} selecionados)
+                    Lotes disponíveis: {filteredBatchesByDate.length} ({selectedBatchesForPrint.length} selecionados)
                   </p>
                   <Button variant="outline" size="sm" onClick={selectAllBatches}>
-                    {selectedBatchesForPrint.length === batches.length ? 'Desmarcar Todos' : 'Selecionar Todos'}
+                    {selectedBatchesForPrint.length === filteredBatchesByDate.length && filteredBatchesByDate.length > 0 ? 'Desmarcar Todos' : 'Selecionar Todos'}
                   </Button>
                 </div>
 
-                <div className="border rounded-lg divide-y max-h-[400px] overflow-y-auto">
-                  {batches.length === 0 ? (
+                <div className="border rounded-lg divide-y max-h-[350px] overflow-y-auto">
+                  {filteredBatchesByDate.length === 0 ? (
                     <p className="text-center text-muted-foreground py-8">
-                      Nenhum lote de matéria-prima cadastrado
+                      Nenhum lote encontrado no período selecionado
                     </p>
                   ) : (
-                    batches.map(batch => {
+                    filteredBatchesByDate.map(batch => {
                       const material = materials.find(m => m.id === batch.raw_material_id);
                       const isSelected = selectedBatchesForPrint.includes(batch.id);
+                      const quantity = batchQuantities[batch.id] || 1;
+                      
                       return (
                         <div 
                           key={batch.id} 
-                          className={`p-3 flex items-center gap-3 cursor-pointer hover:bg-muted/50 ${isSelected ? 'bg-primary/10' : ''}`}
-                          onClick={() => toggleBatchForPrint(batch.id)}
+                          className={`p-4 flex items-center gap-3 hover:bg-muted/50 transition-colors ${isSelected ? 'bg-primary/10' : ''}`}
                         >
                           <Checkbox 
                             checked={isSelected}
                             onCheckedChange={() => toggleBatchForPrint(batch.id)}
+                            className="mt-1"
                           />
-                          <div className="flex-1">
-                            <p className="font-semibold text-foreground">{material?.name || 'N/A'}</p>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-foreground truncate">{material?.name || 'N/A'}</p>
                             <p className="text-sm text-muted-foreground">
                               Lote: {batch.batch_number} | Data: {new Date(batch.date).toLocaleDateString('pt-BR')}
                               {batch.expiry_date && ` | Val: ${new Date(batch.expiry_date).toLocaleDateString('pt-BR')}`}
                             </p>
                           </div>
+                          
+                          {/* Seletor de Quantidade */}
+                          {isSelected && (
+                            <div className="flex items-center gap-2 ml-auto flex-shrink-0">
+                              <Label className="text-xs text-muted-foreground">Qtd:</Label>
+                              <Input
+                                type="number"
+                                min="1"
+                                max="99"
+                                value={quantity}
+                                onChange={(e) => updateBatchQuantity(batch.id, e.target.value)}
+                                className="bg-input border-border text-foreground w-16 h-8 text-center text-sm"
+                              />
+                            </div>
+                          )}
                         </div>
                       );
                     })
                   )}
                 </div>
+
+                {/* Resumo de Impressão */}
+                {selectedBatchesForPrint.length > 0 && (
+                  <div className="p-3 rounded-lg bg-blue-50 border border-blue-200">
+                    <p className="text-sm text-blue-900">
+                      <span className="font-semibold">Total de etiquetas:</span> {' '}
+                      {selectedBatchesForPrint.reduce((total, batchId) => total + (batchQuantities[batchId] || 1), 0)}
+                    </p>
+                  </div>
+                )}
 
                 <div className="flex gap-2 pt-4">
                   <Button 
@@ -418,6 +528,7 @@ export const RawMaterials = () => {
                     onClick={() => {
                       setPrintDialogOpen(false);
                       setSelectedBatchesForPrint([]);
+                      setBatchQuantities({});
                     }}
                   >
                     Cancelar
@@ -428,7 +539,7 @@ export const RawMaterials = () => {
                     disabled={selectedBatchesForPrint.length === 0}
                   >
                     <Printer className="w-4 h-4 mr-2" />
-                    Imprimir ({selectedBatchesForPrint.length})
+                    Imprimir ({selectedBatchesForPrint.length} lote{selectedBatchesForPrint.length !== 1 ? 's' : ''})
                   </Button>
                 </div>
               </div>
