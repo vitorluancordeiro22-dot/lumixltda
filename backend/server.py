@@ -687,6 +687,49 @@ async def reopen_product_batch(batch_id: str, current_user = Depends(get_current
         'batch_number': batch.get('batch_number')
     }
 
+@api_router.post('/product-batches/{batch_id}/ready-for-bottling')
+async def mark_ready_for_bottling(batch_id: str, current_user = Depends(get_current_user)):
+    """
+    Marca um lote como pronto para envase.
+    Apenas usuários autorizados (laboratoriolumix@outlook.com e luansorato1@gmail.com) podem executar.
+    """
+    # Verificar permissão
+    allowed_emails = ['laboratoriolumix@outlook.com', 'luansorato1@gmail.com']
+    if current_user.get('email') not in allowed_emails:
+        raise HTTPException(status_code=403, detail='Você não tem permissão para liberar lotes para envase')
+    
+    batch = await db.product_batches.find_one({'id': batch_id, 'deleted': False}, {'_id': 0})
+    if not batch:
+        raise HTTPException(status_code=404, detail='Lote não encontrado')
+    
+    if batch.get('status') != 'em_producao':
+        raise HTTPException(status_code=400, detail='Apenas lotes em produção podem ser liberados para envase')
+    
+    await db.product_batches.update_one(
+        {'id': batch_id},
+        {'$set': {
+            'status': 'em_aberto',
+            'released_for_bottling_at': datetime.now(timezone.utc).isoformat(),
+            'released_by': current_user.get('email')
+        }}
+    )
+    
+    return {
+        'message': 'Lote liberado para envase com sucesso',
+        'batch_number': batch.get('batch_number')
+    }
+
+@api_router.get('/product-batches/in-production')
+async def get_batches_in_production(current_user = Depends(get_current_user)):
+    """
+    Retorna todos os lotes que estão em produção (aguardando liberação para envase).
+    """
+    batches = await db.product_batches.find({
+        'status': 'em_producao',
+        'deleted': False
+    }, {'_id': 0}).to_list(1000)
+    return batches
+
 @api_router.post('/archive/reopen/{batch_id}')
 async def reopen_archived_batch(batch_id: str, current_user = Depends(get_current_user)):
     """
