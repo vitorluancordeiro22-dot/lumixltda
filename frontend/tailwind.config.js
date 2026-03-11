@@ -1,41 +1,61 @@
 /** @type {import('tailwindcss').Config} */
+
 module.exports = {
-  darkMode: 'class',
+  darkMode: "class",
+
   content: [
-    './src/**/*.{js,jsx,ts,tsx}',
+    "./src/**/*.{js,jsx,ts,tsx}",
   ],
+
   theme: {
     extend: {
+
       colors: {
-        background: '#FFFFFF',
-        foreground: '#1E293B',
-        card: '#FFFFFF',
-        'card-foreground': '#1E293B',
-        primary: '#0EA5E9',
-        'primary-foreground': '#FFFFFF',
-        secondary: '#F1F5F9',
-        'secondary-foreground': '#1E293B',
-        muted: '#F8FAFC',
-        'muted-foreground': '#64748B',
-        accent: '#0EA5E9',
-        'accent-foreground': '#FFFFFF',
-        destructive: '#EF4444',
-        'destructive-foreground': '#FFFFFF',
-        border: '#E2E8F0',
-        input: '#FFFFFF',
-        ring: '#0EA5E9',
+
+        background: "rgb(var(--background) / 1)",
+        foreground: "rgb(var(--foreground) / 1)",
+
+        card: "rgb(var(--card) / 1)",
+        "card-foreground": "rgb(var(--card-foreground) / 1)",
+
+        primary: "rgb(var(--primary) / 1)",
+        "primary-foreground": "rgb(var(--primary-foreground) / 1)",
+
+        secondary: "rgb(var(--secondary) / 1)",
+        "secondary-foreground": "rgb(var(--secondary-foreground) / 1)",
+
+        muted: "rgb(var(--muted) / 1)",
+        "muted-foreground": "rgb(var(--muted-foreground) / 1)",
+
+        accent: "rgb(var(--primary) / 1)",
+        "accent-foreground": "rgb(var(--primary-foreground) / 1)",
+
+        destructive: "#EF4444",
+        "destructive-foreground": "#FFFFFF",
+
+        border: "rgb(var(--border) / 1)",
+        input: "rgb(var(--background) / 1)",
+        ring: "rgb(var(--primary) / 1)",
+
       },
+
       fontFamily: {
-        sans: ['IBM Plex Sans', 'sans-serif'],
-        heading: ['Manrope', 'sans-serif'],
-        mono: ['JetBrains Mono', 'monospace'],
+        sans: ["IBM Plex Sans", "sans-serif"],
+        heading: ["Manrope", "sans-serif"],
+        mono: ["JetBrains Mono", "monospace"],
       },
+
       borderRadius: {
-        lg: '0.5rem',
-        md: '0.375rem',
-        sm: '0.25rem',
+        lg: "0.5rem",
+        md: "0.375rem",
+        sm: "0.25rem",
       },
+
     },
   },
-  plugins: [require('tailwindcss-animate')],
-}
+
+  plugins: [
+    require("tailwindcss-animate"),
+  ],
+
+};

@@ -1,48 +1,142 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import { Card } from '../components/ui/card';
 import { Button } from '../components/ui/button';
-import { User, Zap } from 'lucide-react';
+import { User, Moon, Sun, Zap } from 'lucide-react';
 
 export const Settings = () => {
-  const { user } = useAuth();
+
+    const { user } = useAuth();
+    const { theme, toggleTheme } = useTheme();
+
+    const [profile, setProfile] = useState({
+        name: user?.name || '',
+        email: user?.email || ''
+    });
+
+    const handleChange = (e) => {
+        const { name, value } = e.target;
+
+        setProfile({
+            ...profile,
+            [name]: value
+        });
+    };
 
     return (
+
         <div className="space-y-8">
-              <div>
-                      <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-2">Configurações</h1>
-                              <p className="text-lg text-muted-foreground">Gerencie suas preferências</p>
-                                    </div>
 
-                                          <Card className="p-6 border shadow-sm">
-                                                  <div className="flex items-center gap-4 mb-6">
-                                                            <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center">
-                                                                        <User className="w-8 h-8 text-primary" />
-                                                                                  </div>
-                                                                                            <div>
-                                                                                                        <h2 className="text-2xl font-bold text-foreground">{user?.name}</h2>
-                                                                                                                    <p className="text-muted-foreground">{user?.email}</p>
-                                                                                                                              </div>
-                                                                                                                                      </div>
-                                                                                                                                            </Card>
+            <div>
+                <h1 className="text-4xl md:text-5xl font-bold mb-2">
+                    Configurações
+                </h1>
 
-                                                                                                                                                  <Card className="p-6 border shadow-sm">
-                                                                                                                                                          <div className="flex items-start gap-4">
-                                                                                                                                                                    <div className="w-12 h-12 rounded-lg bg-primary/20 flex items-center justify-center">
-                                                                                                                                                                                <Zap className="w-6 h-6 text-primary" />
-                                                                                                                                                                                          </div>
-                                                                                                                                                                                                    <div className="flex-1">
-                                                                                                                                                                                                                <h3 className="text-xl font-bold text-foreground mb-2">Sobre o Lumix</h3>
-                                                                                                                                                                                                                            <p className="text-muted-foreground leading-relaxed mb-4">
-                                                                                                                                                                                                                                          Sistema de Gestão Inteligente de Produção desenvolvido por Vitor.
-                                                                                                                                                                                                                                                      </p>
-                                                                                                                                                                                                                                                                  <p className="text-sm text-muted-foreground/70">
-                                                                                                                                                                                                                                                                                Versão 1.0.0 • 2025
-                                                                                                                                                                                                                                                                                            </p>
-                                                                                                                                                                                                                                                                                                      </div>
-                                                                                                                                                                                                                                                                                                              </div>
-                                                                                                                                                                                                                                                                                                                    </Card>
-                                                                                                                                                                                                                                                                                                                        </div>
-                                                                                                                                                                                                                                                                                                                          );
-                                                                                                                                                                                                                                                                                                                          };
-                                                                                                                                                                                                                                                                                                                          
+                <p className="text-muted-foreground">
+                    Gerencie suas preferências
+                </p>
+            </div>
+
+            {/* Perfil */}
+
+            <Card className="p-6 space-y-4">
+
+                <div className="flex items-center gap-4">
+
+                    <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center">
+                        <User className="w-8 h-8 text-primary"/>
+                    </div>
+
+                    <div>
+                        <h2 className="text-2xl font-bold">{user?.name}</h2>
+                        <p className="text-muted-foreground">{user?.email}</p>
+                    </div>
+
+                </div>
+
+                <div className="grid gap-3">
+
+                    <input
+                        className="border rounded-md p-2"
+                        type="text"
+                        name="name"
+                        value={profile.name}
+                        onChange={handleChange}
+                        placeholder="Nome"
+                    />
+
+                    <input
+                        className="border rounded-md p-2"
+                        type="email"
+                        name="email"
+                        value={profile.email}
+                        onChange={handleChange}
+                        placeholder="Email"
+                    />
+
+                </div>
+
+                <Button>
+                    Salvar Alterações
+                </Button>
+
+            </Card>
+
+            {/* Aparência */}
+
+            <Card className="p-6 flex items-center justify-between">
+
+                <div className="flex items-center gap-3">
+
+                    {theme === 'dark'
+                        ? <Moon className="w-6 h-6"/>
+                        : <Sun className="w-6 h-6"/>}
+
+                    <div>
+                        <h3 className="font-bold">
+                            Tema
+                        </h3>
+
+                        <p className="text-sm text-muted-foreground">
+                            Alterar modo claro ou escuro
+                        </p>
+                    </div>
+
+                </div>
+
+                <Button onClick={toggleTheme}>
+                    {theme === 'light'
+                        ? 'Modo Escuro'
+                        : 'Modo Claro'}
+                </Button>
+
+            </Card>
+
+            {/* Sobre */}
+
+            <Card className="p-6 flex gap-4">
+
+                <Zap className="w-6 h-6 text-primary"/>
+
+                <div>
+
+                    <h3 className="text-xl font-bold mb-2">
+                        Sobre o Lumix
+                    </h3>
+
+                    <p className="text-muted-foreground">
+                        Sistema de Gestão Inteligente de Produção desenvolvido por Vitor.
+                    </p>
+
+                    <p className="text-sm text-muted-foreground mt-2">
+                        Versão 1.0.0 • 2025
+                    </p>
+
+                </div>
+
+            </Card>
+
+        </div>
+    );
+};
