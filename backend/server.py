@@ -1738,7 +1738,10 @@ async def edit_archived_batch(batch_id: str, data: ArchivedBatchEdit, current_us
 
 @api_router.get('/dashboard/summary', response_model=DashboardSummary)
 async def get_dashboard_summary(current_user = Depends(get_current_user)):
-    open_batches = await db.product_batches.count_documents({'status': 'em_aberto', 'deleted': False})
+    open_batches = await db.product_batches.count_documents({
+        'status': {'$in': ['em_aberto', 'em_producao']}, 
+        'deleted': False
+    })
     in_production = await db.production_orders.count_documents({'status': 'em_producao', 'deleted': False})
     
     # Calculate liters bottled this month (APENAS LITROS)
