@@ -20,6 +20,7 @@ import { IndustrialOPs } from './pages/IndustrialOPs';
 import { Laudos } from './pages/Laudos';
 import { BatchManagement } from './pages/BatchManagement';
 import { Samples } from './pages/Samples';
+import { InProduction } from './pages/InProduction';
 import './App.css';
 
 const PrivateRoute = ({ children }) => {
