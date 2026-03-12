@@ -691,10 +691,10 @@ async def reopen_product_batch(batch_id: str, current_user = Depends(get_current
 async def mark_ready_for_bottling(batch_id: str, current_user = Depends(get_current_user)):
     """
     Marca um lote como pronto para envase.
-    Apenas usuários autorizados (laboratoriolumix@outlook.com e luansorato1@gmail.com) podem executar.
+    Apenas usuários autorizados (laboratoriolumix@outlook.com e luan_ssss@hotmail.com) podem executar.
     """
     # Verificar permissão
-    allowed_emails = ['laboratoriolumix@outlook.com', 'luansorato1@gmail.com']
+    allowed_emails = ['laboratoriolumix@outlook.com', 'luan_ssss@hotmail.com']
     if current_user.get('email') not in allowed_emails:
         raise HTTPException(status_code=403, detail='Você não tem permissão para liberar lotes para envase')
     
