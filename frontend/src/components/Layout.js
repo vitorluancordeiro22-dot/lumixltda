@@ -31,6 +31,7 @@ const allMenuItems = [
   { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', roles: ['laboratorio'] },
   { path: '/products', icon: Package, label: 'Produtos', roles: ['laboratorio'] },
   { path: '/raw-materials', icon: Boxes, label: 'Matérias-Primas', roles: ['laboratorio'] },
+  { path: '/in-production', icon: Factory, label: 'Em Produção', roles: ['laboratorio', 'producao'], testId: 'nav-in-production' },
   { path: '/counting', icon: Calculator, label: 'Contagem', roles: ['laboratorio', 'producao'] },
   { path: '/samples', icon: FlaskConical, label: 'Amostras', roles: ['laboratorio', 'producao'] },
   { path: '/batch-management', icon: ListChecks, label: 'Gerenciar Lotes', roles: ['laboratorio'] },
