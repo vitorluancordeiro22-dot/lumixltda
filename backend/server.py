@@ -529,7 +529,7 @@ async def create_product_batch(data: ProductBatchCreate, current_user = Depends(
         'date': data.date,
         'unit': data.unit,
         'planned_liters': data.planned_liters,
-        'status': 'em_aberto',
+        'status': 'em_producao',  # Começa em produção, precisa ser liberado para envase
         'total_bottled': 0.0,
         'created_at': datetime.now(timezone.utc).isoformat(),
         'deleted': False,
