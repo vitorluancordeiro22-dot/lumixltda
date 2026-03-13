@@ -54,17 +54,37 @@ Sistema de gestão de produção industrial com controle de lotes, matérias-pri
 - **Banco de Dados**: MongoDB
 
 ## Endpoints Principais
+- `GET /api/health` - Health check para deploy/Kubernetes
 - `GET /api/dashboard/summary` - Resumo com litros do mês (ativas + arquivadas)
 - `POST /api/dashboard/recalculate-liters` - Recalcula litragem mensal
+- `GET /api/dashboard/daily-production` - Dados para gráfico diário
+- `GET /api/dashboard/monthly-production` - Dados para gráfico mensal
 - `POST /api/product-batches/{batch_id}/finalize` - Finaliza lote de produto
+- `POST /api/product-batches/{batch_id}/force-finalize` - Encerra lote forçado
+- `PUT /api/product-batches/{batch_id}/release-for-bottling` - Libera para envase
 - `POST /api/raw-material-batches/{batch_id}/finalize` - Finaliza lote de MP
 - `GET /api/archive/by-product/{product_id}` - Todos os lotes arquivados de um produto
+- `PUT /api/archive/reopen/{batch_id}` - Reabre lote arquivado
 - `GET /api/product-batches/check-open/{product_id}` - Verifica se há lote em aberto
+- `GET /api/archived-batches/product/{product_id}` - Busca lotes arquivados por produto
 
 ## Credenciais de Teste
 - **Laboratório**: laboratoriolumix@outlook.com / Lumix2002
 - **Produção**: teste@teste.com / password
+- **Autorizado Em Produção**: luan_ssss@hotmail.com
+
+## Funcionalidades Recentes (01/2026)
+- [x] Workflow "Em Produção" com aprovação antes do envase
+- [x] Gráficos diários e mensais no Dashboard (recharts)
+- [x] Impressão de etiquetas de matérias-primas
+- [x] Detalhes de MP nos Arquivos
+- [x] Reabrir lote arquivado (implementado, pendente teste E2E)
+- [x] Health check `/health` e `/api/health` para deploy
 
 ## Backlog (P1/P2)
+- [ ] (P1) Testar E2E funcionalidade "Reabrir Lote"
+- [ ] (P1) Melhorar campo de data de validade nas matérias-primas
 - [ ] (P1) Upload de PDF na seção Laudos
+- [ ] (P2) Substituir `window.confirm` por `AlertDialog` (Shadcn)
+- [ ] (P2) Refatorar `server.py` em routers modulares
 - [ ] (P2) Atualizar/remover WhatsAppSender.js antigo

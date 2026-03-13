@@ -37,10 +37,16 @@ app = FastAPI()
 api_router = APIRouter(prefix="/api")
 security = HTTPBearer()
 
-# Health check endpoint for Kubernetes
+# Health check endpoint for Kubernetes (direct on app for internal checks)
 @app.get("/health")
 async def health_check():
     """Health check endpoint for deployment monitoring"""
+    return {"status": "healthy", "service": "lumix-backend"}
+
+# Health check also on API router (accessible via /api/health through ingress)
+@api_router.get("/health")
+async def api_health_check():
+    """Health check endpoint accessible via /api prefix"""
     return {"status": "healthy", "service": "lumix-backend"}
 
 JWT_SECRET = os.environ['JWT_SECRET']
