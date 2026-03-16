@@ -14,6 +14,7 @@ import { ProductFileManager } from '../components/ProductFileManager';
 import { WhatsAppSender } from '../components/WhatsAppSender';
 import { WhatsAppMultiBatch } from '../components/WhatsAppMultiBatch';
 import { ProductPrintButton } from '../components/ProductPrintButton';
+import { ProductPrintFichaButton } from '../components/ProductPrintFichaButton';
 
 export const Products = () => {
   const [products, setProducts] = useState([]);
@@ -561,12 +562,13 @@ export const Products = () => {
               )}
               
               <div className="mt-4 pt-4 border-t border-border space-y-2">
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
                   <ProductFileManager 
                     product={product} 
                     onUpdate={fetchProducts}
                   />
                   <ProductPrintButton product={product} rawMaterials={rawMaterials} />
+                  <ProductPrintFichaButton product={product} />
                 </div>
               </div>
             </Card>

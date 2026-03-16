@@ -81,6 +81,7 @@ Sistema de gestão de produção industrial com controle de lotes, matérias-pri
 - [x] Reabrir lote arquivado (implementado, pendente teste E2E)
 - [x] Health check `/health` e `/api/health` para deploy
 - [x] Impressão de OP fiel ao modelo original (corrigido: layout + nomes de MP em vez de IDs)
+- [x] Impressão de Ficha de Análise (segundo botão para controle de qualidade)
 
 ## Backlog (P1/P2)
 - [ ] (P1) Testar E2E funcionalidade "Reabrir Lote"
