@@ -3,221 +3,367 @@ import { Button } from './ui/button';
 import { Printer } from 'lucide-react';
 import { toast } from 'sonner';
 
-export const ProductPrintButton = ({ product }) => {
-  const hasOpModel = product?.file_models?.op_model;
-
+export const ProductPrintButton = ({ product, rawMaterials = [] }) => {
   const handlePrint = () => {
-    if (!hasOpModel) {
-      toast.error('Produto não possui modelo de OP cadastrado');
+    if (!product) {
+      toast.error('Produto não encontrado');
       return;
     }
 
-    // Criar página de impressão com dados do produto
     const printWindow = window.open('', '_blank');
-    
+
+    // Resolve raw material names from IDs
+    const getMatName = (rmId) => {
+      const mat = rawMaterials.find(m => m.id === rmId);
+      return mat ? mat.name : rmId;
+    };
+
+    // Calculate quantities based on expected liters
+    const expectedLiters = product.expected_liters || 0;
+
+    // Build material rows
+    const recipes = product.recipes || [];
+    let totalPercent = 0;
+    let totalQuant = 0;
+
+    const materialRows = recipes.map((recipe, idx) => {
+      const name = getMatName(recipe.raw_material_id);
+      const quant = recipe.quantity_per_liter || 0;
+      const percent = expectedLiters > 0 ? ((quant / expectedLiters) * 100) : 0;
+      totalPercent += percent;
+      totalQuant += quant;
+      return `
+        <tr>
+          <td class="cell center">${idx + 1}</td>
+          <td class="cell">${name.toUpperCase()}</td>
+          <td class="cell center"></td>
+          <td class="cell center"></td>
+          <td class="cell center">${percent % 1 === 0 ? percent : percent.toFixed(2)}</td>
+          <td class="cell center">${quant % 1 === 0 ? quant : parseFloat(quant).toFixed(2)}</td>
+          <td class="cell center"></td>
+          <td class="cell center"></td>
+          <td class="cell center"></td>
+        </tr>
+      `;
+    }).join('');
+
+    // Empty rows to fill the table (min 12 rows total)
+    const emptyRowCount = Math.max(0, 12 - recipes.length);
+    const emptyRows = Array(emptyRowCount).fill('').map(() => `
+      <tr>
+        <td class="cell">&nbsp;</td>
+        <td class="cell">&nbsp;</td>
+        <td class="cell">&nbsp;</td>
+        <td class="cell">&nbsp;</td>
+        <td class="cell">&nbsp;</td>
+        <td class="cell">&nbsp;</td>
+        <td class="cell">&nbsp;</td>
+        <td class="cell">&nbsp;</td>
+        <td class="cell">&nbsp;</td>
+      </tr>
+    `).join('');
+
+    const today = new Date().toLocaleDateString('pt-BR');
+
     const printContent = `
       <!DOCTYPE html>
       <html>
       <head>
         <meta charset="UTF-8">
-        <title>Impressão - ${product.name}</title>
+        <title>OP - ${product.name}</title>
         <style>
           @media print {
-            @page { margin: 2cm; }
+            @page { 
+              margin: 10mm; 
+              size: A4 portrait;
+            }
+            .no-print { display: none !important; }
           }
+          * { margin: 0; padding: 0; box-sizing: border-box; }
           body {
             font-family: Arial, sans-serif;
-            padding: 20px;
-            max-width: 800px;
+            font-size: 10pt;
+            padding: 10mm;
+          }
+          .op-container {
+            width: 100%;
+            max-width: 210mm;
             margin: 0 auto;
           }
-          .header {
+
+          /* HEADER */
+          .header-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 0;
+          }
+          .header-table td {
+            border: 2px solid #000;
+            padding: 6px 10px;
+          }
+          .header-title {
+            font-size: 16pt;
+            font-weight: bold;
             text-align: center;
-            border-bottom: 2px solid #333;
-            padding-bottom: 20px;
-            margin-bottom: 30px;
           }
-          .header h1 {
-            margin: 0;
-            color: #333;
-            font-size: 24px;
+          .header-op {
+            font-size: 12pt;
+            font-weight: bold;
+            text-align: center;
           }
-          .section {
-            margin-bottom: 30px;
+
+          /* PRODUCT INFO */
+          .info-table {
+            width: 100%;
+            border-collapse: collapse;
           }
-          .section h2 {
-            background-color: #f0f0f0;
-            padding: 10px;
-            margin-bottom: 15px;
-            font-size: 18px;
-            border-left: 4px solid #333;
-          }
-          .info-row {
-            display: flex;
-            padding: 8px 0;
-            border-bottom: 1px solid #e0e0e0;
+          .info-table td {
+            border: 1px solid #000;
+            padding: 5px 8px;
+            font-size: 10pt;
           }
           .info-label {
             font-weight: bold;
-            min-width: 200px;
-            color: #555;
           }
-          .info-value {
-            flex: 1;
-            color: #333;
+
+          /* MATERIALS TABLE */
+          .materials-table {
+            width: 100%;
+            border-collapse: collapse;
           }
-          .recipe-table {
+          .materials-table th {
+            border: 2px solid #000;
+            padding: 4px 6px;
+            font-size: 9pt;
+            font-weight: bold;
+            text-align: center;
+            background-color: #f0f0f0;
+          }
+          .materials-table td.cell {
+            border: 1px solid #000;
+            padding: 3px 6px;
+            font-size: 9pt;
+            height: 20px;
+          }
+          .materials-table td.center {
+            text-align: center;
+          }
+          .total-row td {
+            border: 2px solid #000 !important;
+            font-weight: bold;
+          }
+
+          /* PACKAGING SECTION */
+          .section-title {
+            font-weight: bold;
+            font-size: 11pt;
+            border: 2px solid #000;
+            padding: 4px 8px;
+            background-color: #f0f0f0;
+            text-align: center;
+            margin-top: 8px;
+          }
+          .pack-table {
+            width: 100%;
+            border-collapse: collapse;
+          }
+          .pack-table th, .pack-table td {
+            border: 1px solid #000;
+            padding: 3px 6px;
+            font-size: 9pt;
+            text-align: center;
+            height: 22px;
+          }
+          .pack-table th {
+            font-weight: bold;
+            background-color: #f0f0f0;
+          }
+          .pack-table td.label-cell {
+            text-align: left;
+            font-weight: bold;
+            background-color: #fafafa;
+          }
+
+          /* SIGNATURE SECTION */
+          .sig-table {
             width: 100%;
             border-collapse: collapse;
             margin-top: 10px;
           }
-          .recipe-table th,
-          .recipe-table td {
-            border: 1px solid #ddd;
-            padding: 10px;
-            text-align: left;
+          .sig-table td {
+            border: 1px solid #000;
+            padding: 3px 6px;
+            font-size: 9pt;
+            height: 22px;
           }
-          .recipe-table th {
-            background-color: #f5f5f5;
+          .sig-table td.sig-header {
             font-weight: bold;
-          }
-          .footer {
-            margin-top: 50px;
-            padding-top: 20px;
-            border-top: 1px solid #ddd;
             text-align: center;
-            color: #666;
-            font-size: 12px;
+            background-color: #f0f0f0;
           }
-          .signature-section {
-            margin-top: 60px;
-            display: flex;
-            justify-content: space-around;
+          .sig-table td.sig-label {
+            font-weight: bold;
+            width: 80px;
           }
-          .signature-box {
+
+          .print-buttons {
+            margin-top: 20px;
             text-align: center;
-            flex: 1;
-            margin: 0 20px;
           }
-          .signature-line {
-            border-top: 1px solid #333;
-            margin-top: 60px;
-            padding-top: 5px;
+          .print-buttons button {
+            padding: 10px 24px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 0 5px;
           }
-          @media print {
-            button { display: none; }
-          }
+          .btn-print { background: #2563eb; color: white; }
+          .btn-close { background: #666; color: white; }
         </style>
       </head>
       <body>
-        <div class="header">
-          <h1>FICHA TÉCNICA DO PRODUTO</h1>
-          <p>Data de Impressão: ${new Date().toLocaleString('pt-BR')}</p>
-        </div>
+        <div class="op-container">
 
-        <div class="section">
-          <h2>Informações do Produto</h2>
-          <div class="info-row">
-            <div class="info-label">Nome do Produto:</div>
-            <div class="info-value">${product.name}</div>
-          </div>
-          ${product.code ? `
-          <div class="info-row">
-            <div class="info-label">Código:</div>
-            <div class="info-value">${product.code}</div>
-          </div>
-          ` : ''}
-          <div class="info-row">
-            <div class="info-label">Unidade:</div>
-            <div class="info-value">${product.unit}</div>
-          </div>
-          <div class="info-row">
-            <div class="info-label">Lote Padrão Esperado:</div>
-            <div class="info-value">${product.expected_liters} ${product.unit}</div>
-          </div>
-        </div>
+          <!-- HEADER -->
+          <table class="header-table">
+            <tr>
+              <td class="header-title" style="width:60%">ORDEM DE PRODU&Ccedil;&Atilde;O</td>
+              <td class="header-op" style="width:40%">OP N&ordm;: ______</td>
+            </tr>
+          </table>
 
-        ${product.recipes && product.recipes.length > 0 ? `
-        <div class="section">
-          <h2>Receita / Formulação</h2>
-          <table class="recipe-table">
+          <!-- PRODUCT INFO -->
+          <table class="info-table">
+            <tr>
+              <td class="info-label" colspan="5">PRODUTO: ${product.name.toUpperCase()}</td>
+              <td class="info-label" style="text-align:right">QUANT(${product.unit === 'Litros' ? 'Lts' : 'Kg'}):</td>
+              <td style="text-align:center; font-weight:bold">${expectedLiters}</td>
+            </tr>
+            <tr>
+              <td class="info-label" colspan="2">LOTE:</td>
+              <td class="info-label" colspan="2">DATA: ${today}</td>
+              <td>Hora I:</td>
+              <td>Hora F:</td>
+              <td></td>
+            </tr>
+          </table>
+
+          <!-- MATERIALS TABLE -->
+          <table class="materials-table">
             <thead>
               <tr>
-                <th>Matéria-Prima</th>
-                <th>Quantidade por ${product.unit === 'Litros' ? 'Litro' : 'Kg'}</th>
-                <th>Unidade</th>
+                <th style="width:5%">C&Oacute;D</th>
+                <th style="width:25%">MAT&Eacute;RIAS-PRIMAS</th>
+                <th style="width:12%">LOTE</th>
+                <th style="width:12%">VALIDADE</th>
+                <th style="width:8%">%</th>
+                <th style="width:12%">QUANT. (kg)</th>
+                <th style="width:10%">CORRE&Ccedil;&Atilde;O</th>
+                <th style="width:10%">TOTAL</th>
+                <th style="width:6%">OBS</th>
               </tr>
             </thead>
             <tbody>
-              ${product.recipes.map(recipe => `
-                <tr>
-                  <td>MP ID: ${recipe.raw_material_id}</td>
-                  <td>${recipe.quantity_per_liter}</td>
-                  <td>${recipe.unit || 'L'}</td>
-                </tr>
-              `).join('')}
+              ${materialRows}
+              ${emptyRows}
+              <tr class="total-row">
+                <td class="cell" colspan="4" style="text-align:right; font-weight:bold; border:2px solid #000">TOTAL</td>
+                <td class="cell center" style="border:2px solid #000">${totalPercent % 1 === 0 ? totalPercent : totalPercent.toFixed(2)}</td>
+                <td class="cell center" style="border:2px solid #000">${totalQuant % 1 === 0 ? totalQuant : totalQuant.toFixed(2)}</td>
+                <td class="cell" style="border:2px solid #000"></td>
+                <td class="cell" style="border:2px solid #000"></td>
+                <td class="cell" style="border:2px solid #000"></td>
+              </tr>
             </tbody>
           </table>
-        </div>
-        ` : ''}
 
-        <div class="section">
-          <h2>Informações do Arquivo Modelo</h2>
-          <div class="info-row">
-            <div class="info-label">Arquivo Modelo de OP:</div>
-            <div class="info-value">${product.file_models.op_model.filename}</div>
-          </div>
-          <div class="info-row">
-            <div class="info-label">Versão:</div>
-            <div class="info-value">v${product.file_models.op_model.version}</div>
-          </div>
-          <div class="info-row">
-            <div class="info-label">Data de Upload:</div>
-            <div class="info-value">${new Date(product.file_models.op_model.uploaded_at).toLocaleString('pt-BR')}</div>
-          </div>
+          <!-- PACKAGING SECTION -->
+          <div class="section-title">EMBALAGENS</div>
+          <table class="pack-table">
+            <thead>
+              <tr>
+                <th style="width:14%">EMBALAGENS</th>
+                <th>2LTS</th>
+                <th>5 LTS</th>
+                <th>20 LTS</th>
+                <th>50 LTS</th>
+                <th>TB</th>
+                <th>SOBRA</th>
+                <th>PERDA</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="label-cell">Peso Bruto</td>
+                <td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+                <td>%</td>
+              </tr>
+              <tr>
+                <td class="label-cell">Tara</td>
+                <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+              </tr>
+              <tr>
+                <td class="label-cell">Peso L&iacute;quido</td>
+                <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+              </tr>
+              <tr>
+                <td class="label-cell">Quantidade</td>
+                <td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+                <td>Litros</td>
+              </tr>
+              <tr>
+                <td class="label-cell">Total (Litros)</td>
+                <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+              </tr>
+            </tbody>
+          </table>
+
+          <!-- SIGNATURE SECTION -->
+          <table class="sig-table">
+            <tr>
+              <td class="sig-header" colspan="2">Respons&aacute;vel pela pesagem</td>
+              <td class="sig-header" colspan="2">Respons&aacute;vel pela prepara&ccedil;&atilde;o</td>
+              <td class="sig-header" colspan="2">Respons&aacute;vel pelo envase</td>
+            </tr>
+            <tr>
+              <td class="sig-label">Ass.</td><td></td>
+              <td class="sig-label">Ass.</td><td></td>
+              <td class="sig-label">Ass.</td><td></td>
+            </tr>
+            <tr>
+              <td class="sig-label">Nome</td><td></td>
+              <td class="sig-label">Nome</td><td></td>
+              <td class="sig-label">Nome</td><td></td>
+            </tr>
+            <tr>
+              <td class="sig-label">H In&iacute;cio</td><td></td>
+              <td class="sig-label">H In&iacute;cio</td><td></td>
+              <td class="sig-label">H In&iacute;cio</td><td></td>
+            </tr>
+            <tr>
+              <td class="sig-label">H T&eacute;rm</td><td></td>
+              <td class="sig-label">H T&eacute;rm</td><td></td>
+              <td class="sig-label">H T&eacute;rm</td><td></td>
+            </tr>
+            <tr>
+              <td class="sig-header" colspan="2">Conferente / Analista</td>
+              <td class="sig-label">Ass.:</td><td></td>
+              <td class="sig-label">Ass.</td><td></td>
+            </tr>
+            <tr>
+              <td colspan="2"></td>
+              <td class="sig-label">Nome:</td><td></td>
+              <td class="sig-label">Nome:</td><td></td>
+            </tr>
+          </table>
+
         </div>
 
-        ${product.file_models.ficha_analise ? `
-        <div class="section">
-          <h2>Ficha de Análise</h2>
-          <div class="info-row">
-            <div class="info-label">Arquivo:</div>
-            <div class="info-value">${product.file_models.ficha_analise.filename}</div>
-          </div>
-          <div class="info-row">
-            <div class="info-label">Versão:</div>
-            <div class="info-value">v${product.file_models.ficha_analise.version}</div>
-          </div>
-        </div>
-        ` : ''}
-
-        <div class="signature-section">
-          <div class="signature-box">
-            <div class="signature-line">Responsável pela Produção</div>
-          </div>
-          <div class="signature-box">
-            <div class="signature-line">Supervisor de Qualidade</div>
-          </div>
-        </div>
-
-        <div class="footer">
-          <p>Este documento foi gerado automaticamente pelo Sistema Lumix</p>
-          <p>Produto ID: ${product.id}</p>
-        </div>
-
-        <div style="margin-top: 30px; text-align: center;">
-          <button 
-            onclick="window.print()" 
-            style="padding: 12px 24px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 16px;"
-          >
-            🖨️ Imprimir Documento
-          </button>
-          <button 
-            onclick="window.close()" 
-            style="padding: 12px 24px; background: #666; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; margin-left: 10px;"
-          >
-            ✖ Fechar
-          </button>
+        <div class="print-buttons no-print">
+          <button class="btn-print" onclick="window.print()">Imprimir</button>
+          <button class="btn-close" onclick="window.close()">Fechar</button>
         </div>
       </body>
       </html>
@@ -225,8 +371,7 @@ export const ProductPrintButton = ({ product }) => {
 
     printWindow.document.write(printContent);
     printWindow.document.close();
-
-    toast.success('Documento de impressão aberto em nova aba');
+    toast.success('OP aberta para impressão');
   };
 
   return (
@@ -235,10 +380,10 @@ export const ProductPrintButton = ({ product }) => {
       variant="outline"
       className="border-border text-foreground hover:bg-muted"
       onClick={handlePrint}
-      disabled={!hasOpModel}
+      data-testid="print-op-button"
     >
       <Printer className="w-3 h-3 mr-1" />
-      Imprimir
+      Imprimir OP
     </Button>
   );
 };

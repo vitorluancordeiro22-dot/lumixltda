@@ -566,7 +566,7 @@ export const Products = () => {
                     product={product} 
                     onUpdate={fetchProducts}
                   />
-                  <ProductPrintButton product={product} />
+                  <ProductPrintButton product={product} rawMaterials={rawMaterials} />
                 </div>
               </div>
             </Card>
