@@ -112,16 +112,18 @@ class RawMaterialCreate(BaseModel):
     received_date: str = ''
 
 class ProductBatch(BaseModel):
+    model_config = ConfigDict(extra='allow')
     id: str
     product_id: str
     batch_number: str
     date: str
     unit: str
     planned_liters: float
-    status: str  # em_aberto, finalizado
+    status: str  # em_producao, em_aberto, finalizado
     total_bottled: float = 0.0
     created_at: str
     deleted: bool = False
+    raw_materials_used: Optional[List[Dict]] = None
 
 class ProductBatchCreate(BaseModel):
     product_id: str
@@ -329,6 +331,77 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         raise HTTPException(status_code=401, detail='Token expired')
     except Exception:
         raise HTTPException(status_code=401, detail='Invalid token')
+
+# ========== RAW MATERIAL DEDUCTION LOGIC ==========
+
+async def deduct_from_raw_material_batches(raw_material_id: str, needed_qty: float) -> list:
+    """
+    Desconta needed_qty dos lotes mais recentes de uma matéria-prima.
+    Usa LIFO: lote mais recente primeiro.
+    Auto-finaliza lotes que chegam a 0.
+    Retorna lista de lotes usados com quantidades consumidas.
+    """
+    used_batches = []
+    remaining = needed_qty
+
+    # Buscar lotes em aberto, mais recente primeiro
+    batches = await db.raw_material_batches.find({
+        'raw_material_id': raw_material_id,
+        'status': 'em_aberto',
+        'deleted': {'$ne': True},
+        'quantity': {'$gt': 0}
+    }).sort('date', -1).to_list(100)
+
+    for batch in batches:
+        if remaining <= 0:
+            break
+
+        available = batch['quantity']
+        to_deduct = min(available, remaining)
+        new_qty = round(available - to_deduct, 4)
+
+        update_fields = {'quantity': new_qty}
+        if new_qty <= 0:
+            update_fields['status'] = 'finalizado'
+
+        await db.raw_material_batches.update_one(
+            {'id': batch['id']},
+            {'$set': update_fields}
+        )
+
+        used_batches.append({
+            'batch_id': batch['id'],
+            'batch_number': batch.get('batch_number', ''),
+            'quantity_used': to_deduct,
+            'remaining_after': new_qty
+        })
+
+        remaining = round(remaining - to_deduct, 4)
+
+    # Atualizar estoque total da matéria-prima
+    actually_deducted = needed_qty - remaining
+    if actually_deducted > 0:
+        await db.raw_materials.update_one(
+            {'id': raw_material_id},
+            {'$inc': {'total_stock': -actually_deducted}}
+        )
+
+    return used_batches
+
+
+async def auto_finalize_zero_batches():
+    """
+    Finaliza automaticamente todos os lotes de MP com quantidade <= 0 que ainda estão em_aberto.
+    """
+    result = await db.raw_material_batches.update_many(
+        {
+            'status': 'em_aberto',
+            'deleted': {'$ne': True},
+            'quantity': {'$lte': 0}
+        },
+        {'$set': {'status': 'finalizado'}}
+    )
+    return result.modified_count
 
 # ========== AUTH ENDPOINTS ==========
 
@@ -545,9 +618,56 @@ async def create_product_batch(data: ProductBatchCreate, current_user = Depends(
         'total_bottled': 0.0,
         'created_at': datetime.now(timezone.utc).isoformat(),
         'deleted': False,
-        'is_custom': bool(data.custom_batch_number)
+        'is_custom': bool(data.custom_batch_number),
+        'raw_materials_used': []  # Rastreabilidade de MP usadas
     }
+    
+    # === DESCONTO DE MATÉRIAS-PRIMAS ===
+    # Buscar o produto e sua receita para calcular as quantidades necessárias
+    product = await db.products.find_one({'id': data.product_id, 'deleted': False}, {'_id': 0})
+    if product and product.get('recipes'):
+        expected_liters = product.get('expected_liters', 0)
+        all_materials_used = []
+        
+        for recipe in product['recipes']:
+            rm_id = recipe.get('raw_material_id')
+            qty_total = recipe.get('quantity_per_liter', 0)  # Qtd total para expected_liters
+            
+            if not rm_id or qty_total <= 0:
+                continue
+            
+            # Calcular quantidade necessária proporcional ao lote planejado
+            if expected_liters > 0:
+                needed = qty_total * (data.planned_liters / expected_liters)
+            else:
+                needed = qty_total
+            
+            needed = round(needed, 4)
+            
+            # Descontar dos lotes mais recentes da MP
+            used_batches = await deduct_from_raw_material_batches(rm_id, needed)
+            
+            # Buscar nome da MP para rastreabilidade
+            rm_doc = await db.raw_materials.find_one({'id': rm_id}, {'_id': 0})
+            rm_name = rm_doc['name'] if rm_doc else rm_id
+            
+            all_materials_used.append({
+                'raw_material_id': rm_id,
+                'raw_material_name': rm_name,
+                'quantity_needed': needed,
+                'unit': recipe.get('unit', 'L'),
+                'batches_consumed': used_batches
+            })
+        
+        batch_doc['raw_materials_used'] = all_materials_used
+    
     await db.product_batches.insert_one(batch_doc)
+    
+    # Auto-finalizar lotes de MP que chegaram a 0
+    await auto_finalize_zero_batches()
+    
+    # Remover _id para retorno (insert_one adiciona _id ao dict)
+    batch_doc.pop('_id', None)
     
     # Verificar se precisa criar amostra (primeiro lote do produto no mês)
     batch_date = datetime.fromisoformat(data.date)
@@ -985,6 +1105,61 @@ async def finalize_raw_material_batch(batch_id: str, current_user = Depends(get_
     )
     
     return {'message': 'Lote finalizado com sucesso'}
+
+
+@api_router.post('/raw-materials/recalculate-stock')
+async def recalculate_raw_material_stock(current_user = Depends(get_current_user)):
+    """
+    Recalcula o estoque total de todas as matérias-primas baseado nos lotes em aberto.
+    Auto-finaliza lotes com quantidade <= 0.
+    Corrige inconsistências no estoque.
+    """
+    # 1. Auto-finalizar lotes zerados
+    finalized_count = await auto_finalize_zero_batches()
+    
+    # 2. Recalcular total_stock para cada matéria-prima
+    materials = await db.raw_materials.find({'deleted': False}, {'_id': 0}).to_list(1000)
+    corrections = []
+    
+    for mat in materials:
+        # Somar quantidade de todos os lotes em_aberto
+        pipeline = [
+            {
+                '$match': {
+                    'raw_material_id': mat['id'],
+                    'status': 'em_aberto',
+                    'deleted': False
+                }
+            },
+            {
+                '$group': {
+                    '_id': None,
+                    'total': {'$sum': '$quantity'}
+                }
+            }
+        ]
+        result = await db.raw_material_batches.aggregate(pipeline).to_list(1)
+        real_stock = result[0]['total'] if result else 0
+        old_stock = mat.get('total_stock', 0)
+        
+        if round(real_stock, 2) != round(old_stock, 2):
+            await db.raw_materials.update_one(
+                {'id': mat['id']},
+                {'$set': {'total_stock': round(real_stock, 4)}}
+            )
+            corrections.append({
+                'name': mat['name'],
+                'old_stock': old_stock,
+                'new_stock': round(real_stock, 4)
+            })
+    
+    return {
+        'message': 'Estoque recalculado com sucesso',
+        'batches_finalized': finalized_count,
+        'corrections': corrections,
+        'total_materials_checked': len(materials)
+    }
+
 
 # ========== PRODUCTION ORDERS ==========
 

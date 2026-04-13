@@ -82,6 +82,7 @@ Sistema de gestão de produção industrial com controle de lotes, matérias-pri
 - [x] Health check `/health` e `/api/health` para deploy
 - [x] Impressão de OP fiel ao modelo original (corrigido: layout + nomes de MP em vez de IDs)
 - [x] Impressão de Ficha de Análise (segundo botão para controle de qualidade)
+- [x] Organização de MP: desconto do lote mais recente, auto-finalização de lotes zerados, recalcular estoque
 
 ## Backlog (P1/P2)
 - [ ] (P1) Testar E2E funcionalidade "Reabrir Lote"

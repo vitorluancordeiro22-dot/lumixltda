@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Combobox } from '../components/ui/combobox';
 import { Checkbox } from '../components/ui/checkbox';
 import { toast } from 'sonner';
-import { Plus, Edit, Trash2, Boxes, Package, Search, Printer } from 'lucide-react';
+import { Plus, Edit, Trash2, Boxes, Package, Search, Printer, RefreshCw } from 'lucide-react';
 
 export const RawMaterials = () => {
   const [materials, setMaterials] = useState([]);
@@ -51,6 +51,7 @@ export const RawMaterials = () => {
   });
   const [nextBatchNumber, setNextBatchNumber] = useState('');
   const [editingBatchNumber, setEditingBatchNumber] = useState(false);
+  const [recalculating, setRecalculating] = useState(false);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -399,6 +400,28 @@ export const RawMaterials = () => {
     setBatchQuantities({});
   };
 
+  const handleRecalculateStock = async () => {
+    setRecalculating(true);
+    try {
+      const response = await api.post('/raw-materials/recalculate-stock');
+      const data = response.data;
+      const corrections = data.corrections || [];
+      const finalized = data.batches_finalized || 0;
+      
+      if (corrections.length > 0 || finalized > 0) {
+        toast.success(`Estoque recalculado! ${corrections.length} correção(ões), ${finalized} lote(s) finalizado(s)`);
+      } else {
+        toast.info('Estoque já está correto. Nenhuma correção necessária.');
+      }
+      
+      fetchData();
+    } catch (err) {
+      toast.error('Erro ao recalcular estoque');
+    } finally {
+      setRecalculating(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -407,6 +430,17 @@ export const RawMaterials = () => {
           <p className="text-lg text-muted-foreground">Gerencie o estoque de matérias-primas</p>
         </div>
         <div className="flex flex-wrap gap-3">
+          {/* Botão Recalcular Estoque */}
+          <Button 
+            variant="outline" 
+            className="border-border text-foreground hover:bg-muted"
+            onClick={handleRecalculateStock}
+            disabled={recalculating}
+            data-testid="recalculate-stock-button"
+          >
+            <RefreshCw className={`w-4 h-4 mr-2 ${recalculating ? 'animate-spin' : ''}`} />
+            {recalculating ? 'Recalculando...' : 'Recalcular Estoque'}
+          </Button>
           {/* Botão Imprimir Etiquetas */}
           <Dialog open={printDialogOpen} onOpenChange={setPrintDialogOpen}>
             <DialogTrigger asChild>
