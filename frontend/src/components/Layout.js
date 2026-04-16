@@ -27,6 +27,10 @@ import {
   Factory
 } from 'lucide-react';
 
+import {
+  ClipboardCheck
+} from 'lucide-react';
+
 const allMenuItems = [
   { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', roles: ['laboratorio'] },
   { path: '/products', icon: Package, label: 'Produtos', roles: ['laboratorio'] },
@@ -34,6 +38,7 @@ const allMenuItems = [
   { path: '/in-production', icon: Factory, label: 'Em Produção', roles: ['laboratorio', 'producao'], testId: 'nav-in-production' },
   { path: '/counting', icon: Calculator, label: 'Contagem', roles: ['laboratorio', 'producao'] },
   { path: '/samples', icon: FlaskConical, label: 'Amostras', roles: ['laboratorio', 'producao'] },
+  { path: '/fichas-analise', icon: ClipboardCheck, label: 'Fichas de Análises', roles: ['laboratorio'], emailOnly: 'laboratoriolumix@outlook.com' },
   { path: '/batch-management', icon: ListChecks, label: 'Gerenciar Lotes', roles: ['laboratorio'] },
   { path: '/suppliers', icon: Truck, label: 'Fornecedores', roles: ['laboratorio'] },
   { path: '/laudos', icon: FileCheck, label: 'Laudos', roles: ['laboratorio'] },
@@ -47,8 +52,12 @@ const Sidebar = ({ mobile = false, onItemClick }) => {
   const location = useLocation();
   const { user, role, logout } = useAuth();
 
-  // Filtra itens do menu baseado na role do usuário
-  const menuItems = allMenuItems.filter(item => item.roles.includes(role || 'producao'));
+  // Filtra itens do menu baseado na role do usuário e email
+  const menuItems = allMenuItems.filter(item => {
+    if (!item.roles.includes(role || 'producao')) return false;
+    if (item.emailOnly && user?.email !== item.emailOnly) return false;
+    return true;
+  });
 
   // URL da logo oficial Lumix
   const logoUrl = "https://customer-assets.emergentagent.com/job_prodman-lumix/artifacts/aod9p9yw_images.png";

@@ -372,6 +372,8 @@ async def deduct_from_raw_material_batches(raw_material_id: str, needed_qty: flo
         used_batches.append({
             'batch_id': batch['id'],
             'batch_number': batch.get('batch_number', ''),
+            'supplier_batch_number': batch.get('supplier_batch_number', ''),
+            'expiry_date': batch.get('expiry_date', ''),
             'quantity_used': to_deduct,
             'remaining_after': new_qty
         })
@@ -691,6 +693,47 @@ async def create_product_batch(data: ProductBatchCreate, current_user = Depends(
             'collected_at': None
         }
         await db.samples.insert_one(sample_doc)
+    
+    # === FICHA DE ANÁLISE ===
+    # Criar ficha apenas para o primeiro lote do produto no mês
+    existing_ficha = await db.fichas_analise.find_one({
+        'product_id': data.product_id,
+        'month': batch_date.month,
+        'year': batch_date.year,
+        'deleted': {'$ne': True}
+    })
+    
+    if not existing_ficha and product:
+        ficha_doc = {
+            'id': str(uuid.uuid4()),
+            'product_id': data.product_id,
+            'product_name': product.get('name', ''),
+            'product_batch_id': batch_id,
+            'batch_number': batch_number,
+            'month': batch_date.month,
+            'year': batch_date.year,
+            'date': data.date,
+            'planned_liters': data.planned_liters,
+            'unit': data.unit,
+            'expected_liters': product.get('expected_liters', 0),
+            'recipes': [],
+            'status': 'aberta',  # aberta ou fechada
+            'created_at': datetime.now(timezone.utc).isoformat(),
+            'deleted': False
+        }
+        
+        # Preencher receita com dados detalhados de MP
+        for mat_used in batch_doc.get('raw_materials_used', []):
+            recipe_entry = {
+                'raw_material_id': mat_used['raw_material_id'],
+                'raw_material_name': mat_used['raw_material_name'],
+                'quantity_needed': mat_used['quantity_needed'],
+                'unit': mat_used.get('unit', ''),
+                'batches_consumed': mat_used.get('batches_consumed', [])
+            }
+            ficha_doc['recipes'].append(recipe_entry)
+        
+        await db.fichas_analise.insert_one(ficha_doc)
     
     return ProductBatch(**batch_doc)
 
@@ -1159,6 +1202,39 @@ async def recalculate_raw_material_stock(current_user = Depends(get_current_user
         'corrections': corrections,
         'total_materials_checked': len(materials)
     }
+
+
+# ========== FICHAS DE ANÁLISE ==========
+
+@api_router.get('/fichas-analise')
+async def get_fichas_analise(status: str = 'aberta', current_user = Depends(get_current_user)):
+    """Retorna fichas de análise. Apenas para laboratoriolumix@outlook.com"""
+    if current_user.get('email') != 'laboratoriolumix@outlook.com':
+        raise HTTPException(status_code=403, detail='Acesso restrito ao laboratório')
+    
+    query = {'deleted': {'$ne': True}}
+    if status:
+        query['status'] = status
+    
+    fichas = await db.fichas_analise.find(query, {'_id': 0}).sort('created_at', -1).to_list(1000)
+    return fichas
+
+
+@api_router.put('/fichas-analise/{ficha_id}/close')
+async def close_ficha_analise(ficha_id: str, current_user = Depends(get_current_user)):
+    """Fecha uma ficha de análise"""
+    if current_user.get('email') != 'laboratoriolumix@outlook.com':
+        raise HTTPException(status_code=403, detail='Acesso restrito ao laboratório')
+    
+    result = await db.fichas_analise.update_one(
+        {'id': ficha_id},
+        {'$set': {'status': 'fechada', 'closed_at': datetime.now(timezone.utc).isoformat()}}
+    )
+    
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail='Ficha não encontrada')
+    
+    return {'message': 'Ficha fechada com sucesso'}
 
 
 # ========== PRODUCTION ORDERS ==========
