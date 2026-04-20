@@ -25,10 +25,11 @@ export const RawMaterials = () => {
   const [selectedBatchesForPrint, setSelectedBatchesForPrint] = useState([]);
   const [batchQuantities, setBatchQuantities] = useState({}); // Armazenar quantidade de etiquetas por lote
   
-  // Estados para filtro de datas
-  const [dateFilter, setDateFilter] = useState({
-    startDate: '',
-    endDate: new Date().toISOString().split('T')[0]
+  // Estados para filtro de etiquetas
+  const [printFilterMode, setPrintFilterMode] = useState('ultima_leva'); // 'ultima_leva' ou 'por_mes'
+  const [printFilterMonth, setPrintFilterMonth] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   });
 
   const [filteredBatchesByDate, setFilteredBatchesByDate] = useState([]);
@@ -64,21 +65,25 @@ export const RawMaterials = () => {
     };
   }, []);
 
-  // Efeito para filtrar lotes por data
+  // Efeito para filtrar lotes por modo selecionado
   useEffect(() => {
     filterBatchesByDate();
-  }, [batches, dateFilter]);
+  }, [batches, printFilterMode, printFilterMonth]);
 
   const filterBatchesByDate = () => {
     const filtered = batches.filter(batch => {
-      const batchDate = new Date(batch.date);
-      const start = dateFilter.startDate ? new Date(dateFilter.startDate) : null;
-      const end = dateFilter.endDate ? new Date(dateFilter.endDate) : null;
+      const batchDate = new Date(batch.date + 'T00:00:00');
 
-      if (start && batchDate < start) return false;
-      if (end && batchDate > end) return false;
-      
-      return true;
+      if (printFilterMode === 'ultima_leva') {
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        sevenDaysAgo.setHours(0, 0, 0, 0);
+        return batchDate >= sevenDaysAgo;
+      }
+
+      // por_mes
+      const [year, month] = printFilterMonth.split('-').map(Number);
+      return batchDate.getFullYear() === year && (batchDate.getMonth() + 1) === month;
     });
 
     setFilteredBatchesByDate(filtered);
@@ -458,33 +463,43 @@ export const RawMaterials = () => {
               </DialogHeader>
               
               <div className="space-y-4">
-                {/* Filtro por Datas - ALTERADO PARA DEIXAR CLARO QUE É DATA DO LOTE */}
-                <div className="border rounded-lg p-4 bg-muted/30">
-                  <p className="text-sm font-semibold text-foreground mb-3">🗓️ Filtrar Lotes por Data de Registro</p>
-                  <p className="text-xs text-muted-foreground mb-3">Selecione o período para filtrar os lotes por data de entrada/criação</p>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label className="text-foreground text-sm font-medium">Data Inicial do Lote</Label>
-                      <Input 
-                        type="date" 
-                        value={dateFilter.startDate}
-                        onChange={(e) => setDateFilter({...dateFilter, startDate: e.target.value})}
-                        className="bg-input border-border text-foreground mt-1"
-                      />
-                      <p className="text-xs text-muted-foreground mt-1">Desde quando</p>
-                    </div>
-                    <div>
-                      <Label className="text-foreground text-sm font-medium">Data Final do Lote</Label>
-                      <Input 
-                        type="date" 
-                        value={dateFilter.endDate}
-                        onChange={(e) => setDateFilter({...dateFilter, endDate: e.target.value})}
-                        className="bg-input border-border text-foreground mt-1"
-                      />
-                      <p className="text-xs text-muted-foreground mt-1">Até quando</p>
-                    </div>
-                  </div>
+                {/* Seletor de Modo */}
+                <div className="flex gap-2 bg-muted/40 p-1 rounded-lg" data-testid="print-filter-mode">
+                  <button
+                    onClick={() => setPrintFilterMode('ultima_leva')}
+                    className={`flex-1 py-2 px-3 rounded-md text-sm font-medium transition-all ${
+                      printFilterMode === 'ultima_leva'
+                        ? 'bg-primary text-primary-foreground shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    Última Leva (7 dias)
+                  </button>
+                  <button
+                    onClick={() => setPrintFilterMode('por_mes')}
+                    className={`flex-1 py-2 px-3 rounded-md text-sm font-medium transition-all ${
+                      printFilterMode === 'por_mes'
+                        ? 'bg-primary text-primary-foreground shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    Por Mês
+                  </button>
                 </div>
+
+                {/* Filtro por Mês - só aparece quando selecionado */}
+                {printFilterMode === 'por_mes' && (
+                  <div className="border rounded-lg p-3 bg-muted/20">
+                    <Label className="text-foreground text-sm font-medium">Selecione o mês</Label>
+                    <Input 
+                      type="month" 
+                      value={printFilterMonth}
+                      onChange={(e) => setPrintFilterMonth(e.target.value)}
+                      className="bg-input border-border text-foreground mt-1 w-48"
+                      data-testid="print-month-filter"
+                    />
+                  </div>
+                )}
 
                 {/* Seleção de Lotes */}
                 <div className="flex items-center justify-between">
