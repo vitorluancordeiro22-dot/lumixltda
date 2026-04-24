@@ -59,7 +59,7 @@ export default function FichasAnalise() {
   return (
     <div className="space-y-6" data-testid="fichas-analise-page">
       <div>
-        <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-2">Fichas de Análises</h1>
+        <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-2">Ordem de Produção</h1>
         <p className="text-lg text-muted-foreground">Controle de qualidade — primeiro lote de cada produto no mês</p>
       </div>
 

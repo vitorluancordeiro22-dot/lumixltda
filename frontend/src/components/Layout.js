@@ -28,7 +28,7 @@ import {
 } from 'lucide-react';
 
 import {
-  ClipboardCheck
+  ClipboardCheck, FlaskConical as FlaskIcon
 } from 'lucide-react';
 
 const allMenuItems = [
@@ -38,7 +38,8 @@ const allMenuItems = [
   { path: '/in-production', icon: Factory, label: 'Em Produção', roles: ['laboratorio', 'producao'], testId: 'nav-in-production' },
   { path: '/counting', icon: Calculator, label: 'Contagem', roles: ['laboratorio', 'producao'] },
   { path: '/samples', icon: FlaskConical, label: 'Amostras', roles: ['laboratorio', 'producao'] },
-  { path: '/fichas-analise', icon: ClipboardCheck, label: 'Fichas de Análises', roles: ['laboratorio'], emailOnly: 'laboratoriolumix@outlook.com' },
+  { path: '/fichas-analise', icon: ClipboardCheck, label: 'Ordem de Produção', roles: ['laboratorio'], emailOnly: 'laboratoriolumix@outlook.com' },
+  { path: '/ficha-analise', icon: FlaskIcon, label: 'Ficha de Análise', roles: ['laboratorio'], emailOnly: 'laboratoriolumix@outlook.com' },
   { path: '/batch-management', icon: ListChecks, label: 'Gerenciar Lotes', roles: ['laboratorio'] },
   { path: '/suppliers', icon: Truck, label: 'Fornecedores', roles: ['laboratorio'] },
   { path: '/laudos', icon: FileCheck, label: 'Laudos', roles: ['laboratorio'] },

@@ -85,6 +85,8 @@ Sistema de gestão de produção industrial com controle de lotes, matérias-pri
 - [x] Organização de MP: desconto do lote mais recente, auto-finalização de lotes zerados, recalcular estoque
 - [x] Fichas de Análises: aba exclusiva para laboratório, 1 ficha por produto/mês, detalhes de MP com lotes e validades, copiar texto, fechar ficha
 - [x] Filtro de etiquetas redesenhado: "Última Leva" (7 dias) como padrão + "Por Mês" como alternativa
+- [x] Aba "Ordem de Produção" (renomeada de "Fichas de Análises")
+- [x] Nova aba "Ficha de Análise" com 2 sub-abas (Produtos / Matérias-Primas): categorias, campos editáveis por produto, seletor de lote filtrado, registro de análises
 
 ## Backlog (P1/P2)
 - [ ] (P1) Testar E2E funcionalidade "Reabrir Lote"

@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, UploadFile, File
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, UploadFile, File, Body
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import StreamingResponse
 from dotenv import load_dotenv
@@ -13,6 +13,7 @@ from datetime import datetime, timezone, timedelta
 import bcrypt
 import jwt
 from uuid import uuid4
+import uuid
 import io
 from bson import ObjectId
 
@@ -1235,6 +1236,145 @@ async def close_ficha_analise(ficha_id: str, current_user = Depends(get_current_
         raise HTTPException(status_code=404, detail='Ficha não encontrada')
     
     return {'message': 'Ficha fechada com sucesso'}
+
+
+# ========== FICHA DE ANÁLISE - SISTEMA DE ANÁLISES ==========
+
+# --- Categorias ---
+@api_router.get('/analise-categories')
+async def get_analise_categories(type: str = None, current_user = Depends(get_current_user)):
+    query = {'deleted': {'$ne': True}}
+    if type:
+        query['type'] = type
+    categories = await db.analise_categories.find(query, {'_id': 0}).sort('name', 1).to_list(1000)
+    return categories
+
+@api_router.post('/analise-categories')
+async def create_analise_category(data: dict = Body(...), current_user = Depends(get_current_user)):
+    cat_doc = {
+        'id': str(uuid.uuid4()),
+        'name': data['name'],
+        'type': data['type'],  # 'produto' ou 'materia_prima'
+        'items': [],
+        'created_at': datetime.now(timezone.utc).isoformat(),
+        'deleted': False
+    }
+    await db.analise_categories.insert_one(cat_doc)
+    cat_doc.pop('_id', None)
+    return cat_doc
+
+@api_router.put('/analise-categories/{cat_id}')
+async def update_analise_category(cat_id: str, data: dict = Body(...), current_user = Depends(get_current_user)):
+    update = {}
+    if 'name' in data:
+        update['name'] = data['name']
+    if 'items' in data:
+        update['items'] = data['items']
+    await db.analise_categories.update_one({'id': cat_id}, {'$set': update})
+    return {'message': 'Categoria atualizada'}
+
+@api_router.delete('/analise-categories/{cat_id}')
+async def delete_analise_category(cat_id: str, current_user = Depends(get_current_user)):
+    await db.analise_categories.update_one({'id': cat_id}, {'$set': {'deleted': True}})
+    return {'message': 'Categoria removida'}
+
+@api_router.post('/analise-categories/{cat_id}/add-item')
+async def add_item_to_category(cat_id: str, data: dict = Body(...), current_user = Depends(get_current_user)):
+    item_id = data['item_id']
+    await db.analise_categories.update_one({'id': cat_id}, {'$addToSet': {'items': item_id}})
+    return {'message': 'Item adicionado'}
+
+@api_router.post('/analise-categories/{cat_id}/remove-item')
+async def remove_item_from_category(cat_id: str, data: dict = Body(...), current_user = Depends(get_current_user)):
+    item_id = data['item_id']
+    await db.analise_categories.update_one({'id': cat_id}, {'$pull': {'items': item_id}})
+    return {'message': 'Item removido'}
+
+# --- Campos personalizados por produto/MP ---
+@api_router.get('/analise-fields/{item_id}')
+async def get_analise_fields(item_id: str, current_user = Depends(get_current_user)):
+    doc = await db.analise_fields.find_one({'item_id': item_id}, {'_id': 0})
+    if not doc:
+        # Retornar campos padrão
+        return {
+            'item_id': item_id,
+            'fields': [
+                {'name': 'Aspecto', 'order': 0},
+                {'name': 'Cor', 'order': 1},
+                {'name': 'Odor', 'order': 2},
+                {'name': 'pH', 'order': 3},
+                {'name': 'Viscosidade', 'order': 4},
+                {'name': 'Massa Específica', 'order': 5}
+            ]
+        }
+    return doc
+
+@api_router.put('/analise-fields/{item_id}')
+async def save_analise_fields(item_id: str, data: dict = Body(...), current_user = Depends(get_current_user)):
+    fields = data.get('fields', [])
+    await db.analise_fields.update_one(
+        {'item_id': item_id},
+        {'$set': {'item_id': item_id, 'fields': fields}},
+        upsert=True
+    )
+    return {'message': 'Campos salvos'}
+
+# --- Análises (registros) ---
+@api_router.get('/analises')
+async def get_analises(item_id: str = None, item_type: str = None, current_user = Depends(get_current_user)):
+    query = {'deleted': {'$ne': True}}
+    if item_id:
+        query['item_id'] = item_id
+    if item_type:
+        query['item_type'] = item_type
+    analises = await db.analises.find(query, {'_id': 0}).sort('created_at', -1).to_list(1000)
+    return analises
+
+@api_router.post('/analises')
+async def create_analise(data: dict = Body(...), current_user = Depends(get_current_user)):
+    analise_doc = {
+        'id': str(uuid.uuid4()),
+        'item_id': data['item_id'],
+        'item_type': data['item_type'],  # 'produto' ou 'materia_prima'
+        'item_name': data.get('item_name', ''),
+        'batch_id': data['batch_id'],
+        'batch_number': data.get('batch_number', ''),
+        'results': data.get('results', {}),
+        'specifications': data.get('specifications', {}),
+        'raw_materials_used': data.get('raw_materials_used', []),
+        'created_at': datetime.now(timezone.utc).isoformat(),
+        'created_by': current_user.get('name', current_user.get('email', '')),
+        'deleted': False
+    }
+    await db.analises.insert_one(analise_doc)
+    analise_doc.pop('_id', None)
+    return analise_doc
+
+@api_router.delete('/analises/{analise_id}')
+async def delete_analise(analise_id: str, current_user = Depends(get_current_user)):
+    await db.analises.update_one({'id': analise_id}, {'$set': {'deleted': True}})
+    return {'message': 'Análise removida'}
+
+# --- Lotes por item (para seletor) ---
+@api_router.get('/analise-batches/{item_type}/{item_id}')
+async def get_batches_for_analise(item_type: str, item_id: str, current_user = Depends(get_current_user)):
+    if item_type == 'produto':
+        batches = await db.product_batches.find(
+            {'product_id': item_id, 'deleted': {'$ne': True}},
+            {'_id': 0}
+        ).sort('created_at', -1).to_list(100)
+        # Also check archived
+        archived = await db.archived_product_batches.find(
+            {'product_id': item_id},
+            {'_id': 0}
+        ).sort('created_at', -1).to_list(100)
+        return batches + archived
+    else:
+        batches = await db.raw_material_batches.find(
+            {'raw_material_id': item_id, 'deleted': {'$ne': True}},
+            {'_id': 0}
+        ).sort('date', -1).to_list(100)
+        return batches
 
 
 # ========== PRODUCTION ORDERS ==========

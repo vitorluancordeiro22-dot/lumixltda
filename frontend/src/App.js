@@ -22,6 +22,7 @@ import { BatchManagement } from './pages/BatchManagement';
 import { Samples } from './pages/Samples';
 import { InProduction } from './pages/InProduction';
 import FichasAnalise from './pages/FichasAnalise';
+import FichaAnalise from './pages/FichaAnalise';
 import './App.css';
 
 const PrivateRoute = ({ children }) => {
@@ -73,6 +74,7 @@ function App() {
               <Route path="industrial-ops" element={<RoleRoute allowedRoles={['laboratorio']}><IndustrialOPs /></RoleRoute>} />
               <Route path="laudos" element={<RoleRoute allowedRoles={['laboratorio']}><Laudos /></RoleRoute>} />
               <Route path="fichas-analise" element={<RoleRoute allowedRoles={['laboratorio']}><FichasAnalise /></RoleRoute>} />
+              <Route path="ficha-analise" element={<RoleRoute allowedRoles={['laboratorio']}><FichaAnalise /></RoleRoute>} />
               <Route path="batch-management" element={<RoleRoute allowedRoles={['laboratorio']}><BatchManagement /></RoleRoute>} />
               <Route path="team" element={<RoleRoute allowedRoles={['laboratorio']}><Team /></RoleRoute>} />
               <Route path="trash" element={<RoleRoute allowedRoles={['laboratorio']}><Trash /></RoleRoute>} />
