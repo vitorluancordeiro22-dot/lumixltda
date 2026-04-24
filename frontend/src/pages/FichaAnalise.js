@@ -12,12 +12,12 @@ import {
 } from 'lucide-react';
 
 const DEFAULT_FIELDS = [
-  { name: 'Aspecto', order: 0 },
-  { name: 'Cor', order: 1 },
-  { name: 'Odor', order: 2 },
-  { name: 'pH', order: 3 },
-  { name: 'Viscosidade', order: 4 },
-  { name: 'Massa Específica', order: 5 },
+  { name: 'Aspecto', order: 0, spec: '' },
+  { name: 'Cor', order: 1, spec: '' },
+  { name: 'Odor', order: 2, spec: '' },
+  { name: 'pH', order: 3, spec: '' },
+  { name: 'Viscosidade', order: 4, spec: '' },
+  { name: 'Massa Específica', order: 5, spec: '' },
 ];
 
 export default function FichaAnalise() {
@@ -38,6 +38,8 @@ export default function FichaAnalise() {
   const [showNewCat, setShowNewCat] = useState(false);
   const [showAddItem, setShowAddItem] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [searchAddItem, setSearchAddItem] = useState('');
+  const [analiseStatus, setAnaliseStatus] = useState('aprovado');
 
   const itemType = activeTab === 'produto' ? 'produto' : 'materia_prima';
 
@@ -125,12 +127,15 @@ export default function FichaAnalise() {
 
   const startNewAnalise = () => {
     setSelectedBatch(null);
-    setResults({});
-    setSpecs({});
+    setAnaliseStatus('aprovado');
+    const newResults = {};
+    const newSpecs = {};
     fields.forEach(f => {
-      setResults(prev => ({ ...prev, [f.name]: '' }));
-      setSpecs(prev => ({ ...prev, [f.name]: '' }));
+      newResults[f.name] = '';
+      newSpecs[f.name] = f.spec || ''; // Pré-preencher especificações fixas
     });
+    setResults(newResults);
+    setSpecs(newSpecs);
     setView('new_analise');
   };
 
@@ -145,6 +150,7 @@ export default function FichaAnalise() {
         batch_number: selectedBatch.batch_number,
         results,
         specifications: specs,
+        status: analiseStatus,
         raw_materials_used: selectedBatch.raw_materials_used || []
       };
       await api.post('/analises', payload);
@@ -178,7 +184,12 @@ export default function FichaAnalise() {
 
   const availableItemsForCategory = () => {
     const usedIds = selectedCategory?.items || [];
-    return allItems.filter(i => !usedIds.includes(i.id));
+    let items = allItems.filter(i => !usedIds.includes(i.id));
+    if (searchAddItem.trim()) {
+      const search = searchAddItem.toLowerCase();
+      items = items.filter(i => i.name.toLowerCase().includes(search));
+    }
+    return items;
   };
 
   // ====== RENDER ======
@@ -282,14 +293,24 @@ export default function FichaAnalise() {
         )}
 
         {/* Dialog para adicionar item */}
-        <Dialog open={showAddItem} onOpenChange={setShowAddItem}>
+        <Dialog open={showAddItem} onOpenChange={(open) => { setShowAddItem(open); if (!open) setSearchAddItem(''); }}>
           <DialogContent className="bg-card border-border max-h-[70vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="text-foreground">Adicionar {activeTab === 'produto' ? 'Produto' : 'Matéria-Prima'}</DialogTitle>
             </DialogHeader>
-            <div className="space-y-2 mt-2">
+            <Input
+              placeholder="Pesquisar..."
+              value={searchAddItem}
+              onChange={e => setSearchAddItem(e.target.value)}
+              className="bg-input border-border text-foreground mb-2"
+              autoFocus
+              data-testid="search-add-item"
+            />
+            <div className="space-y-2 max-h-[40vh] overflow-y-auto">
               {availableItemsForCategory().length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-4">Todos os itens já foram adicionados.</p>
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  {searchAddItem ? 'Nenhum resultado encontrado.' : 'Todos os itens já foram adicionados.'}
+                </p>
               ) : (
                 availableItemsForCategory().map(item => (
                   <Button key={item.id} variant="outline" className="w-full justify-start border-border text-foreground" onClick={() => handleAddItem(item.id)}>
@@ -342,6 +363,13 @@ export default function FichaAnalise() {
                   <div className="flex items-center gap-3">
                     <FileText className="w-4 h-4 text-primary" />
                     <span className="font-bold text-foreground">Lote: {a.batch_number}</span>
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded ${
+                      a.status === 'reprovado' 
+                        ? 'bg-red-500/20 text-red-400' 
+                        : 'bg-green-500/20 text-green-400'
+                    }`}>
+                      {a.status === 'reprovado' ? 'REPROVADO' : 'APROVADO'}
+                    </span>
                     <span className="text-sm text-muted-foreground">{new Date(a.created_at).toLocaleDateString('pt-BR')}</span>
                   </div>
                   <span className="text-xs text-muted-foreground">por {a.created_by}</span>
@@ -449,7 +477,12 @@ export default function FichaAnalise() {
       {/* Campos de Análise */}
       <Card className="p-4 bg-card border-border">
         <Label className="text-foreground font-semibold text-sm">Campos de Análise</Label>
-        <div className="mt-3 space-y-3">
+        <div className="mt-2 mb-3 grid grid-cols-3 gap-3 text-xs text-muted-foreground font-semibold">
+          <span>Campo</span>
+          <span className="text-center">Especificação</span>
+          <span className="text-center">Resultado</span>
+        </div>
+        <div className="space-y-3">
           {fields.map((field, idx) => (
             <div key={idx} className="grid grid-cols-3 gap-3 items-center">
               <Label className="text-sm text-foreground font-medium">{field.name}</Label>
@@ -457,8 +490,8 @@ export default function FichaAnalise() {
                 <Input
                   placeholder="Especificação"
                   value={specs[field.name] || ''}
-                  onChange={e => setSpecs(prev => ({ ...prev, [field.name]: e.target.value }))}
-                  className="bg-input border-border text-foreground text-sm"
+                  readOnly
+                  className="bg-muted/50 border-border text-muted-foreground text-sm cursor-default"
                 />
               </div>
               <div>
@@ -471,11 +504,35 @@ export default function FichaAnalise() {
               </div>
             </div>
           ))}
-          <div className="grid grid-cols-3 gap-3 text-xs text-muted-foreground">
-            <span></span>
-            <span className="text-center">Especificação</span>
-            <span className="text-center">Resultado</span>
-          </div>
+        </div>
+      </Card>
+
+      {/* Status Aprovado/Reprovado */}
+      <Card className="p-4 bg-card border-border">
+        <Label className="text-foreground font-semibold text-sm mb-3 block">Resultado da Análise</Label>
+        <div className="flex gap-3">
+          <button
+            onClick={() => setAnaliseStatus('aprovado')}
+            className={`flex-1 py-3 px-4 rounded-lg text-sm font-bold transition-all border-2 ${
+              analiseStatus === 'aprovado'
+                ? 'border-green-500 bg-green-500/20 text-green-400'
+                : 'border-border bg-muted/20 text-muted-foreground hover:border-green-500/50'
+            }`}
+            data-testid="status-aprovado"
+          >
+            APROVADO
+          </button>
+          <button
+            onClick={() => setAnaliseStatus('reprovado')}
+            className={`flex-1 py-3 px-4 rounded-lg text-sm font-bold transition-all border-2 ${
+              analiseStatus === 'reprovado'
+                ? 'border-red-500 bg-red-500/20 text-red-400'
+                : 'border-border bg-muted/20 text-muted-foreground hover:border-red-500/50'
+            }`}
+            data-testid="status-reprovado"
+          >
+            REPROVADO
+          </button>
         </div>
       </Card>
 
@@ -499,10 +556,16 @@ export default function FichaAnalise() {
       </div>
 
       <Card className="p-4 bg-card border-border space-y-3">
-        <p className="text-sm text-muted-foreground">Adicione, remova ou renomeie os campos de análise para este item.</p>
+        <p className="text-sm text-muted-foreground">Adicione, remova ou renomeie os campos de análise. As especificações ficam fixas para este produto.</p>
+        <div className="grid grid-cols-[30px_1fr_1fr_40px] gap-2 text-xs text-muted-foreground font-semibold mb-1">
+          <span></span>
+          <span>Nome do Campo</span>
+          <span>Especificação Fixa</span>
+          <span></span>
+        </div>
         {editingFields.map((field, idx) => (
-          <div key={idx} className="flex items-center gap-3">
-            <span className="text-sm text-muted-foreground w-8">{idx + 1}.</span>
+          <div key={idx} className="grid grid-cols-[30px_1fr_1fr_40px] gap-2 items-center">
+            <span className="text-sm text-muted-foreground">{idx + 1}.</span>
             <Input
               value={field.name}
               onChange={e => {
@@ -510,14 +573,25 @@ export default function FichaAnalise() {
                 updated[idx].name = e.target.value;
                 setEditingFields(updated);
               }}
-              className="bg-input border-border text-foreground flex-1"
+              placeholder="Nome do campo"
+              className="bg-input border-border text-foreground"
+            />
+            <Input
+              value={field.spec || ''}
+              onChange={e => {
+                const updated = [...editingFields];
+                updated[idx].spec = e.target.value;
+                setEditingFields(updated);
+              }}
+              placeholder="Ex: ATÉ 11,40"
+              className="bg-input border-border text-foreground"
             />
             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditingFields(editingFields.filter((_, i) => i !== idx))}>
               <Trash2 className="w-4 h-4 text-destructive" />
             </Button>
           </div>
         ))}
-        <Button variant="outline" size="sm" className="border-border" onClick={() => setEditingFields([...editingFields, { name: '', order: editingFields.length }])}>
+        <Button variant="outline" size="sm" className="border-border" onClick={() => setEditingFields([...editingFields, { name: '', order: editingFields.length, spec: '' }])}>
           <Plus className="w-4 h-4 mr-1" /> Adicionar Campo
         </Button>
       </Card>

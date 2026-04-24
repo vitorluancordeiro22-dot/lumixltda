@@ -1341,6 +1341,7 @@ async def create_analise(data: dict = Body(...), current_user = Depends(get_curr
         'batch_number': data.get('batch_number', ''),
         'results': data.get('results', {}),
         'specifications': data.get('specifications', {}),
+        'status': data.get('status', 'aprovado'),
         'raw_materials_used': data.get('raw_materials_used', []),
         'created_at': datetime.now(timezone.utc).isoformat(),
         'created_by': current_user.get('name', current_user.get('email', '')),
