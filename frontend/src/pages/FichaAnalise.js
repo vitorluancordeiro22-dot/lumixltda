@@ -179,7 +179,8 @@ export default function FichaAnalise() {
   };
 
   const getCategoryItems = (cat) => {
-    return (cat.items || []).map(itemId => allItems.find(i => i.id === itemId)).filter(Boolean);
+    return (cat.items || []).map(itemId => allItems.find(i => i.id === itemId)).filter(Boolean)
+      .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
   };
 
   const availableItemsForCategory = () => {
@@ -189,7 +190,7 @@ export default function FichaAnalise() {
       const search = searchAddItem.toLowerCase();
       items = items.filter(i => i.name.toLowerCase().includes(search));
     }
-    return items;
+    return items.sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
   };
 
   // ====== RENDER ======
