@@ -1339,6 +1339,7 @@ async def create_analise(data: dict = Body(...), current_user = Depends(get_curr
         'item_name': data.get('item_name', ''),
         'batch_id': data['batch_id'],
         'batch_number': data.get('batch_number', ''),
+        'date': data.get('date', ''),
         'results': data.get('results', {}),
         'specifications': data.get('specifications', {}),
         'status': data.get('status', 'aprovado'),

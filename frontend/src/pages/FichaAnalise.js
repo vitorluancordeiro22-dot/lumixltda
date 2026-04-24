@@ -40,6 +40,7 @@ export default function FichaAnalise() {
   const [loading, setLoading] = useState(false);
   const [searchAddItem, setSearchAddItem] = useState('');
   const [analiseStatus, setAnaliseStatus] = useState('aprovado');
+  const [analiseDate, setAnaliseDate] = useState(() => new Date().toISOString().split('T')[0]);
 
   const itemType = activeTab === 'produto' ? 'produto' : 'materia_prima';
 
@@ -128,6 +129,7 @@ export default function FichaAnalise() {
   const startNewAnalise = () => {
     setSelectedBatch(null);
     setAnaliseStatus('aprovado');
+    setAnaliseDate(new Date().toISOString().split('T')[0]);
     const newResults = {};
     const newSpecs = {};
     fields.forEach(f => {
@@ -148,6 +150,7 @@ export default function FichaAnalise() {
         item_name: selectedItem.name,
         batch_id: selectedBatch.id,
         batch_number: selectedBatch.batch_number,
+        date: analiseDate,
         results,
         specifications: specs,
         status: analiseStatus,
@@ -371,7 +374,9 @@ export default function FichaAnalise() {
                     }`}>
                       {a.status === 'reprovado' ? 'REPROVADO' : 'APROVADO'}
                     </span>
-                    <span className="text-sm text-muted-foreground">{new Date(a.created_at).toLocaleDateString('pt-BR')}</span>
+                    <span className="text-sm text-muted-foreground">
+                      {a.date ? new Date(a.date + 'T00:00:00').toLocaleDateString('pt-BR') : new Date(a.created_at).toLocaleDateString('pt-BR')}
+                    </span>
                   </div>
                   <span className="text-xs text-muted-foreground">por {a.created_by}</span>
                 </div>
@@ -474,6 +479,18 @@ export default function FichaAnalise() {
           </div>
         </Card>
       )}
+
+      {/* Data da Ficha */}
+      <Card className="p-4 bg-card border-border">
+        <Label className="text-foreground font-semibold text-sm">Data da Ficha</Label>
+        <Input
+          type="date"
+          value={analiseDate}
+          onChange={e => setAnaliseDate(e.target.value)}
+          className="bg-input border-border text-foreground mt-2 w-48"
+          data-testid="analise-date"
+        />
+      </Card>
 
       {/* Campos de Análise */}
       <Card className="p-4 bg-card border-border">
