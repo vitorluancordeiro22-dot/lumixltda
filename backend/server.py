@@ -705,6 +705,13 @@ async def create_product_batch(data: ProductBatchCreate, current_user = Depends(
     })
     
     if not existing_ficha and product:
+        # Calcular número da OP do dia (conta fichas criadas no mesmo dia, excluindo repetidos do mês)
+        op_count_today = await db.fichas_analise.count_documents({
+            'date': data.date,
+            'deleted': {'$ne': True}
+        })
+        op_number = op_count_today + 1
+        
         ficha_doc = {
             'id': str(uuid.uuid4()),
             'product_id': data.product_id,
@@ -714,11 +721,12 @@ async def create_product_batch(data: ProductBatchCreate, current_user = Depends(
             'month': batch_date.month,
             'year': batch_date.year,
             'date': data.date,
+            'op_number': op_number,
             'planned_liters': data.planned_liters,
             'unit': data.unit,
             'expected_liters': product.get('expected_liters', 0),
             'recipes': [],
-            'status': 'aberta',  # aberta ou fechada
+            'status': 'aberta',
             'created_at': datetime.now(timezone.utc).isoformat(),
             'deleted': False
         }
