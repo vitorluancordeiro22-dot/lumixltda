@@ -12,13 +12,27 @@ import {
 } from 'lucide-react';
 
 const DEFAULT_FIELDS = [
-  { name: 'Aspecto', order: 0, spec: '' },
-  { name: 'Cor', order: 1, spec: '' },
-  { name: 'Odor', order: 2, spec: '' },
-  { name: 'pH', order: 3, spec: '' },
-  { name: 'Viscosidade', order: 4, spec: '' },
-  { name: 'Massa Específica', order: 5, spec: '' },
+  { name: 'Aspecto', order: 0, spec: '', quick_answer: true },
+  { name: 'Cor', order: 1, spec: '', quick_answer: true },
+  { name: 'Odor', order: 2, spec: '', quick_answer: true },
+  { name: 'pH', order: 3, spec: '', quick_answer: false },
+  { name: 'Viscosidade', order: 4, spec: '', quick_answer: false },
+  { name: 'Massa Específica', order: 5, spec: '', quick_answer: false },
 ];
+
+// Soma N dias a uma data "YYYY-MM-DD" sem cair em problemas de fuso horário.
+const addDaysISO = (isoDate, days) => {
+  if (!isoDate) return '';
+  const parts = String(isoDate).split('T')[0].split('-');
+  if (parts.length !== 3) return isoDate;
+  const [y, m, d] = parts.map(Number);
+  const dt = new Date(y, m - 1, d);
+  dt.setDate(dt.getDate() + days);
+  const yy = dt.getFullYear();
+  const mm = String(dt.getMonth() + 1).padStart(2, '0');
+  const dd = String(dt.getDate()).padStart(2, '0');
+  return `${yy}-${mm}-${dd}`;
+};
 
 export default function FichaAnalise() {
   const [activeTab, setActiveTab] = useState('produto');
@@ -140,6 +154,16 @@ export default function FichaAnalise() {
     setSpecs(newSpecs);
     setView('new_analise');
   };
+
+  // Quando o lote é selecionado, a Data da Ficha vira "Data do Lote + 1 dia"
+  // (a análise física é concluída no dia seguinte à produção, independentemente
+  // de quando o usuário registrar no sistema).
+  useEffect(() => {
+    if (selectedBatch && selectedBatch.date) {
+      const next = addDaysISO(selectedBatch.date, 1);
+      if (next) setAnaliseDate(next);
+    }
+  }, [selectedBatch]);
 
   const handleSaveAnalise = async () => {
     if (!selectedBatch) { toast.error('Selecione um lote'); return; }
@@ -513,12 +537,41 @@ export default function FichaAnalise() {
                 />
               </div>
               <div>
-                <Input
-                  placeholder="Resultado"
-                  value={results[field.name] || ''}
-                  onChange={e => setResults(prev => ({ ...prev, [field.name]: e.target.value }))}
-                  className="bg-input border-border text-foreground text-sm"
-                />
+                {field.quick_answer ? (
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setResults(prev => ({ ...prev, [field.name]: 'OK' }))}
+                      className={`flex-1 py-2 px-3 rounded-md text-xs font-bold transition-all border ${
+                        results[field.name] === 'OK'
+                          ? 'border-green-500 bg-green-500/20 text-green-400'
+                          : 'border-border bg-muted/20 text-muted-foreground hover:border-green-500/50'
+                      }`}
+                      data-testid={`quick-ok-${field.name}`}
+                    >
+                      OK
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setResults(prev => ({ ...prev, [field.name]: 'REPROVADO' }))}
+                      className={`flex-1 py-2 px-3 rounded-md text-xs font-bold transition-all border ${
+                        results[field.name] === 'REPROVADO'
+                          ? 'border-red-500 bg-red-500/20 text-red-400'
+                          : 'border-border bg-muted/20 text-muted-foreground hover:border-red-500/50'
+                      }`}
+                      data-testid={`quick-reprovado-${field.name}`}
+                    >
+                      REPROVADO
+                    </button>
+                  </div>
+                ) : (
+                  <Input
+                    placeholder="Resultado"
+                    value={results[field.name] || ''}
+                    onChange={e => setResults(prev => ({ ...prev, [field.name]: e.target.value }))}
+                    className="bg-input border-border text-foreground text-sm"
+                  />
+                )}
               </div>
             </div>
           ))}
@@ -574,15 +627,19 @@ export default function FichaAnalise() {
       </div>
 
       <Card className="p-4 bg-card border-border space-y-3">
-        <p className="text-sm text-muted-foreground">Adicione, remova ou renomeie os campos de análise. As especificações ficam fixas para este produto.</p>
-        <div className="grid grid-cols-[30px_1fr_1fr_40px] gap-2 text-xs text-muted-foreground font-semibold mb-1">
+        <p className="text-sm text-muted-foreground">
+          Adicione, remova ou renomeie os campos de análise. As especificações ficam fixas para este produto.
+          Marque <span className="text-foreground font-semibold">"Resposta Rápida"</span> em campos cuja resposta é sempre <span className="text-green-400 font-semibold">OK</span> ou <span className="text-red-400 font-semibold">REPROVADO</span> (ex: Cor, Odor, Aspecto) — assim você só clica em vez de digitar.
+        </p>
+        <div className="grid grid-cols-[30px_1fr_1fr_110px_40px] gap-2 text-xs text-muted-foreground font-semibold mb-1">
           <span></span>
           <span>Nome do Campo</span>
           <span>Especificação Fixa</span>
+          <span className="text-center">Resposta Rápida</span>
           <span></span>
         </div>
         {editingFields.map((field, idx) => (
-          <div key={idx} className="grid grid-cols-[30px_1fr_1fr_40px] gap-2 items-center">
+          <div key={idx} className="grid grid-cols-[30px_1fr_1fr_110px_40px] gap-2 items-center">
             <span className="text-sm text-muted-foreground">{idx + 1}.</span>
             <Input
               value={field.name}
@@ -604,12 +661,28 @@ export default function FichaAnalise() {
               placeholder="Ex: ATÉ 11,40"
               className="bg-input border-border text-foreground"
             />
+            <button
+              type="button"
+              onClick={() => {
+                const updated = [...editingFields];
+                updated[idx].quick_answer = !updated[idx].quick_answer;
+                setEditingFields(updated);
+              }}
+              className={`py-2 px-2 rounded-md text-xs font-bold transition-all border ${
+                field.quick_answer
+                  ? 'border-primary bg-primary/20 text-primary'
+                  : 'border-border bg-muted/20 text-muted-foreground hover:border-primary/50'
+              }`}
+              data-testid={`toggle-quick-${idx}`}
+            >
+              {field.quick_answer ? 'OK / REPROV.' : 'TEXTO LIVRE'}
+            </button>
             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditingFields(editingFields.filter((_, i) => i !== idx))}>
               <Trash2 className="w-4 h-4 text-destructive" />
             </Button>
           </div>
         ))}
-        <Button variant="outline" size="sm" className="border-border" onClick={() => setEditingFields([...editingFields, { name: '', order: editingFields.length, spec: '' }])}>
+        <Button variant="outline" size="sm" className="border-border" onClick={() => setEditingFields([...editingFields, { name: '', order: editingFields.length, spec: '', quick_answer: false }])}>
           <Plus className="w-4 h-4 mr-1" /> Adicionar Campo
         </Button>
       </Card>

@@ -1,185 +1,143 @@
 <analysis>**original_problem_statement:**
-The user wants to enhance their production management application, Gestão Inteligente de Produção – Lumix. The core goal is to refine existing features and add new quality-of-life improvements.
+The user wants to enhance the Gestão Inteligente de Produção – Lumix application. The core requirements involve refining the raw material inventory deduction system, adding complex QA (Quality Assurance) tracking features (Ficha de Análise), standardizing and formatting production printing templates (Ordem de Produção and Ficha de Análise), and improving UI workflows and data filters for production and laboratory roles. 
 
-**Recent user requests implemented in this session:**
-1.  **Logo & Recalculation:** Add the company logo to the header and a Recalculate Liters button to the dashboard.
-2.  **Raw Material Archiving:** Fix a bug where raw material batches with zero quantity were not being archived. This was solved by adding both automatic archiving for zero-quantity batches and a manual Finalizar button.
-3.  **Forced Batch Closure:** Add a button on the Contagem page to allow forcibly ending a batch even if it's not complete, with a confirmation dialog.
-4.  **Product Filter in Archives:** Add a filter on the Arquivos page to view all archived batches for a specific product, across all months.
-5.  **Duplicate Batch Bug Fix:** Fix a critical bug where the app would freeze when trying to create a new batch for a product that already had one em aberto. The fix involved moving the validation logic to a dedicated backend endpoint.
-6.  **Mandatory Operator:** Make the Operator field mandatory when registering a production count.
-7.  **UI/UX Improvements:**
-    *   Make the Encerrar Lote button larger and more prominent.
-    *   Remove unused OP and Ordens de Produção tabs from the main menu.
-    *   Add a Detalhes view in the archives to show the raw materials (with their batch numbers and expiry dates) used to produce a finished product.
-8.  **Label Printing:** Create a feature to print labels for raw material batches based on a user-provided template.
-9.  **Dashboard Graphs:** Add daily and monthly production graphs to the dashboard.
-10. **In Production Workflow:** Implement a new pre-production step. Newly created product batches now go to an Em Produção page and must be approved by an authorized user before they appear on the Contagem page for bottling.
-11. **Reopen Batch:** Add functionality to reopen an archived batch, moving it back to an active state.
-12. **Authorization Update:** Change an authorized email address for the In Production workflow.
-13. **Deployment Fix:** Add a  endpoint to the backend to assist with Kubernetes health checks during deployment.
+PRODUCT REQUIREMENTS:
+- Accurate DOM-based printing for production labels and forms.
+- LIFO (Last-In-First-Out) automatic deduction for raw materials during product batch creation.
+- A QA system to organize products/materials by category, save fixed product specifications, and record analysis results.
+- Automated creation of Ordem de Produção records for the lab to review when the first batch of a product is created each month.
 
 **User's preferred language**: Portuguese
+*(INSTRUCT next agent to respond in the user's preferred language only)*
 
-**what currently exists?**
-The application is a full-stack solution (FastAPI, React, MongoDB) with features for managing products, batches, production counting, and archives.
-
-**Key recent additions:**
-- A new Em Produção page and status () that acts as a staging area for new product batches before they are released for bottling.
-- Authorization logic restricting the release of batches to specific user emails.
-- Data visualization on the Dashboard page with daily and monthly production graphs powered by .
-- A label printing system for raw materials that generates a print-friendly view from selected batches.
-- A Detalhes modal in the archives to trace raw materials used in a finished product.
-- An option to reopen previously archived batches.
-- The critical bug preventing the creation of duplicate open batches has been fixed with a robust backend validation check.
-- A  endpoint has been added to the backend for deployment health checks.
+**what currently exists?** 
+A full-stack application (React, FastAPI, MongoDB) with recent major additions: 
+- Perfected DOM-based printing mimicking original Excel templates for OP and Ficha de Análise.
+- Automated LIFO inventory deduction for raw materials, including auto-finalization of empty batches and a recalculation tool.
+- A new Ordem de Produção tab (exclusive to the lab role) showing compact daily production orders.
+- A comprehensive Ficha de Análise tab allowing the QA team to group items into categories (alphabetically sorted), set fixed spec thresholds, and record Approved/Rejected analysis results.
 
 **Last working item**:
-    - Last item agent was working: The user reported a deployment failure with a  error. The agent, after analyzing deployment logs, correctly identified this as a DNS propagation issue rather than a code problem. To improve deployment robustness, the agent added a  endpoint to the backend as it was missing from the health checks. The agent explained the DNS issue to the user and confirmed the  endpoint was working locally.
-    - Status: USER VERIFICATION PENDING
-    - Agent Testing Done: Y
-    - Which testing method agent to use? The agent has already fixed the code-level issue (missing  endpoint). The user needs to trigger a new deployment to verify if the infrastructure/DNS issue is resolved. No further testing is required from the agent on this item.
-    - User Testing Done: N
+- **Last item agent was working**: The user requested a modification to the Ficha de Análise result date. Currently, the system uses the manual registration date. The user wants the analysis date (Data da Ficha) to automatically default to exactly **1 day after the selected Batch Date (Data do Lote)**, because the physical analysis is completed the day after production, regardless of when it is typed into the system. The agent just opened  to begin implementing this logic.
+- **Status**: IN PROGRESS
+- **Agent Testing Done**: N
+- **Which testing method agent to use?**: Frontend testing agent / Screenshot tool
+- **User Testing Done**: N
 
 **All Pending/In progress Issue list**:
-  - Issue 1: Deployment to production is failing. (P0)
-
-  Issues Detail:
-  - Issue 1: 
-     - **Description:** The user is unable to deploy the application. Health checks are failing with , which points to a DNS resolution failure. The application's backend was also missing a required  endpoint.
-     - **Attempted fixes:** The agent correctly added a  endpoint to . This resolves the code-level issue for health checks. The agent also correctly identified that the  error is an external DNS propagation issue, not a code bug, and advised the user to wait or retry the deployment.
-     - **Next debug checklist:** The user needs to re-attempt the deployment. If it fails again with the same DNS error after a reasonable waiting period (e.g., 30 minutes), the issue is external and needs to be escalated to the platform's support. No further code changes are needed for this issue.
-     - **Why fix this issue and what will be achieved with the fix?** A successful deployment is required for the user to access the application in a production environment.
-     - **Status:** BLOCKED
-     - **Is recurring issue?** Y (The user reported it twice)
-     - **Should Test frontend/backend/both after fix?** N/A (Issue is likely external)
-     - **Blocked on other issue:** Blocked on external DNS propagation.
+- **Issue 1**: Ficha de Análise date logic needs to be Batch Date + 1 day (P0)
+  - **Attempted fixes**: The agent viewed  but made no edits yet.
+  - **Next debug checklist**: Modify the  or the  dependent on  in  to calculate  as . Ensure timezone/date parsing doesn't shift the date backward. 
+  - **Why fix this issue and what will be achieved with the fix?**: Ensures accurate QA compliance dates based on physical production times rather than delayed data entry times.
+  - **Status**: IN PROGRESS
+  - **Is recurring issue?**: N
+  - **Should Test frontend/backend/both after fix?**: Frontend
+  - **Blocked on other issue**: None
 
 **In progress Task List**:
-  - Task 1: Complete the reopen batch functionality. (P1)
-     - **Where to resume:** The agent implemented the backend endpoint () and added the frontend button and handler function in . However, this was interrupted by several other high-priority user requests. The functionality was not fully tested end-to-end. The next step is to perform a full test cycle: archive a batch, then use the new Reabrir button to reopen it, and confirm it reappears as an active batch on the Contagem page.
-     - **What will be achieved with this?** Users will be able to correct errors by reverting an archived or finalized batch back to an active state.
-     - **Status:** IN PROGRESS
-     - **Should Test frontend/backend/both after fix?** both
-     - **Blocked on something:** None
+- **Task 1**: Complete E2E testing for Reabrir Lote Arquivado functionality (P1)
+  - **Where to resume**: The feature was implemented in a previous fork but repeatedly skipped in this session due to new high-priority requests. Perform a full test cycle: archive a batch, use the Reabrir button, and confirm it reappears as active.
+  - **What will be achieved with this?**: Verification that users can recover accidentally archived batches.
+  - **Status**: TESTING PENDING
+  - **Should Test frontend/backend/both after fix?**: Both
+  - **Blocked on something**: None
 
-**Upcoming and Future Tasks**
-    Upcoming Tasks:
-    - (P1) **Add Expiry Date to Raw Material Batches:** The user was prompted by the agent that the expiry date field was often empty. A task should be to make this field more prominent or required during raw material batch creation to ensure the Detalhes view is fully populated.
-    - (P1) **Implement PDF Upload in Laudos**: The folder structure is complete, but the functionality to upload PDF files into the folders needs to be implemented.
+**Upcoming and Future Tasks**:
+- (P1) **Implement PDF Upload in Laudos**: The folder structure exists, but PDF upload functionality is missing. (File: Frontend  component / Backend upload routes).
+- (P2) **Refactor **: Replace native alerts with Shadcn  across the app to prevent dev-server blocking.
+- (P2) **Refactor **: The backend file is now approaching 3000 lines. Break it down into modular routers (, , etc.).
+- (P2) **Deprecate/update **: Remove or update outdated components.
 
-    Future Tasks:
-    - (P2) **Refactor :** The agent identified numerous  calls that cause page reloads during development. These should be systematically replaced with the  component from Shadcn for a better UX.
-    - (P2) **Refactor :** The main backend file is now over 2400 lines long and contains logic for all features. It should be broken down into multiple router files (e.g., , , ) for maintainability.
-    - (P2) **Deprecate or update **: This component is outdated and should be removed or updated.
+**Completed work in this session**:
+-  and  endpoints verified and updated (DONE)
+- Perfected  and created  to strictly match the user's layout requirements (DONE)
+- LIFO Raw Material deduction logic added to  (DONE)
+-  label filtering UI redesigned to Última Leva / Por Mês (DONE)
+- Renamed Fichas de Análises to Ordem de Produção, added daily sequence numbering (), and created a compact UI (DONE)
+- Created completely new  for QA with categories, alphabetical sorting, fixed specifications, and Approved/Rejected toggles (DONE)
 
-**Completed work in this session**
-- **Feature: In Production Workflow:** Implemented a new pre-production stage where new batches await approval before bottling.
-- **Feature: Dashboard Graphs:** Added daily and monthly production graphs to the dashboard using .
-- **Feature: Label Printing:** Created a feature to select and print labels for raw material batches.
-- **Feature: Raw Material Details in Archives:** Added a Detalhes button to show which raw material batches were used in a final product.
-- **Feature: Force Batch Closure:** Implemented a button to end a batch prematurely.
-- **Feature: Reopen Archived Batch:** Added backend and frontend components to reopen an archived batch.
-- **Feature: Product Filter in Archives:** Added a product-based filter to the archives page.
-- **Bug Fix: Duplicate Batch Creation:** Resolved a critical bug where creating a duplicate open batch would freeze the application by moving validation to the backend.
-- **Bug Fix: Raw Material Archiving:** Fixed a bug where zero-quantity raw material batches were not being archived.
-- **Enhancement: Mandatory Operator:** The operator field is now required for production counts.
-- **Enhancement: Logo & Recalculate Button:** Added company logo and a manual recalculation button.
-- **Enhancement: UI Cleanup:** Redesigned the Encerrar Lote button and removed obsolete menu items.
-- **Deployment: Health Check:** Added a  endpoint to the backend to support deployment health checks.
+**Earlier issues found/mentioned but not fixed**:
+- None.
 
-**Earlier issues found/mentioned but not fixed**
-   - None.
+**Known issue recurrence from previous fork**:
+- None. (The DNS deployment issue from the previous fork was resolved by the user externally).
 
-**Known issue recurrence from previous fork**
-  - **Issue recurrence in previous fork:** The duplicate open batch confirmation dialog bug, which was marked as a P0 issue in the initial handoff, was still present and was definitively fixed in this session.
-  - **Recurrence count:** 1
-  - **Status:** RESOLVED
-
-**Code Architecture**
+**Code Architecture**:
 
 
-**Key Technical Concepts**
-- **Data Visualization:** Use of  library to create area and bar charts on the frontend.
-- **State-Driven Workflow:** Introduction of a new  status to create a multi-step batch release process.
-- **Backend-Driven Validation:** Shifted the critical logic for checking duplicate batches from the frontend to a dedicated backend API endpoint for reliability.
-- **DOM for Printing:** Generating a hidden, print-specific HTML structure and using  combined with  CSS rules to create custom printable labels.
-- **Deployment Health Checks:** Understanding and implementing a  endpoint as required by container orchestration systems like Kubernetes.
+**Key Technical Concepts**:
+- **Print Layouts**: Uses hidden browser windows, injected custom HTML/CSS, and  to generate precise, pixel-perfect documentation.
+- **Inventory Deduction**: Backend dynamically checks the  sorted by date to deduct stock using a LIFO methodology, storing  inside the product batch for traceability.
+- **QA Specs**: Dynamic form generation where fixed specs () are pre-populated as read-only, and results () are recorded per item batch.
 
-**key DB schema**
-  - ****: The  field can now be , representing a batch that has been created but not yet released for bottling.
+**key DB schema**:
+- : Stores Ordem de Produção data auto-generated once per month per product.
+- : QA Categories (e.g., Desinfetantes).
+- : Fixed specifications per product/material.
+- : QA testing results tied to specific batches.
+- : Now contains  detailing exactly which raw material batches were consumed (LIFO).
 
-**changes in tech stack**
-  - ****: Added to the frontend for data visualization.
+**changes in tech stack**:
+- None.
 
-**All files of reference**
-- : The monolithic backend file, modified for nearly every feature.
-- : The new page for the production approval workflow.
-- : The rewritten dashboard with graphs.
-- : Contains the new label printing feature.
-- : Contains the Detalhes modal, Reabrir button, and product filter.
-- : Contains the final fix for the duplicate batch bug.
-- : Contains the updated Encerrar Lote button and mandatory operator logic.
-- : Contains the updated navigation menu.
+**All files of reference**:
+- : Heavily updated with new LIFO deduction logic and QA endpoints.
+- : **NEW** QA module.
+- : **UPDATED** to Ordem de Produção compact view.
+- : **UPDATED** to match real Excel OP model.
+- : **NEW** matching real Ficha model.
+- : Updated multiple times with new features and backlog.
 
 **Areas that need refactoring**:
-- **:** Now critically oversized at >2400 lines. Must be broken down into modular routers.
-- ** usage:** The codebase relies heavily on native  dialogs, which cause page reloads in the development environment. These should be replaced with the non-blocking  component from Shadcn.
-- **:** This file has become very complex, managing state for editing, viewing counts, viewing details, and reopening batches. It could be broken down into smaller, more focused components.
+-  is critically large and needs modularization.
 
-**key api endpoints**
-- **New Endpoints:**
-  - : For deployment health checks.
-  - : Moves a batch from 'em_producao' to 'em_aberto'.
-  - : Aggregates production data for the daily chart.
-  - : Aggregates production data for the monthly chart.
-  - : Moves an archived batch back to the active collection.
-  - : Checks if a product has an existing open batch.
-  - : Forcibly finalizes a batch from the Counting page.
-  - : Fetches all archived batches for a given product.
-  - : Manually sets a raw material batch status to 'finalizado'.
+**key api endpoints**:
+- : Modified to handle LIFO deduction and Ordem de Produção generation.
+- : Cleans up ghost inventory and auto-finalizes empty batches.
+- , : New endpoints for the QA Ficha de Análise system.
 
-**Critical Info for New Agent**
-- **User Language is Portuguese:** All communication MUST be in Portuguese.
-- **Deployment Issue:** The primary blocker is a deployment failure likely caused by DNS propagation. A  endpoint has been added, and the next step is for the user to retry deployment. Do not spend time on code changes for this issue unless new error logs appear.
-- **Interrupted Task:** The reopen batch feature was implemented but not fully tested. This should be the first task to verify and complete once the deployment issue is addressed.
-- **Hot Reload Behavior:** The user has noticed that the page reloads after agent edits. This is expected behavior of the React development server (Hot Module Replacement). Be prepared to explain this again if it comes up.
+**Critical Info for New Agent**:
+- **Environment Notice**: The user has deployed to production. If they report a bug, assume you are fixing it in the PREVIEW environment, and they will deploy it later. **Do not use any preview or production URLs in your messages or summaries.**
+- **Dates & Timezones**: Be extremely careful when doing  math in JS to avoid timezone offsets pushing the date backwards. Use robust date parsing. 
+- **User Language**: Always respond in Portuguese.
 
-**documents and test reports created in this job**
-  -  (updated multiple times)
+**documents and test reports created in this job**:
+- 
 
-**Last 10 User Messages and any pending HUMAN messages**
-1.  **User:** Reports deployment is failing again with the same DNS error. (PENDING)
-2.  **User:** Shows a screenshot of the  error page. (ADDRESSED)
-3.  **User:** Asks to terminate the Uvicorn process. (ADDRESSED - Agent explained it's necessary).
-4.  **User:** Reports that page reloads after every change, asking for a fix. (ADDRESSED - Agent explained it's normal hot-reload behavior).
-5.  **User:** Asks to change an authorized email to . (COMPLETED)
-6.  **User:** Asks for the In Production workflow to be created. (COMPLETED)
-7.  **User:** Asks for production graphs on the dashboard. (COMPLETED)
-8.  **User:** Asks for the label printing feature for raw materials. (COMPLETED)
-9.  **User:** Asks for an option to reopen an archived batch. (IN PROGRESS)
-10. **User:** Requests UI changes: bigger Encerrar Lote button, remove old menu items, and add a Detalhes view for raw materials in archives. (COMPLETED)
+**Last 10 User Messages and any pending HUMAN messages**:
+1. **User**: Requests changing Fichas de Análises to Ordem de Produção and creating a complex new QA Ficha de Análise with categories and specific questions per product. (COMPLETED)
+2. **User**: Clarifies that the QA system must filter by specific batch, and applies to raw materials too. (COMPLETED)
+3. **User**: Asks to add fixed specification thresholds, an Approved/Rejected button, and a search bar to the QA categories. (COMPLETED)
+4. **User**: Requests sorting items in categories alphabetically. (COMPLETED)
+5. **User**: Asks to include the Ficha date manually instead of relying on creation date. (COMPLETED)
+6. **User**: Asks for daily OP numbering (OP 1, OP 2) on the Ordem de Produção tab, and to make the UI cards compact/expandable. (COMPLETED)
+7. **User**: Reports that the manual date on the Ficha de Análise isn't exactly what they need. It must automatically default to 1 day AFTER the Data do Lote (Batch Date), because analysis happens the next day, even if recorded in the system weeks later. (PENDING - P0)
 
 **Project Health Check:**
-- **Broken**:
-    - The production deployment is failing due to a likely external DNS issue.
-- **Mocked**: None.
+- Broken: None (Pending logic adjustment on date).
+- Mocked: None.
 
-**3rd Party Integrations**
-- **html-to-image:** Frontend library for generating images from DOM.
-- **recharts:** Frontend library for creating charts and graphs.
-- **WhatsApp Web:** Manual frontend integration (copy-paste).
+**3rd Party Integrations**:
+None added in this session.
 
-**Testing status**
-  - Testing agent used after significant changes: NO
-  - Troubleshoot agent used after agent stuck in loop: NO
-  - Test files created: []
-  - Known regressions: None.
+**Testing status**:
+- Testing agent used after significant changes: NO (Agent relied heavily on screenshot tool and API curl verifications).
+- Troubleshoot agent used after agent stuck in loop: NO
+- Test files created: None
+- Known regressions: None
 
 **Credentials to test flow:**
-- **Laboratório (Admin):**  / 
-- **Produção (Restricted):**  / 
-- **Authorized user for Em Produção:** 
+- **Laboratório (Admin)**:  /  (Use this to see Ordem de Produção and Ficha de Análise tabs).
+- **Produção (Restricted)**:  / 
 
-**What agent forgot to execute**
-- The agent started the reopen batch feature as requested but got interrupted by several subsequent user requests. The implementation was added but never fully tested end-to-end. This task remains incomplete.</analysis>
+**What agent forgot to execute**:
+- The agent continuously pushed the E2E testing of Reabrir Lote Arquivado to the backlog and never executed it.
+- The agent opened  to fix the  issue but the session ended before edits were made.
+
+**Debugging checklist for current issue**
+Issue: Ficha de Análise default date should be Batch Date + 1 day.
+
+Frontend files to check: 
+-  
+Look for the  state initialization and how it reacts when  changes.
+</analysis>

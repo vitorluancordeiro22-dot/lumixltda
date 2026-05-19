@@ -88,6 +88,8 @@ Sistema de gestão de produção industrial com controle de lotes, matérias-pri
 - [x] Aba "Ordem de Produção" (renomeada de "Fichas de Análises")
 - [x] Nova aba "Ficha de Análise" com 2 sub-abas (Produtos / Matérias-Primas): categorias, campos editáveis por produto, seletor de lote filtrado, registro de análises
 - [x] Especificações fixas por produto, botão Aprovado/Reprovado, barra de pesquisa ao adicionar produtos
+- [x] **Data da Ficha de Análise = Data do Lote + 1 dia** (02/2026) - Auto-preenchimento ao selecionar lote, com parsing manual para evitar fuso horário
+- [x] **Campos de Resposta Rápida (OK/REPROVADO)** (02/2026) - Toggle "TEXTO LIVRE / OK / REPROV." na edição de campos; renderiza botões OK/REPROVADO em vez de input ao registrar análise
 
 ## Backlog (P1/P2)
 - [ ] (P1) Testar E2E funcionalidade "Reabrir Lote"
