@@ -85,24 +85,29 @@ const buildLabelsHTML = (labels) => {
         .label {
           width: 4.4cm;
           height: 1.3cm;
-          padding: 0.1cm 0.15cm;
+          padding: 0.05cm 0.15cm;
           display: flex;
           flex-direction: column;
           justify-content: center;
           align-items: stretch;
           overflow: hidden;
-          line-height: 1.05;
+          line-height: 1.0;
         }
         .label.empty { background: transparent; }
         .product-name {
           font-weight: bold;
-          font-size: 8pt;
+          font-size: 7.5pt;
           text-align: center;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          margin-bottom: 0.05cm;
+          line-height: 1.0;
+          margin-bottom: 0.03cm;
           color: #1e3a8a; /* azul marinho */
+          /* Permite quebrar em até 2 linhas, ex: "LIMPADOR PERFUMADO" / "MANDARIM" */
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
+          word-break: break-word;
+          overflow-wrap: break-word;
         }
         .info {
           display: flex;
