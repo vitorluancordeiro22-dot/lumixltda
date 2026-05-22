@@ -39,8 +39,8 @@ const buildLabelsHTML = (labels) => {
           <div class="label">
             <div class="product-name">${(lbl.productName || '').toUpperCase()}</div>
             <div class="info">
-              <span>LOTE ${lbl.lote || '-'}</span>
-              <span>FAB ${lbl.fab || '-'}</span>
+              <span class="lote">LOTE ${lbl.lote || '-'}</span>
+              <span class="fab">FAB ${lbl.fab || '-'}</span>
             </div>
           </div>
         `);
@@ -63,7 +63,13 @@ const buildLabelsHTML = (labels) => {
           margin: 0;
         }
         * { box-sizing: border-box; }
-        html, body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; color: #000; background: #fff; }
+        html, body {
+          margin: 0; padding: 0;
+          font-family: Arial, Helvetica, sans-serif;
+          color: #000; background: #fff;
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+        }
         .sheet {
           width: 21.6cm;
           height: 27.9cm;
@@ -96,6 +102,7 @@ const buildLabelsHTML = (labels) => {
           overflow: hidden;
           text-overflow: ellipsis;
           margin-bottom: 0.05cm;
+          color: #1e3a8a; /* azul marinho */
         }
         .info {
           display: flex;
@@ -105,6 +112,8 @@ const buildLabelsHTML = (labels) => {
           font-weight: 600;
           white-space: nowrap;
         }
+        .info .lote { color: #15803d; }  /* verde escuro */
+        .info .fab  { color: #b91c1c; }  /* vermelho escuro */
         .info span { letter-spacing: 0.2px; }
         /* Preview only (não afeta impressão) */
         body.preview { background: #2a2a2a; padding: 1cm 0; }
