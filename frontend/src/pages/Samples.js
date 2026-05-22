@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Badge } from '../components/ui/badge';
 import { toast } from 'sonner';
 import { FlaskConical, Check, Clock, User } from 'lucide-react';
+import SampleLabelsPrintButton from '../components/SampleLabelsPrintButton';
 
 const formatDateBR = (dateStr) => {
   if (!dateStr) return 'N/A';
@@ -91,9 +92,12 @@ export const Samples = () => {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-2">Amostras</h1>
-        <p className="text-lg text-muted-foreground">Controle de amostras mensais de produtos</p>
+      <div className="flex items-start justify-between flex-wrap gap-3">
+        <div>
+          <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-2">Amostras</h1>
+          <p className="text-lg text-muted-foreground">Controle de amostras mensais de produtos</p>
+        </div>
+        <SampleLabelsPrintButton samples={samples} products={products} batches={batches} />
       </div>
 
       {loading ? (

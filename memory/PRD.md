@@ -90,6 +90,7 @@ Sistema de gestão de produção industrial com controle de lotes, matérias-pri
 - [x] Especificações fixas por produto, botão Aprovado/Reprovado, barra de pesquisa ao adicionar produtos
 - [x] **Data da Ficha de Análise = Data do Lote + 1 dia** (02/2026) - Auto-preenchimento ao selecionar lote, com parsing manual para evitar fuso horário
 - [x] **Campos de Resposta Rápida (OK/REPROVADO)** (02/2026) - Toggle "TEXTO LIVRE / OK / REPROV." na edição de campos; renderiza botões OK/REPROVADO em vez de input ao registrar análise
+- [x] **Impressão de Etiquetas de Amostras** (02/2026) - Nova folha em Papel Carta (21,6×27,9cm) com grid 4×20=80 etiquetas. Filtro por mês/ano, seleção de quantidade por amostra, pré-visualização em nova janela e impressão. Layout fiel: margem 1,3cm, etiquetas 4,4×1,3cm, gap horizontal 0,3cm. Cada etiqueta exibe NOME centralizado + LOTE/FAB.
 
 ## Backlog (P1/P2)
 - [ ] (P1) Testar E2E funcionalidade "Reabrir Lote"
