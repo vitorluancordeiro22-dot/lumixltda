@@ -1977,6 +1977,18 @@ async def get_archived_by_product(product_id: str, current_user = Depends(get_cu
     return batches
 
 
+@api_router.get('/archive/all-product-batches')
+async def get_all_archived_product_batches(current_user = Depends(get_current_user)):
+    """
+    Retorna TODOS os lotes de produtos arquivados (qualquer mês, qualquer produto).
+    Usado para resolver lote/data ao imprimir etiquetas de amostras antigas.
+    """
+    batches = await db.archived_product_batches.find(
+        {}, {'_id': 0}
+    ).sort('archived_at', -1).to_list(20000)
+    return batches
+
+
 @api_router.get('/archive/raw-materials/{year}/{month}')
 async def get_archived_raw_materials(year: int, month: int, current_user = Depends(get_current_user)):
     """

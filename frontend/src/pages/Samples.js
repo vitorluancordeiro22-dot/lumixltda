@@ -41,16 +41,20 @@ export const Samples = () => {
 
   const fetchData = async () => {
     try {
-      const [samplesRes, productsRes, batchesRes, teamRes] = await Promise.all([
+      const [samplesRes, productsRes, batchesRes, archivedBatchesRes, teamRes] = await Promise.all([
         api.get('/samples'),
         api.get('/products'),
         api.get('/product-batches'),
+        api.get('/archive/all-product-batches').catch(() => ({ data: [] })),
         api.get('/team')
       ]);
       if (isMountedRef.current) {
         setSamples(samplesRes.data);
         setProducts(productsRes.data);
-        setBatches(batchesRes.data);
+        // Mescla lotes ativos + arquivados (arquivados ficam ao final, sem duplicar IDs)
+        const activeIds = new Set((batchesRes.data || []).map(b => b.id));
+        const archivedOnly = (archivedBatchesRes.data || []).filter(b => !activeIds.has(b.id));
+        setBatches([...(batchesRes.data || []), ...archivedOnly]);
         setTeamMembers(teamRes.data);
       }
     } catch (error) {
