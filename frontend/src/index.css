@@ -3,30 +3,32 @@
 @tailwind utilities;
 
 /* =========================
-   TEMA CLARO
+   TEMA CLARO — Premium Lumix (Linear/Vercel/Stripe inspired)
 ========================= */
 
 :root {
-  --background: 255 255 255;
-  --foreground: 30 41 59;
+  --background: 250 250 250;          /* #FAFAFA — superfície da página */
+  --foreground: 15 23 42;             /* #0F172A — texto principal */
 
-  --card: 255 255 255;
-  --card-foreground: 30 41 59;
+  --card: 255 255 255;                /* #FFFFFF — superfície de cards */
+  --card-foreground: 15 23 42;
 
-  --primary: 14 165 233;
+  --primary: 37 99 235;               /* #2563EB — Azul principal */
   --primary-foreground: 255 255 255;
 
-  --secondary: 241 245 249;
-  --secondary-foreground: 30 41 59;
+  --secondary: 16 185 129;            /* #10B981 — Verde secundário */
+  --secondary-foreground: 255 255 255;
 
-  --muted: 248 250 252;
-  --muted-foreground: 100 116 139;
+  --muted: 241 245 249;               /* #F1F5F9 — surface secundária */
+  --muted-foreground: 100 116 139;    /* #64748B — texto auxiliar */
 
-  --border: 226 232 240;
+  --border: 228 228 231;              /* #E4E4E7 — bordas neutras */
+
+  --radius: 1rem;                     /* 16px raiz para cards */
 }
 
 /* =========================
-   TEMA ESCURO
+   TEMA ESCURO (mantido)
 ========================= */
 
 .dark {
@@ -36,11 +38,11 @@
   --card: 30 41 59;
   --card-foreground: 241 245 249;
 
-  --primary: 56 189 248;
+  --primary: 96 165 250;
   --primary-foreground: 15 23 42;
 
-  --secondary: 30 41 59;
-  --secondary-foreground: 241 245 249;
+  --secondary: 52 211 153;
+  --secondary-foreground: 15 23 42;
 
   --muted: 30 41 59;
   --muted-foreground: 148 163 184;
@@ -49,13 +51,12 @@
 }
 
 /* =========================
-   FIX: inputs/seletores no dark
+   FIX: inputs/seletores
 ========================= */
 
-/* texto e placeholder padrão */
 input, textarea, select {
   color: rgb(var(--foreground));
-  background-color: rgb(var(--background));
+  background-color: rgb(var(--card));
   border-color: rgb(var(--border));
 }
 
@@ -64,7 +65,6 @@ textarea::placeholder {
   color: rgb(var(--muted-foreground));
 }
 
-/* quando o navegador aplica autofill (Chrome) */
 input:-webkit-autofill,
 textarea:-webkit-autofill,
 select:-webkit-autofill {
@@ -72,13 +72,13 @@ select:-webkit-autofill {
   transition: background-color 9999s ease-in-out 0s;
 }
 
-/* dropdown/menus (muitos componentes usam popper/portal) */
 [role="listbox"],
 [role="menu"],
 [role="dialog"] [data-radix-popper-content-wrapper],
 [data-radix-portal] {
   color: rgb(var(--foreground));
 }
+
 /* =========================
    BASE
 ========================= */
@@ -86,6 +86,11 @@ select:-webkit-autofill {
 html,
 body {
   height: 100%;
+  font-family: 'Manrope', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-feature-settings: 'cv11', 'ss01';
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 body {
@@ -93,7 +98,38 @@ body {
   color: rgb(var(--foreground));
 }
 
-/* (Opcional) troca de tema suave */
-* {
-  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+/* Transições globais sutis */
+button, a, [role="button"] {
+  transition: background-color 180ms ease, color 180ms ease, border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+}
+
+/* Scrollbar sutil tipo Linear/Vercel */
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+  background: rgb(var(--border));
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover { background: rgb(var(--muted-foreground) / 0.4); background-clip: padding-box; }
+
+/* Sombras utilitárias premium */
+.shadow-soft {
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.02), 0 2px 10px 0 rgb(0 0 0 / 0.03);
+}
+.shadow-lift {
+  box-shadow: 0 4px 20px 0 rgb(0 0 0 / 0.06), 0 1px 3px 0 rgb(0 0 0 / 0.04);
+}
+
+/* Hover lift para cards premium */
+.hover-lift {
+  transition: box-shadow 220ms ease, transform 220ms ease, border-color 220ms ease;
+}
+.hover-lift:hover {
+  box-shadow: 0 8px 30px rgb(0 0 0 / 0.06);
+  transform: translateY(-1px);
 }

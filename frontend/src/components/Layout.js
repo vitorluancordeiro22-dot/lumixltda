@@ -66,19 +66,19 @@ const Sidebar = ({ mobile = false, onItemClick }) => {
   return (
     <div className="flex flex-col h-full">
       {/* Header com Logo */}
-      <div className="p-6 border-b border-border">
+      <div className="px-5 pt-6 pb-5 border-b border-border/60">
         <div className="flex items-center gap-3">
           <img 
             src={logoUrl} 
             alt="Lumix - Produtos de Limpeza" 
-            className="h-16 w-auto object-contain"
+            className="h-12 w-auto object-contain"
           />
         </div>
         {/* Role Badge */}
-        <div className={`mt-3 inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium ${
+        <div className={`mt-4 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold tracking-wide ${
           role === 'laboratorio' 
-            ? 'bg-primary/10 text-primary' 
-            : 'bg-orange-500/10 text-orange-600'
+            ? 'bg-primary/10 text-primary ring-1 ring-primary/20' 
+            : 'bg-orange-500/10 text-orange-600 ring-1 ring-orange-500/20'
         }`}>
           {role === 'laboratorio' ? <FlaskConical className="h-3 w-3" /> : <Factory className="h-3 w-3" />}
           {role === 'laboratorio' ? 'Laboratório' : 'Produção'}
@@ -86,7 +86,7 @@ const Sidebar = ({ mobile = false, onItemClick }) => {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
+      <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
         {menuItems.map((item) => {
           const Icon = item.icon;
           const isActive = location.pathname === item.path;
@@ -96,32 +96,38 @@ const Sidebar = ({ mobile = false, onItemClick }) => {
               to={item.path}
               data-testid={`nav-${item.path.slice(1)}`}
               onClick={onItemClick}
-              className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
+              className={`group relative flex items-center gap-3 px-3 py-2 rounded-xl text-sm transition-all duration-200 ${
                 isActive
-                  ? 'bg-primary text-primary-foreground shadow-md'
-                  : 'text-foreground hover:bg-muted hover:text-foreground'
+                  ? 'bg-card text-primary font-semibold shadow-soft ring-1 ring-border'
+                  : 'text-muted-foreground font-medium hover:bg-muted hover:text-foreground'
               }`}
             >
-              <Icon className="w-5 h-5" strokeWidth={1.5} />
-              <span className="font-medium">{item.label}</span>
+              {isActive && (
+                <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-0.5 rounded-r bg-primary" aria-hidden="true" />
+              )}
+              <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'}`} strokeWidth={isActive ? 2.25 : 1.75} />
+              <span className="truncate">{item.label}</span>
             </Link>
           );
         })}
       </nav>
 
       {/* User Section */}
-      <div className="p-4 border-t border-border">
-        <div className="flex items-center justify-between mb-3">
-          <div>
-            <p className="text-sm font-medium text-foreground">{user?.name}</p>
-            <p className="text-xs text-muted-foreground">{user?.email}</p>
+      <div className="px-4 py-4 border-t border-border/60">
+        <div className="flex items-center gap-2.5 mb-3">
+          <div className="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm font-semibold shrink-0 ring-1 ring-primary/15">
+            {(user?.name || user?.email || '?').charAt(0).toUpperCase()}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-foreground truncate">{user?.name}</p>
+            <p className="text-[11px] text-muted-foreground truncate">{user?.email}</p>
           </div>
         </div>
         <Button
           onClick={logout}
           data-testid="logout-button"
           variant="outline"
-          className="w-full justify-start"
+          className="w-full justify-start h-9 text-sm border-border hover:bg-muted hover:text-foreground rounded-xl"
         >
           <LogOut className="w-4 h-4 mr-2" />
           Sair
@@ -142,7 +148,7 @@ export const Layout = () => {
     <div className="min-h-screen bg-background">
       {/* Desktop Sidebar - escondido se forceMobileView está ativo */}
       {showDesktopSidebar && (
-        <aside className="hidden md:fixed md:inset-y-0 md:flex md:w-64 md:flex-col bg-card border-r border-border z-50 shadow-sm">
+        <aside className="hidden md:fixed md:inset-y-0 md:flex md:w-64 md:flex-col bg-background border-r border-border/60 z-50">
           <Sidebar />
         </aside>
       )}

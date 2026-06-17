@@ -40,15 +40,23 @@ module.exports = {
       },
 
       fontFamily: {
-        sans: ["IBM Plex Sans", "sans-serif"],
-        heading: ["Manrope", "sans-serif"],
+        sans: ["Manrope", "Inter", "system-ui", "-apple-system", "sans-serif"],
+        heading: ["Manrope", "Inter", "sans-serif"],
         mono: ["JetBrains Mono", "monospace"],
       },
 
       borderRadius: {
-        lg: "0.5rem",
-        md: "0.375rem",
-        sm: "0.25rem",
+        '2xl': "1rem",
+        xl: "0.75rem",
+        lg: "0.625rem",
+        md: "0.5rem",
+        sm: "0.375rem",
+      },
+
+      boxShadow: {
+        'soft': '0 1px 2px 0 rgb(0 0 0 / 0.02), 0 2px 10px 0 rgb(0 0 0 / 0.03)',
+        'lift': '0 4px 20px 0 rgb(0 0 0 / 0.06), 0 1px 3px 0 rgb(0 0 0 / 0.04)',
+        'premium': '0 8px 30px 0 rgb(0 0 0 / 0.06)',
       },
 
     },

@@ -7,6 +7,21 @@ import { Skeleton } from '../components/ui/skeleton';
 import { toast } from 'sonner';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 
+// Tooltip customizado para os gráficos (definido fora do componente para evitar re-renders)
+const CustomTooltip = ({ active, payload, label }) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-card border border-border px-3.5 py-2.5 rounded-xl shadow-premium">
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">{label}</p>
+        <p className="text-sm font-bold text-foreground">
+          {payload[0].value.toFixed(1)} <span className="text-muted-foreground font-medium">Litros</span>
+        </p>
+      </div>
+    );
+  }
+  return null;
+};
+
 export const Dashboard = () => {
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -44,8 +59,10 @@ export const Dashboard = () => {
   };
 
   useEffect(() => {
-    fetchSummary();
-    fetchChartData();
+    queueMicrotask(() => {
+      fetchSummary();
+      fetchChartData();
+    });
   }, []);
 
   const handleResetLiters = async () => {
@@ -87,40 +104,28 @@ export const Dashboard = () => {
       label: 'Lotes em Aberto',
       value: summary?.open_batches || 0,
       icon: Package,
-      color: 'text-muted-foreground',
-      bg: 'bg-muted'
+      color: 'text-primary',
+      bg: 'bg-primary/10',
+      ring: 'ring-primary/15'
     },
     {
       label: 'Litros Envasados (Mês)',
       value: summary?.liters_bottled_month?.toFixed(1) || '0.0',
       icon: Droplets,
-      color: 'text-emerald-600',
-      bg: 'bg-emerald-50'
+      color: 'text-secondary',
+      bg: 'bg-secondary/10',
+      ring: 'ring-secondary/15'
     },
   ];
-
-  // Tooltip customizado para os gráficos
-  const CustomTooltip = ({ active, payload, label }) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-card border border-border p-3 rounded-lg shadow-lg">
-          <p className="text-sm font-semibold text-foreground">{label}</p>
-          <p className="text-sm text-emerald-600">
-            {payload[0].value.toFixed(1)} Litros
-          </p>
-        </div>
-      );
-    }
-    return null;
-  };
 
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 pb-2">
         <div>
-          <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-2">Dashboard</h1>
-          <p className="text-lg text-muted-foreground">Visão geral da produção</p>
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-2">Visão Geral</p>
+          <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-foreground">Dashboard</h1>
+          <p className="text-sm text-muted-foreground mt-1">Acompanhamento de produção, lotes e estoque em tempo real</p>
         </div>
         <div className="flex gap-2 flex-wrap">
           <Button
@@ -128,17 +133,17 @@ export const Dashboard = () => {
             disabled={recalculating}
             variant="default"
             data-testid="recalculate-liters-btn"
-            className="bg-emerald-600 hover:bg-emerald-700 text-white shrink-0"
+            className="bg-secondary hover:bg-secondary/90 text-secondary-foreground shrink-0 rounded-xl h-10 px-4 shadow-soft"
           >
             <Calculator className="w-4 h-4 mr-2" />
-            {recalculating ? 'Calculando...' : 'Recalcular Litragem Mensal'}
+            {recalculating ? 'Calculando...' : 'Recalcular Litragem'}
           </Button>
           <Button
             onClick={handleResetLiters}
             disabled={resetting}
             variant="outline"
             data-testid="reset-liters-btn"
-            className="border-border text-foreground hover:bg-muted shrink-0"
+            className="border-border text-foreground hover:bg-muted shrink-0 rounded-xl h-10 px-4"
           >
             <RotateCcw className="w-4 h-4 mr-2" />
             {resetting ? 'Resetando...' : 'Resetar Litros'}
@@ -147,10 +152,10 @@ export const Dashboard = () => {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         {loading ? (
           [...Array(2)].map((_, i) => (
-            <Card key={i} className="p-6 border shadow-sm">
+            <Card key={i} className="p-6 rounded-2xl border border-border shadow-soft">
               <Skeleton className="h-20 bg-muted" />
             </Card>
           ))
@@ -161,17 +166,17 @@ export const Dashboard = () => {
               <Card
                 key={index}
                 data-testid={`stat-card-${index}`}
-                className="p-6 border shadow-sm hover:border-primary/50 hover:shadow-md transition-all"
+                className="p-6 rounded-2xl border border-border bg-card shadow-soft hover-lift"
               >
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground uppercase tracking-wider mb-2">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest mb-3">
                       {stat.label}
                     </p>
-                    <p className="text-3xl font-bold text-foreground">{stat.value}</p>
+                    <p className="text-4xl font-bold tracking-tight text-foreground">{stat.value}</p>
                   </div>
-                  <div className={`p-3 rounded-lg ${stat.bg}`}>
-                    <Icon className={`w-6 h-6 ${stat.color}`} strokeWidth={1.5} />
+                  <div className={`w-11 h-11 rounded-xl ${stat.bg} ring-1 ${stat.ring} flex items-center justify-center shrink-0`}>
+                    <Icon className={`w-5 h-5 ${stat.color}`} strokeWidth={2} />
                   </div>
                 </div>
               </Card>
@@ -181,47 +186,55 @@ export const Dashboard = () => {
       </div>
 
       {/* Charts Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         {/* Gráfico de Produção Diária */}
-        <Card className="p-6 border shadow-sm">
-          <div className="flex items-center gap-2 mb-4">
-            <TrendingUp className="w-5 h-5 text-emerald-600" />
-            <h2 className="text-xl font-semibold text-foreground">Produção Diária (Últimos 30 dias)</h2>
+        <Card className="p-6 rounded-2xl border border-border shadow-soft">
+          <div className="flex items-center gap-2.5 mb-5">
+            <div className="w-8 h-8 rounded-lg bg-secondary/10 ring-1 ring-secondary/15 flex items-center justify-center">
+              <TrendingUp className="w-4 h-4 text-secondary" strokeWidth={2.2} />
+            </div>
+            <div>
+              <h2 className="text-base font-semibold text-foreground tracking-tight">Produção Diária</h2>
+              <p className="text-xs text-muted-foreground">Últimos 30 dias</p>
+            </div>
           </div>
           {chartsLoading ? (
             <Skeleton className="h-[300px] bg-muted" />
           ) : dailyData.length === 0 ? (
-            <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+            <div className="h-[300px] flex items-center justify-center text-muted-foreground text-sm">
               Nenhum dado de produção disponível
             </div>
           ) : (
             <ResponsiveContainer width="100%" height={300}>
-              <AreaChart data={dailyData}>
+              <AreaChart data={dailyData} margin={{ top: 10, right: 10, left: 5, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorLiters" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
+                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.25}/>
                     <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.3} />
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
                 <XAxis 
                   dataKey="day" 
-                  tick={{ fill: '#9ca3af', fontSize: 12 }}
-                  axisLine={{ stroke: '#374151' }}
+                  tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 500 }}
+                  axisLine={false}
+                  tickLine={false}
                 />
                 <YAxis 
-                  tick={{ fill: '#9ca3af', fontSize: 12 }}
-                  axisLine={{ stroke: '#374151' }}
+                  tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 500 }}
+                  axisLine={false}
+                  tickLine={false}
                   tickFormatter={(value) => `${value}L`}
                 />
-                <Tooltip content={<CustomTooltip />} />
+                <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#cbd5e1', strokeDasharray: '3 3' }} />
                 <Area 
                   type="monotone" 
                   dataKey="liters" 
                   stroke="#10b981" 
-                  strokeWidth={2}
+                  strokeWidth={2.5}
                   fillOpacity={1} 
                   fill="url(#colorLiters)" 
+                  activeDot={{ r: 5, strokeWidth: 0, fill: '#10b981' }}
                 />
               </AreaChart>
             </ResponsiveContainer>
@@ -229,36 +242,43 @@ export const Dashboard = () => {
         </Card>
 
         {/* Gráfico de Produção Mensal */}
-        <Card className="p-6 border shadow-sm">
-          <div className="flex items-center gap-2 mb-4">
-            <BarChart3 className="w-5 h-5 text-blue-600" />
-            <h2 className="text-xl font-semibold text-foreground">Produção Mensal (Últimos 12 meses)</h2>
+        <Card className="p-6 rounded-2xl border border-border shadow-soft">
+          <div className="flex items-center gap-2.5 mb-5">
+            <div className="w-8 h-8 rounded-lg bg-primary/10 ring-1 ring-primary/15 flex items-center justify-center">
+              <BarChart3 className="w-4 h-4 text-primary" strokeWidth={2.2} />
+            </div>
+            <div>
+              <h2 className="text-base font-semibold text-foreground tracking-tight">Produção Mensal</h2>
+              <p className="text-xs text-muted-foreground">Últimos 12 meses</p>
+            </div>
           </div>
           {chartsLoading ? (
             <Skeleton className="h-[300px] bg-muted" />
           ) : monthlyData.length === 0 ? (
-            <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+            <div className="h-[300px] flex items-center justify-center text-muted-foreground text-sm">
               Nenhum dado de produção disponível
             </div>
           ) : (
             <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={monthlyData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.3} />
+              <BarChart data={monthlyData} margin={{ top: 10, right: 10, left: 5, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
                 <XAxis 
                   dataKey="month" 
-                  tick={{ fill: '#9ca3af', fontSize: 11 }}
-                  axisLine={{ stroke: '#374151' }}
+                  tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 500 }}
+                  axisLine={false}
+                  tickLine={false}
                 />
                 <YAxis 
-                  tick={{ fill: '#9ca3af', fontSize: 12 }}
-                  axisLine={{ stroke: '#374151' }}
+                  tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 500 }}
+                  axisLine={false}
+                  tickLine={false}
                   tickFormatter={(value) => `${value}L`}
                 />
-                <Tooltip content={<CustomTooltip />} />
+                <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(37, 99, 235, 0.05)' }} />
                 <Bar 
                   dataKey="liters" 
-                  fill="#3b82f6" 
-                  radius={[4, 4, 0, 0]}
+                  fill="#2563EB" 
+                  radius={[6, 6, 0, 0]}
                 />
               </BarChart>
             </ResponsiveContainer>
@@ -268,41 +288,38 @@ export const Dashboard = () => {
 
       {/* Resumo dos Gráficos */}
       {!chartsLoading && (dailyData.length > 0 || monthlyData.length > 0) && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Melhor dia */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
           {dailyData.length > 0 && (
-            <Card className="p-4 border bg-emerald-50/50">
-              <p className="text-sm text-muted-foreground mb-1">Melhor Dia (30 dias)</p>
-              <p className="text-2xl font-bold text-emerald-600">
-                {Math.max(...dailyData.map(d => d.liters)).toFixed(1)}L
+            <Card className="p-5 rounded-2xl border border-border bg-card shadow-soft hover-lift">
+              <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest mb-2">Melhor Dia (30 dias)</p>
+              <p className="text-3xl font-bold text-secondary tracking-tight">
+                {Math.max(...dailyData.map(d => d.liters)).toFixed(1)}<span className="text-base text-muted-foreground font-medium ml-1">L</span>
               </p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-muted-foreground mt-1">
                 {dailyData.find(d => d.liters === Math.max(...dailyData.map(x => x.liters)))?.day || '-'}
               </p>
             </Card>
           )}
           
-          {/* Melhor mês */}
           {monthlyData.length > 0 && (
-            <Card className="p-4 border bg-blue-50/50">
-              <p className="text-sm text-muted-foreground mb-1">Melhor Mês (12 meses)</p>
-              <p className="text-2xl font-bold text-blue-600">
-                {Math.max(...monthlyData.map(d => d.liters)).toFixed(1)}L
+            <Card className="p-5 rounded-2xl border border-border bg-card shadow-soft hover-lift">
+              <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest mb-2">Melhor Mês (12 meses)</p>
+              <p className="text-3xl font-bold text-primary tracking-tight">
+                {Math.max(...monthlyData.map(d => d.liters)).toFixed(1)}<span className="text-base text-muted-foreground font-medium ml-1">L</span>
               </p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-muted-foreground mt-1">
                 {monthlyData.find(d => d.liters === Math.max(...monthlyData.map(x => x.liters)))?.month || '-'}
               </p>
             </Card>
           )}
           
-          {/* Média diária */}
           {dailyData.length > 0 && (
-            <Card className="p-4 border bg-purple-50/50">
-              <p className="text-sm text-muted-foreground mb-1">Média Diária</p>
-              <p className="text-2xl font-bold text-purple-600">
-                {(dailyData.reduce((acc, d) => acc + d.liters, 0) / dailyData.length).toFixed(1)}L
+            <Card className="p-5 rounded-2xl border border-border bg-card shadow-soft hover-lift">
+              <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest mb-2">Média Diária</p>
+              <p className="text-3xl font-bold text-foreground tracking-tight">
+                {(dailyData.reduce((acc, d) => acc + d.liters, 0) / dailyData.length).toFixed(1)}<span className="text-base text-muted-foreground font-medium ml-1">L</span>
               </p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-muted-foreground mt-1">
                 Últimos {dailyData.length} dias com produção
               </p>
             </Card>
