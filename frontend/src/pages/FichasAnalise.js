@@ -4,6 +4,7 @@ import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { toast } from 'sonner';
 import { ClipboardCopy, X, FlaskConical, Package, Calendar, Hash, ChevronDown, ChevronRight } from 'lucide-react';
+import DocumentationButton from '../components/DocumentationButton';
 
 export default function FichasAnalise() {
   const [fichas, setFichas] = useState([]);
@@ -120,7 +121,8 @@ export default function FichasAnalise() {
                     {ficha.planned_liters} {ficha.unit}
                   </span>
 
-                  <div className="ml-auto flex-shrink-0">
+                  <div className="ml-auto flex-shrink-0 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                    <DocumentationButton productId={ficha.product_id} productName={ficha.product_name} />
                     <Button
                       variant="destructive"
                       size="sm"

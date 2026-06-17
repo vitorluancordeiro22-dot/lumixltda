@@ -741,23 +741,17 @@ async def create_product_batch(data: ProductBatchCreate, current_user = Depends(
         }
         await db.samples.insert_one(sample_doc)
     
-    # === FICHA DE ANÁLISE ===
-    # Criar ficha apenas para o primeiro lote do produto no mês
-    existing_ficha = await db.fichas_analise.find_one({
-        'product_id': data.product_id,
-        'month': batch_date.month,
-        'year': batch_date.year,
-        'deleted': {'$ne': True}
-    })
-    
-    if not existing_ficha and product:
-        # Calcular número da OP do dia (conta fichas criadas no mesmo dia, excluindo repetidos do mês)
+    # === FICHA DE ANÁLISE / ORDEM DE PRODUÇÃO ===
+    # Cria uma ficha para CADA lote (não mais "uma por mês"). Cada lote vira uma
+    # entrada na aba "Ordem de Produção" e fica visível até ser fechada.
+    if product:
+        # Numeração OP do dia (sequencial por dia, todos os produtos)
         op_count_today = await db.fichas_analise.count_documents({
             'date': data.date,
             'deleted': {'$ne': True}
         })
         op_number = op_count_today + 1
-        
+
         ficha_doc = {
             'id': str(uuid.uuid4()),
             'product_id': data.product_id,
@@ -776,7 +770,7 @@ async def create_product_batch(data: ProductBatchCreate, current_user = Depends(
             'created_at': datetime.now(timezone.utc).isoformat(),
             'deleted': False
         }
-        
+
         # Preencher receita com dados detalhados de MP
         for mat_used in batch_doc.get('raw_materials_used', []):
             recipe_entry = {
@@ -787,9 +781,9 @@ async def create_product_batch(data: ProductBatchCreate, current_user = Depends(
                 'batches_consumed': mat_used.get('batches_consumed', [])
             }
             ficha_doc['recipes'].append(recipe_entry)
-        
+
         await db.fichas_analise.insert_one(ficha_doc)
-    
+
     return ProductBatch(**batch_doc)
 
 @api_router.put('/product-batches/{batch_id}', response_model=ProductBatch)
@@ -1364,6 +1358,80 @@ async def close_ficha_analise(ficha_id: str, current_user = Depends(get_current_
         raise HTTPException(status_code=404, detail='Ficha não encontrada')
     
     return {'message': 'Ficha fechada com sucesso'}
+
+
+@api_router.post('/fichas-analise/backfill')
+async def backfill_fichas_analise(current_user = Depends(get_current_user)):
+    """
+    Cria fichas/OPs para lotes de produto existentes que ainda não têm uma ficha.
+    Útil para popular a aba Ordem de Produção com lotes históricos em aberto.
+    Só inclui lotes não-finalizados e não-deletados.
+    """
+    if current_user.get('email') != 'laboratoriolumix@outlook.com':
+        raise HTTPException(status_code=403, detail='Acesso restrito ao laboratório')
+
+    # Pega todos os lotes em aberto que ainda não têm ficha vinculada
+    batches = await db.product_batches.find(
+        {'deleted': {'$ne': True}, 'status': {'$ne': 'finalizado'}},
+        {'_id': 0}
+    ).to_list(5000)
+
+    existing_batch_ids = set()
+    async for f in db.fichas_analise.find(
+        {'deleted': {'$ne': True}},
+        {'_id': 0, 'product_batch_id': 1}
+    ):
+        if f.get('product_batch_id'):
+            existing_batch_ids.add(f['product_batch_id'])
+
+    created = 0
+    for b in batches:
+        if b['id'] in existing_batch_ids:
+            continue
+        product = await db.products.find_one({'id': b.get('product_id')}, {'_id': 0})
+        if not product:
+            continue
+        try:
+            batch_date = datetime.fromisoformat(str(b.get('date')).split('T')[0])
+        except Exception:
+            batch_date = datetime.now(timezone.utc)
+
+        op_count = await db.fichas_analise.count_documents({
+            'date': b.get('date'),
+            'deleted': {'$ne': True}
+        })
+        ficha_doc = {
+            'id': str(uuid.uuid4()),
+            'product_id': b.get('product_id'),
+            'product_name': product.get('name', ''),
+            'product_batch_id': b['id'],
+            'batch_number': b.get('batch_number', ''),
+            'month': batch_date.month,
+            'year': batch_date.year,
+            'date': b.get('date'),
+            'op_number': op_count + 1,
+            'planned_liters': b.get('planned_liters', 0),
+            'unit': b.get('unit', 'Litros'),
+            'expected_liters': product.get('expected_liters', 0),
+            'recipes': [
+                {
+                    'raw_material_id': m.get('raw_material_id'),
+                    'raw_material_name': m.get('raw_material_name'),
+                    'quantity_needed': m.get('quantity_needed'),
+                    'unit': m.get('unit', ''),
+                    'batches_consumed': m.get('batches_consumed', []),
+                }
+                for m in (b.get('raw_materials_used') or [])
+            ],
+            'status': 'aberta',
+            'created_at': datetime.now(timezone.utc).isoformat(),
+            'deleted': False,
+            'backfilled': True,
+        }
+        await db.fichas_analise.insert_one(ficha_doc)
+        created += 1
+
+    return {'message': f'{created} ordem(ns) de produção criada(s) para lotes existentes', 'created': created}
 
 
 # ========== FICHA DE ANÁLISE - SISTEMA DE ANÁLISES ==========
