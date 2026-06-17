@@ -3035,18 +3035,33 @@ async def _build_documentation_payload(product_batch_id: str) -> dict:
     if consumed:
         # Caso o lote tenha consumido MP (via LIFO)
         for mat in consumed:
-            # Pega validade do primeiro lote consumido
+            # Pega validade do primeiro lote consumido (mesmo finalizado/zerado)
             validade = ''
+            lote_mp = ''
             for b in (mat.get('batches_consumed') or []):
                 rm_b = await db.raw_material_batches.find_one(
                     {'id': b.get('batch_id')}, {'_id': 0}
                 )
-                if rm_b and rm_b.get('expiration_date'):
-                    validade = _fmt_date_br(rm_b['expiration_date'])
+                if rm_b:
+                    if rm_b.get('expiry_date'):
+                        validade = _fmt_date_br(rm_b['expiry_date'])
                     lote_mp = rm_b.get('batch_number') or ''
-                    break
-            else:
-                lote_mp = ''
+                    if lote_mp:
+                        break
+
+            # Fallback: se o lote consumido foi deletado, busca o lote MAIS RECENTE
+            # da MP em qualquer status (em_aberto, finalizado), ignorando só os
+            # marcados como deleted=True.
+            if not lote_mp:
+                latest = await db.raw_material_batches.find(
+                    {'raw_material_id': mat.get('raw_material_id'),
+                     'deleted': {'$ne': True}},
+                    {'_id': 0}
+                ).sort('date', -1).limit(1).to_list(1)
+                if latest:
+                    lote_mp = latest[0].get('batch_number', '') or ''
+                    if not validade and latest[0].get('expiry_date'):
+                        validade = _fmt_date_br(latest[0]['expiry_date'])
 
             qty = float(mat.get('quantity_needed') or 0)
             # Percentual proporcional à litragem planejada (qty corresponde a planned_liters)
@@ -3074,13 +3089,14 @@ async def _build_documentation_payload(product_batch_id: str) -> dict:
             rm = await db.raw_materials.find_one({'id': rm_id}, {'_id': 0})
             rm_name = (rm.get('name') if rm else '') or ''
 
-            # Lote mais recente em estoque
+            # Lote mais recente em QUALQUER status (em_aberto, finalizado/zerado),
+            # excluindo só os deletados. Se a MP acabou, pega o último lote usado.
             latest = await db.raw_material_batches.find(
-                {'raw_material_id': rm_id, 'status': 'em_aberto', 'deleted': {'$ne': True}},
+                {'raw_material_id': rm_id, 'deleted': {'$ne': True}},
                 {'_id': 0}
             ).sort('date', -1).limit(1).to_list(1)
             lote_mp = latest[0].get('batch_number', '') if latest else ''
-            validade = _fmt_date_br(latest[0].get('expiration_date')) if latest else ''
+            validade = _fmt_date_br(latest[0].get('expiry_date')) if latest else ''
 
             materials.append({
                 'name': rm_name.upper(),
