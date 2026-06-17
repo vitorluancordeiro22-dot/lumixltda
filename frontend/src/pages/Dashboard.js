@@ -213,28 +213,28 @@ export const Dashboard = () => {
                     <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" vertical={false} />
                 <XAxis 
                   dataKey="day" 
-                  tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 500 }}
+                  tick={{ fill: '#94A3B8', fontSize: 11, fontWeight: 500 }}
                   axisLine={false}
                   tickLine={false}
                 />
                 <YAxis 
-                  tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 500 }}
+                  tick={{ fill: '#94A3B8', fontSize: 11, fontWeight: 500 }}
                   axisLine={false}
                   tickLine={false}
                   tickFormatter={(value) => `${value}L`}
                 />
-                <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#cbd5e1', strokeDasharray: '3 3' }} />
+                <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#CBD5E1', strokeDasharray: '3 3' }} />
                 <Area 
                   type="monotone" 
                   dataKey="liters" 
-                  stroke="#10b981" 
+                  stroke="#10B981" 
                   strokeWidth={2.5}
                   fillOpacity={1} 
                   fill="url(#colorLiters)" 
-                  activeDot={{ r: 5, strokeWidth: 0, fill: '#10b981' }}
+                  activeDot={{ r: 5, strokeWidth: 0, fill: '#10B981' }}
                 />
               </AreaChart>
             </ResponsiveContainer>
@@ -261,15 +261,15 @@ export const Dashboard = () => {
           ) : (
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={monthlyData} margin={{ top: 10, right: 10, left: 5, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" vertical={false} />
                 <XAxis 
                   dataKey="month" 
-                  tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 500 }}
+                  tick={{ fill: '#94A3B8', fontSize: 11, fontWeight: 500 }}
                   axisLine={false}
                   tickLine={false}
                 />
                 <YAxis 
-                  tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 500 }}
+                  tick={{ fill: '#94A3B8', fontSize: 11, fontWeight: 500 }}
                   axisLine={false}
                   tickLine={false}
                   tickFormatter={(value) => `${value}L`}

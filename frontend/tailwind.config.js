@@ -26,15 +26,19 @@ module.exports = {
 
         muted: "rgb(var(--muted) / 1)",
         "muted-foreground": "rgb(var(--muted-foreground) / 1)",
+        auxiliary: "rgb(var(--auxiliary) / 1)",
 
         accent: "rgb(var(--primary) / 1)",
         "accent-foreground": "rgb(var(--primary-foreground) / 1)",
 
         destructive: "#EF4444",
         "destructive-foreground": "#FFFFFF",
+        success: "rgb(var(--success) / 1)",
+        warning: "rgb(var(--warning) / 1)",
+        info: "rgb(var(--info) / 1)",
 
         border: "rgb(var(--border) / 1)",
-        input: "rgb(var(--background) / 1)",
+        input: "rgb(var(--card) / 1)",
         ring: "rgb(var(--primary) / 1)",
 
       },

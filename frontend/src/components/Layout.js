@@ -98,14 +98,11 @@ const Sidebar = ({ mobile = false, onItemClick }) => {
               onClick={onItemClick}
               className={`group relative flex items-center gap-3 px-3 py-2 rounded-xl text-sm transition-all duration-200 ${
                 isActive
-                  ? 'bg-card text-primary font-semibold shadow-soft ring-1 ring-border'
-                  : 'text-muted-foreground font-medium hover:bg-muted hover:text-foreground'
+                  ? 'bg-primary text-primary-foreground font-semibold shadow-soft'
+                  : 'text-muted-foreground font-medium hover:bg-primary/10 hover:text-primary'
               }`}
             >
-              {isActive && (
-                <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-0.5 rounded-r bg-primary" aria-hidden="true" />
-              )}
-              <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'}`} strokeWidth={isActive ? 2.25 : 1.75} />
+              <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-primary-foreground' : 'text-muted-foreground group-hover:text-primary'}`} strokeWidth={isActive ? 2.25 : 1.75} />
               <span className="truncate">{item.label}</span>
             </Link>
           );
@@ -148,7 +145,7 @@ export const Layout = () => {
     <div className="min-h-screen bg-background">
       {/* Desktop Sidebar - escondido se forceMobileView está ativo */}
       {showDesktopSidebar && (
-        <aside className="hidden md:fixed md:inset-y-0 md:flex md:w-64 md:flex-col bg-background border-r border-border/60 z-50">
+        <aside className="hidden md:fixed md:inset-y-0 md:flex md:w-64 md:flex-col bg-card border-r border-border/60 z-50">
           <Sidebar />
         </aside>
       )}
