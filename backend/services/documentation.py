@@ -25,6 +25,20 @@ from xlutils.copy import copy as xl_copy
 TEMPLATES_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'templates')
 FICHA_TEMPLATE = os.path.join(TEMPLATES_DIR, 'ficha_template.docx')
 OP_TEMPLATE = os.path.join(TEMPLATES_DIR, 'op_template.xls')
+CUSTOM_TEMPLATES_DIR = os.path.join(TEMPLATES_DIR, 'custom_ficha')
+os.makedirs(CUSTOM_TEMPLATES_DIR, exist_ok=True)
+
+
+def get_ficha_template_path(product_id: Optional[str] = None) -> str:
+    """
+    Retorna o caminho do template DOCX para o produto, se ele tiver um custom,
+    ou o template padrão (CITRONELA GEL) como fallback.
+    """
+    if product_id:
+        custom = os.path.join(CUSTOM_TEMPLATES_DIR, f'{product_id}.docx')
+        if os.path.isfile(custom):
+            return custom
+    return FICHA_TEMPLATE
 
 
 def _fmt_date_br(value) -> str:
@@ -66,13 +80,17 @@ def fill_ficha_template(
     lote_number: str,
     fab_date: str,
     output_path: str,
+    template_path: Optional[str] = None,
 ):
     """
     Preenche o DOCX da Ficha de Fabricação. Apenas substitui os campos variáveis
     no cabeçalho (PRODUTO, LOTE Nº, ORDEM DE PRODUÇÃO Nº, DATA) mantendo o restante
     do template (processo de fabricação, especificações) exatamente como está.
+
+    template_path: se fornecido, usa esse template específico em vez do padrão.
     """
-    doc = Document(FICHA_TEMPLATE)
+    src = template_path or FICHA_TEMPLATE
+    doc = Document(src)
 
     # As substituições são feitas via regex porque os textos podem ter espaços
     # múltiplos / quebras visuais. O template tem "PRODUTO: CITRONELA GEL" e

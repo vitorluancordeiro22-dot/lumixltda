@@ -2987,7 +2987,8 @@ setup_industrial_op_routes(api_router, db, fs, get_current_user, generate_batch_
 
 # ========== DOCUMENTAÇÃO DE PRODUÇÃO (Ficha + OP via templates oficiais) ==========
 from services.documentation import (
-    fill_ficha_template, fill_op_template, convert_to_pdf, _fmt_date_br
+    fill_ficha_template, fill_op_template, convert_to_pdf, _fmt_date_br,
+    CUSTOM_TEMPLATES_DIR, get_ficha_template_path
 )
 import tempfile
 
@@ -3155,12 +3156,18 @@ async def generate_production_documentation(
     try:
         if doc_type == 'ficha':
             out_path = os.path.join(tmpdir, f'ficha_{safe_prod}_{safe_lote}.docx')
+            # usa template personalizado do produto se existir, senão o padrão
+            batch_doc = await db.product_batches.find_one({'id': product_batch_id}, {'_id': 0, 'product_id': 1}) \
+                or await db.archived_product_batches.find_one({'id': product_batch_id}, {'_id': 0, 'product_id': 1})
+            product_id_for_tpl = batch_doc.get('product_id') if batch_doc else None
+            template_path = get_ficha_template_path(product_id_for_tpl)
             fill_ficha_template(
                 product_name=payload['product_name'],
                 op_number=payload['op_number'],
                 lote_number=payload['lote_number'],
                 fab_date=payload['fab_date'],
                 output_path=out_path,
+                template_path=template_path,
             )
             mime_native = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
             filename_native = f'Ficha_{safe_prod}_{safe_lote}.docx'
@@ -3206,6 +3213,87 @@ async def generate_production_documentation(
             _sh.rmtree(tmpdir, ignore_errors=True)
         except Exception:
             pass
+
+
+# ----- Templates de Ficha por Produto -----
+
+@api_router.get('/products/{product_id}/ficha-template')
+async def get_product_ficha_template_status(
+    product_id: str,
+    current_user = Depends(get_current_user)
+):
+    """Retorna se o produto tem template personalizado e meta informações."""
+    custom_path = os.path.join(CUSTOM_TEMPLATES_DIR, f'{product_id}.docx')
+    exists = os.path.isfile(custom_path)
+    if not exists:
+        return {'has_custom': False}
+    meta = await db.product_ficha_templates.find_one({'product_id': product_id}, {'_id': 0})
+    return {
+        'has_custom': True,
+        'filename': (meta or {}).get('filename', ''),
+        'uploaded_at': (meta or {}).get('uploaded_at', ''),
+        'size': os.path.getsize(custom_path),
+    }
+
+
+@api_router.post('/products/{product_id}/ficha-template')
+async def upload_product_ficha_template(
+    product_id: str,
+    file: UploadFile = File(...),
+    current_user = Depends(get_current_user)
+):
+    """Faz upload do template DOCX personalizado para um produto."""
+    if not file.filename.lower().endswith('.docx'):
+        raise HTTPException(status_code=400, detail='Apenas arquivos .docx são aceitos')
+    product = await db.products.find_one({'id': product_id, 'deleted': False}, {'_id': 0})
+    if not product:
+        raise HTTPException(status_code=404, detail='Produto não encontrado')
+
+    content = await file.read()
+    if len(content) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail='Arquivo muito grande (limite 5MB)')
+
+    try:
+        from io import BytesIO
+        from docx import Document as _Doc
+        _Doc(BytesIO(content))
+    except Exception:
+        raise HTTPException(status_code=400, detail='Arquivo DOCX inválido ou corrompido')
+
+    target = os.path.join(CUSTOM_TEMPLATES_DIR, f'{product_id}.docx')
+    with open(target, 'wb') as f:
+        f.write(content)
+
+    await db.product_ficha_templates.update_one(
+        {'product_id': product_id},
+        {'$set': {
+            'product_id': product_id,
+            'filename': file.filename,
+            'size': len(content),
+            'uploaded_at': datetime.now(timezone.utc).isoformat(),
+            'uploaded_by': current_user.get('email', ''),
+        }},
+        upsert=True
+    )
+
+    return {
+        'message': 'Template enviado com sucesso',
+        'filename': file.filename,
+        'size': len(content),
+    }
+
+
+@api_router.delete('/products/{product_id}/ficha-template')
+async def delete_product_ficha_template(
+    product_id: str,
+    current_user = Depends(get_current_user)
+):
+    """Remove o template personalizado de um produto (volta para o padrão)."""
+    target = os.path.join(CUSTOM_TEMPLATES_DIR, f'{product_id}.docx')
+    if os.path.isfile(target):
+        os.remove(target)
+    await db.product_ficha_templates.delete_one({'product_id': product_id})
+    return {'message': 'Template removido — usando o padrão agora'}
 
 
 app.include_router(api_router)

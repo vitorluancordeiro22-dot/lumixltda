@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import api from '../lib/api';
 import { Button } from './ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Card } from './ui/card';
 import { Label } from './ui/label';
-import { FileText, Download, Loader2, Calendar, Package } from 'lucide-react';
+import { FileText, Download, Loader2, Calendar, Package, Upload, Trash2, CheckCircle2, Info } from 'lucide-react';
 import { toast } from 'sonner';
 
 const formatBR = (iso) => {
@@ -26,11 +26,26 @@ export default function DocumentationButton({ productId, productName }) {
   const [batches, setBatches] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedBatchId, setSelectedBatchId] = useState(null);
-  const [generating, setGenerating] = useState(null); // 'ficha-pdf' | 'op-pdf' | ...
+  const [generating, setGenerating] = useState(null);
   const [previewData, setPreviewData] = useState(null);
+  // Template personalizado
+  const [templateStatus, setTemplateStatus] = useState(null); // {has_custom, filename, uploaded_at}
+  const [uploadingTpl, setUploadingTpl] = useState(false);
+  const fileInputRef = useRef(null);
+
+  const fetchTemplateStatus = async () => {
+    if (!productId) return;
+    try {
+      const r = await api.get(`/products/${productId}/ficha-template`);
+      setTemplateStatus(r.data);
+    } catch (e) {
+      setTemplateStatus({ has_custom: false });
+    }
+  };
 
   useEffect(() => {
     if (!open || !productId) return;
+    fetchTemplateStatus();
     setLoading(true);
     Promise.all([
       api.get('/product-batches'),
@@ -112,6 +127,41 @@ export default function DocumentationButton({ productId, productName }) {
 
   const sel = useMemo(() => batches.find(b => b.id === selectedBatchId), [batches, selectedBatchId]);
 
+  const handleUploadTemplate = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith('.docx')) {
+      toast.error('Apenas arquivos .docx são aceitos');
+      return;
+    }
+    setUploadingTpl(true);
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      const r = await api.post(`/products/${productId}/ficha-template`, form, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      toast.success(r.data.message || 'Template enviado!');
+      await fetchTemplateStatus();
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Erro ao enviar template');
+    } finally {
+      setUploadingTpl(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleRemoveTemplate = async () => {
+    if (!window.confirm('Remover o template personalizado? O sistema voltará a usar o template padrão.')) return;
+    try {
+      await api.delete(`/products/${productId}/ficha-template`);
+      toast.success('Template removido');
+      await fetchTemplateStatus();
+    } catch (err) {
+      toast.error('Erro ao remover template');
+    }
+  };
+
   return (
     <>
       <Button
@@ -138,13 +188,109 @@ export default function DocumentationButton({ productId, productName }) {
               <Loader2 className="w-4 h-4 animate-spin" /> Carregando lotes...
             </div>
           ) : batches.length === 0 ? (
-            <div className="py-10 text-center">
-              <Package className="w-10 h-10 text-muted-foreground mx-auto mb-2" />
-              <p className="text-foreground font-semibold">Nenhum lote encontrado</p>
-              <p className="text-sm text-muted-foreground">Crie um lote desse produto primeiro.</p>
+            <div className="space-y-4">
+              {/* Status / Upload do Template Personalizado (mesmo sem lotes) */}
+              <Card className={`p-3.5 rounded-xl border ${
+                templateStatus?.has_custom 
+                  ? 'border-secondary/40 bg-secondary/5' 
+                  : 'border-border bg-muted/30'
+              }`}>
+                <div className="flex items-start gap-3">
+                  {templateStatus?.has_custom ? <CheckCircle2 className="w-5 h-5 text-secondary shrink-0 mt-0.5" /> : <Info className="w-5 h-5 text-muted-foreground shrink-0 mt-0.5" />}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Template da Ficha</p>
+                    {templateStatus?.has_custom ? (
+                      <p className="text-sm text-foreground font-semibold mt-0.5 truncate">
+                        Personalizado: <span className="font-mono text-xs text-secondary">{templateStatus.filename}</span>
+                      </p>
+                    ) : (
+                      <p className="text-sm text-foreground font-semibold mt-0.5">Padrão (CITRONELA GEL)</p>
+                    )}
+                  </div>
+                  <div className="flex gap-1.5 shrink-0">
+                    <input ref={fileInputRef} type="file" accept=".docx" onChange={handleUploadTemplate} className="hidden" />
+                    <Button size="sm" variant="outline" className="border-border h-8 rounded-lg text-xs" disabled={uploadingTpl} onClick={() => fileInputRef.current?.click()}>
+                      {uploadingTpl ? <Loader2 className="w-3 h-3 animate-spin" /> : <><Upload className="w-3 h-3 mr-1" /> {templateStatus?.has_custom ? 'Trocar' : 'Enviar'}</>}
+                    </Button>
+                    {templateStatus?.has_custom && (
+                      <Button size="sm" variant="outline" className="border-destructive/40 text-destructive hover:bg-destructive/10 h-8 rounded-lg" onClick={handleRemoveTemplate}>
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </Card>
+              <div className="py-6 text-center">
+                <Package className="w-10 h-10 text-muted-foreground mx-auto mb-2" />
+                <p className="text-foreground font-semibold">Nenhum lote encontrado</p>
+                <p className="text-sm text-muted-foreground">Crie um lote desse produto para gerar a documentação.</p>
+              </div>
             </div>
           ) : (
             <div className="space-y-4">
+              {/* Status / Upload do Template Personalizado */}
+              <Card className={`p-3.5 rounded-xl border ${
+                templateStatus?.has_custom 
+                  ? 'border-secondary/40 bg-secondary/5' 
+                  : 'border-border bg-muted/30'
+              }`}>
+                <div className="flex items-start gap-3">
+                  {templateStatus?.has_custom ? (
+                    <CheckCircle2 className="w-5 h-5 text-secondary shrink-0 mt-0.5" />
+                  ) : (
+                    <Info className="w-5 h-5 text-muted-foreground shrink-0 mt-0.5" />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Template da Ficha</p>
+                    {templateStatus?.has_custom ? (
+                      <>
+                        <p className="text-sm text-foreground font-semibold mt-0.5 truncate" data-testid="template-status">
+                          Personalizado: <span className="font-mono text-xs text-secondary">{templateStatus.filename || 'arquivo.docx'}</span>
+                        </p>
+                        <p className="text-[11px] text-muted-foreground">Este produto usa seu próprio template DOCX.</p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-sm text-foreground font-semibold mt-0.5">Padrão (CITRONELA GEL)</p>
+                        <p className="text-[11px] text-muted-foreground">Envie um .docx para personalizar a Ficha deste produto.</p>
+                      </>
+                    )}
+                  </div>
+                  <div className="flex gap-1.5 shrink-0">
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".docx"
+                      onChange={handleUploadTemplate}
+                      className="hidden"
+                      data-testid="upload-template-input"
+                    />
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-border h-8 rounded-lg text-xs"
+                      disabled={uploadingTpl}
+                      onClick={() => fileInputRef.current?.click()}
+                      data-testid="upload-template-btn"
+                    >
+                      {uploadingTpl ? <Loader2 className="w-3 h-3 animate-spin" /> : <><Upload className="w-3 h-3 mr-1" /> {templateStatus?.has_custom ? 'Trocar' : 'Enviar'}</>}
+                    </Button>
+                    {templateStatus?.has_custom && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="border-destructive/40 text-destructive hover:bg-destructive/10 h-8 rounded-lg"
+                        onClick={handleRemoveTemplate}
+                        data-testid="remove-template-btn"
+                        title="Remover template personalizado"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </Card>
+
               {/* Seleção de lote */}
               <div>
                 <Label className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">
