@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { toast } from 'sonner';
 import { 
   FolderPlus, FileText, Upload, Download, Trash2, 
-  Folder, FolderOpen, ChevronRight, FileCheck, Home, ArrowLeft
+  Folder, FolderOpen, ChevronRight, FileCheck, Home, ArrowLeft, Pencil
 } from 'lucide-react';
 
 export const Laudos = () => {
@@ -20,9 +20,14 @@ export const Laudos = () => {
   const [folderDialogOpen, setFolderDialogOpen] = useState(false);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState({ done: 0, total: 0 });
   const [newFolderName, setNewFolderName] = useState('');
   const [uploadNotes, setUploadNotes] = useState('');
-  const [selectedFile, setSelectedFile] = useState(null);
+  const [selectedFiles, setSelectedFiles] = useState([]); // array agora
+  // Renomeação
+  const [renameOpen, setRenameOpen] = useState(false);
+  const [renameTarget, setRenameTarget] = useState(null); // { type: 'folder'|'file', id, name }
+  const [renameValue, setRenameValue] = useState('');
   const isMountedRef = useRef(true);
 
   useEffect(() => {
@@ -138,47 +143,69 @@ export const Laudos = () => {
 
   const handleUploadFile = async (e) => {
     e.preventDefault();
-    if (!selectedFile || !currentFolderId || !isMountedRef.current) return;
+    if (!selectedFiles || selectedFiles.length === 0 || !currentFolderId || !isMountedRef.current) return;
 
     setUploading(true);
+    setUploadProgress({ done: 0, total: selectedFiles.length });
 
+    let okCount = 0;
+    let errCount = 0;
+    for (let i = 0; i < selectedFiles.length; i++) {
+      const f = selectedFiles[i];
+      try {
+        const formData = new FormData();
+        formData.append('file', f);
+        await api.post('/laudos/upload', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+          params: { folder_id: currentFolderId, notes: uploadNotes }
+        });
+        okCount++;
+      } catch (err) {
+        errCount++;
+      }
+      if (isMountedRef.current) setUploadProgress({ done: i + 1, total: selectedFiles.length });
+    }
+
+    if (!isMountedRef.current) return;
+
+    if (okCount > 0) toast.success(`${okCount} arquivo(s) enviado(s) com sucesso!`);
+    if (errCount > 0) toast.error(`${errCount} arquivo(s) falharam no envio`);
+
+    setSelectedFiles([]);
+    setUploadNotes('');
+    setUploadDialogOpen(false);
+
+    setTimeout(() => {
+      if (isMountedRef.current) fetchFiles(currentFolderId);
+    }, 300);
+    setUploading(false);
+  };
+
+  const openRename = (type, id, name) => {
+    setRenameTarget({ type, id, name });
+    setRenameValue(name);
+    setRenameOpen(true);
+  };
+
+  const handleRename = async (e) => {
+    e.preventDefault();
+    if (!renameTarget || !renameValue.trim()) return;
     try {
-      const formData = new FormData();
-      formData.append('file', selectedFile);
-      formData.append('folder_id', currentFolderId);
-      formData.append('notes', uploadNotes);
-
-      await api.post('/laudos/upload', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        },
-        params: {
-          folder_id: currentFolderId,
-          notes: uploadNotes
-        }
-      });
-
-      if (!isMountedRef.current) return;
-
-      toast.success('Arquivo enviado com sucesso!');
-      setSelectedFile(null);
-      setUploadNotes('');
-      setUploadDialogOpen(false);
-
-      setTimeout(() => {
-        if (isMountedRef.current) {
-          fetchFiles(currentFolderId);
-        }
-      }, 300);
-    } catch (error) {
-      if (isMountedRef.current) {
-        const errorMsg = error.response?.data?.detail || 'Erro ao enviar arquivo';
-        toast.error(errorMsg);
+      if (renameTarget.type === 'folder') {
+        await api.put(`/laudos/folders/${renameTarget.id}`, { name: renameValue.trim() });
+        toast.success('Pasta renomeada!');
+        fetchFolders();
+      } else {
+        await api.put(`/laudos/files/${renameTarget.id}`, { filename: renameValue.trim() });
+        toast.success('Arquivo renomeado!');
+        if (currentFolderId) fetchFiles(currentFolderId);
       }
-    } finally {
-      if (isMountedRef.current) {
-        setUploading(false);
-      }
+      setRenameOpen(false);
+      setRenameTarget(null);
+      setRenameValue('');
+    } catch (err) {
+      const msg = err.response?.data?.detail || 'Erro ao renomear';
+      toast.error(msg);
     }
   };
 
@@ -252,8 +279,8 @@ export const Laudos = () => {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-2">Laudos</h1>
-          <p className="text-lg text-muted-foreground">Gerenciamento de documentos e laudos</p>
+          <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-2">Pastas</h1>
+          <p className="text-lg text-muted-foreground">Organize pastas e arquivos do laboratório</p>
         </div>
 
         <div className="flex flex-wrap gap-3">
@@ -297,19 +324,19 @@ export const Laudos = () => {
             <Dialog open={uploadDialogOpen} onOpenChange={(open) => { 
               setUploadDialogOpen(open); 
               if (!open) { 
-                setSelectedFile(null); 
+                setSelectedFiles([]); 
                 setUploadNotes(''); 
               } 
             }}>
               <DialogTrigger asChild>
                 <Button className="bg-primary hover:bg-primary/90">
                   <Upload className="w-4 h-4 mr-2" />
-                  Upload PDF
+                  Upload Arquivos
                 </Button>
               </DialogTrigger>
               <DialogContent className="bg-card border-border">
                 <DialogHeader>
-                  <DialogTitle className="text-foreground">Upload de Laudo</DialogTitle>
+                  <DialogTitle className="text-foreground">Upload de Arquivos</DialogTitle>
                 </DialogHeader>
                 <form onSubmit={handleUploadFile} className="space-y-4">
                   <div>
@@ -322,14 +349,21 @@ export const Laudos = () => {
                   </div>
 
                   <div>
-                    <Label className="text-foreground">Arquivo PDF *</Label>
+                    <Label className="text-foreground">Arquivo(s) PDF * — pode selecionar vários</Label>
                     <input
                       type="file"
                       accept=".pdf"
-                      onChange={(e) => setSelectedFile(e.target.files[0])}
+                      multiple
+                      onChange={(e) => setSelectedFiles(Array.from(e.target.files || []))}
                       className="block w-full text-sm text-muted-foreground file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
                       required
+                      data-testid="upload-file-input"
                     />
+                    {selectedFiles.length > 0 && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {selectedFiles.length} arquivo(s) selecionado(s)
+                      </p>
+                    )}
                   </div>
 
                   <div>
@@ -338,17 +372,19 @@ export const Laudos = () => {
                       value={uploadNotes}
                       onChange={(e) => setUploadNotes(e.target.value)}
                       className="bg-input border-border text-foreground"
-                      placeholder="Notas sobre o arquivo..."
+                      placeholder="Notas que serão aplicadas a todos os arquivos..."
                       rows={3}
                     />
                   </div>
 
                   <Button 
                     type="submit" 
-                    disabled={uploading} 
+                    disabled={uploading || selectedFiles.length === 0} 
                     className="w-full bg-primary hover:bg-primary/90"
                   >
-                    {uploading ? 'Enviando...' : 'Enviar Arquivo'}
+                    {uploading 
+                      ? `Enviando ${uploadProgress.done}/${uploadProgress.total}...` 
+                      : `Enviar ${selectedFiles.length || ''} arquivo(s)`}
                   </Button>
                 </form>
               </DialogContent>
@@ -430,6 +466,16 @@ export const Laudos = () => {
                       <Button
                         size="sm"
                         variant="ghost"
+                        className="absolute top-2 right-9 h-6 w-6 p-0 opacity-0 group-hover:opacity-100"
+                        onClick={(e) => { e.stopPropagation(); openRename('folder', folder.id, folder.name); }}
+                        data-testid={`rename-folder-${folder.id}`}
+                        title="Renomear pasta"
+                      >
+                        <Pencil className="w-3 h-3 text-primary" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
                         className="absolute top-2 right-2 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 hover:bg-red-50"
                         onClick={(e) => handleDeleteFolder(folder.id, e)}
                       >
@@ -493,6 +539,16 @@ export const Laudos = () => {
                           <Button
                             size="sm"
                             variant="outline"
+                            className="border-border text-primary hover:bg-muted"
+                            onClick={() => openRename('file', file.id, file.filename)}
+                            data-testid={`rename-file-${file.id}`}
+                            title="Renomear"
+                          >
+                            <Pencil className="w-3 h-3" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
                             className="border-red-200 text-red-600 hover:bg-red-50"
                             onClick={() => handleDeleteFile(file.id)}
                           >
@@ -530,6 +586,39 @@ export const Laudos = () => {
           </div>
         )}
       </Card>
+
+      {/* Dialog Renomear */}
+      <Dialog open={renameOpen} onOpenChange={setRenameOpen}>
+        <DialogContent className="bg-card border-border">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">
+              Renomear {renameTarget?.type === 'folder' ? 'Pasta' : 'Arquivo'}
+            </DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleRename} className="space-y-4">
+            <div>
+              <Label className="text-foreground">Novo nome</Label>
+              <Input
+                value={renameValue}
+                onChange={(e) => setRenameValue(e.target.value)}
+                className="bg-input border-border text-foreground"
+                autoFocus
+                required
+                data-testid="rename-input"
+              />
+              {renameTarget?.type === 'file' && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Se omitir a extensão, ela será mantida automaticamente.
+                </p>
+              )}
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button type="button" variant="ghost" onClick={() => setRenameOpen(false)}>Cancelar</Button>
+              <Button type="submit" className="bg-primary hover:bg-primary/90" data-testid="rename-save-btn">Salvar</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

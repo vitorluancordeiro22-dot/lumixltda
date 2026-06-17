@@ -406,6 +406,86 @@ async def auto_finalize_zero_batches():
     )
     return result.modified_count
 
+
+async def restore_raw_materials_for_batch(batch_doc: dict) -> dict:
+    """
+    Devolve para o estoque a matéria-prima que foi descontada por um lote de produto.
+    Lê batch_doc['raw_materials_used'] e:
+      - Soma a quantidade de volta nos lotes específicos de MP usados
+      - Reabre lotes de MP que estavam finalizados por terem zerado
+      - Atualiza total_stock da MP
+    Retorna um resumo do que foi devolvido.
+    """
+    summary = []
+    for mat_used in (batch_doc.get('raw_materials_used') or []):
+        rm_id = mat_used.get('raw_material_id')
+        if not rm_id:
+            continue
+        total_restored = 0.0
+        for b in (mat_used.get('batches_consumed') or []):
+            qty = float(b.get('quantity_used') or 0)
+            if qty <= 0 or not b.get('batch_id'):
+                continue
+            await db.raw_material_batches.update_one(
+                {'id': b['batch_id']},
+                {
+                    '$inc': {'quantity': qty},
+                    '$set': {'status': 'em_aberto'}  # reabre se tinha finalizado por zerar
+                }
+            )
+            total_restored = round(total_restored + qty, 4)
+        if total_restored > 0:
+            await db.raw_materials.update_one(
+                {'id': rm_id},
+                {'$inc': {'total_stock': total_restored}}
+            )
+            summary.append({
+                'raw_material_id': rm_id,
+                'raw_material_name': mat_used.get('raw_material_name', ''),
+                'restored': total_restored
+            })
+    return {'restored': summary}
+
+
+async def compute_and_deduct_for_batch(product: dict, planned_liters: float) -> list:
+    """
+    Calcula a MP necessária para `planned_liters` litros de `product` e desconta via LIFO.
+    Retorna a lista `raw_materials_used` no mesmo formato salvo em product_batches.
+    """
+    all_materials_used = []
+    if not product or not product.get('recipes'):
+        return all_materials_used
+
+    expected_liters = product.get('expected_liters', 0) or 0
+    for recipe in product['recipes']:
+        rm_id = recipe.get('raw_material_id')
+        qty_total = recipe.get('quantity_per_liter', 0) or 0
+        if not rm_id or qty_total <= 0:
+            continue
+
+        if expected_liters > 0:
+            needed = qty_total * (planned_liters / expected_liters)
+        else:
+            needed = qty_total
+        needed = round(needed, 4)
+        if needed <= 0:
+            continue
+
+        used_batches = await deduct_from_raw_material_batches(rm_id, needed)
+
+        rm_doc = await db.raw_materials.find_one({'id': rm_id}, {'_id': 0})
+        rm_name = rm_doc['name'] if rm_doc else rm_id
+
+        all_materials_used.append({
+            'raw_material_id': rm_id,
+            'raw_material_name': rm_name,
+            'quantity_needed': needed,
+            'unit': recipe.get('unit', 'Kg'),
+            'batches_consumed': used_batches
+        })
+
+    return all_materials_used
+
 # ========== AUTH ENDPOINTS ==========
 
 @api_router.get('/')
@@ -626,43 +706,9 @@ async def create_product_batch(data: ProductBatchCreate, current_user = Depends(
     }
     
     # === DESCONTO DE MATÉRIAS-PRIMAS ===
-    # Buscar o produto e sua receita para calcular as quantidades necessárias
     product = await db.products.find_one({'id': data.product_id, 'deleted': False}, {'_id': 0})
     if product and product.get('recipes'):
-        expected_liters = product.get('expected_liters', 0)
-        all_materials_used = []
-        
-        for recipe in product['recipes']:
-            rm_id = recipe.get('raw_material_id')
-            qty_total = recipe.get('quantity_per_liter', 0)  # Qtd total para expected_liters
-            
-            if not rm_id or qty_total <= 0:
-                continue
-            
-            # Calcular quantidade necessária proporcional ao lote planejado
-            if expected_liters > 0:
-                needed = qty_total * (data.planned_liters / expected_liters)
-            else:
-                needed = qty_total
-            
-            needed = round(needed, 4)
-            
-            # Descontar dos lotes mais recentes da MP
-            used_batches = await deduct_from_raw_material_batches(rm_id, needed)
-            
-            # Buscar nome da MP para rastreabilidade
-            rm_doc = await db.raw_materials.find_one({'id': rm_id}, {'_id': 0})
-            rm_name = rm_doc['name'] if rm_doc else rm_id
-            
-            all_materials_used.append({
-                'raw_material_id': rm_id,
-                'raw_material_name': rm_name,
-                'quantity_needed': needed,
-                'unit': recipe.get('unit', 'L'),
-                'batches_consumed': used_batches
-            })
-        
-        batch_doc['raw_materials_used'] = all_materials_used
+        batch_doc['raw_materials_used'] = await compute_and_deduct_for_batch(product, data.planned_liters)
     
     await db.product_batches.insert_one(batch_doc)
     
@@ -776,7 +822,19 @@ async def update_product_batch(batch_id: str, data: ProductBatchUpdate, current_
         update_fields['unit'] = data.unit
     if data.planned_liters is not None:
         update_fields['planned_liters'] = data.planned_liters
-    
+
+    # === RECÁLCULO DE MP NA EDIÇÃO DE planned_liters ===
+    # Se a litragem planejada mudou, devolvemos a MP antes e descontamos baseado na nova.
+    new_materials_used = None
+    if data.planned_liters is not None and float(data.planned_liters) != float(batch.get('planned_liters') or 0):
+        # 1) Devolve a MP que foi descontada (usando o que estava em raw_materials_used)
+        await restore_raw_materials_for_batch(batch)
+        # 2) Desconta de novo com base na nova litragem planejada
+        product = await db.products.find_one({'id': batch.get('product_id'), 'deleted': False}, {'_id': 0})
+        new_materials_used = await compute_and_deduct_for_batch(product or {}, float(data.planned_liters))
+        update_fields['raw_materials_used'] = new_materials_used
+        await auto_finalize_zero_batches()
+
     if update_fields:
         await db.product_batches.update_one(
             {'id': batch_id},
@@ -814,7 +872,11 @@ async def delete_product_batch(batch_id: str, current_user = Depends(get_current
     batch = await db.product_batches.find_one({'id': batch_id}, {'_id': 0})
     if not batch:
         raise HTTPException(status_code=404, detail='Batch not found')
-    
+
+    # Devolve MP que estava reservada para este lote (em qualquer status, pois o lote
+    # vai para a lixeira — se for restaurado, o cálculo terá que ser refeito).
+    mp_summary = await restore_raw_materials_for_batch(batch)
+
     await db.trash.insert_one({
         'id': str(__import__('uuid').uuid4()),
         'item_type': 'product_batch',
@@ -822,7 +884,10 @@ async def delete_product_batch(batch_id: str, current_user = Depends(get_current
         'deleted_at': datetime.now(timezone.utc).isoformat()
     })
     await db.product_batches.update_one({'id': batch_id}, {'$set': {'deleted': True}})
-    return {'message': 'Batch moved to trash'}
+    return {
+        'message': 'Batch moved to trash',
+        'raw_materials_restored': mp_summary.get('restored', [])
+    }
 
 @api_router.post('/product-batches/{batch_id}/finalize')
 async def finalize_product_batch(batch_id: str, current_user = Depends(get_current_user)):
@@ -1210,6 +1275,61 @@ async def recalculate_raw_material_stock(current_user = Depends(get_current_user
         'batches_finalized': finalized_count,
         'corrections': corrections,
         'total_materials_checked': len(materials)
+    }
+
+
+@api_router.get('/raw-materials/audit')
+async def audit_recipes(current_user = Depends(get_current_user)):
+    """
+    Lista produtos com problemas que impedem o desconto correto de matéria-prima:
+      - Produto sem receita cadastrada
+      - Produto com expected_liters = 0 (litragem esperada)
+      - Receita sem matéria-prima vinculada
+      - Item da receita com quantidade <= 0
+      - Receita apontando para MP inexistente/deletada
+    """
+    products = await db.products.find({'deleted': False}, {'_id': 0}).to_list(2000)
+    all_rms = await db.raw_materials.find({}, {'_id': 0, 'id': 1, 'name': 1, 'deleted': 1}).to_list(5000)
+    rm_map = {rm['id']: rm for rm in all_rms}
+
+    issues = []
+    for p in products:
+        recipes = p.get('recipes') or []
+        expected = p.get('expected_liters') or 0
+        problems = []
+
+        if not recipes:
+            problems.append('Sem receita cadastrada (nenhuma MP será descontada)')
+
+        if expected <= 0:
+            problems.append('Litragem esperada (expected_liters) é 0 — cálculo proporcional fica incorreto')
+
+        for idx, r in enumerate(recipes):
+            rid = r.get('raw_material_id')
+            qty = r.get('quantity_per_liter', 0) or 0
+            if not rid:
+                problems.append(f'Receita #{idx + 1} sem matéria-prima vinculada')
+                continue
+            rm = rm_map.get(rid)
+            if not rm or rm.get('deleted'):
+                problems.append(f'Receita #{idx + 1} aponta para MP inexistente/deletada')
+            if qty <= 0:
+                problems.append(f'Receita #{idx + 1} com quantidade zerada')
+
+        if problems:
+            issues.append({
+                'product_id': p['id'],
+                'product_name': p.get('name', ''),
+                'expected_liters': expected,
+                'recipes_count': len(recipes),
+                'issues': problems
+            })
+
+    issues.sort(key=lambda x: x['product_name'].lower())
+    return {
+        'total_products_checked': len(products),
+        'total_with_issues': len(issues),
+        'products': issues
     }
 
 
@@ -2508,6 +2628,25 @@ async def delete_laudo_folder(
     
     return {'message': 'Pasta deletada com sucesso'}
 
+
+@api_router.put('/laudos/folders/{folder_id}')
+async def rename_laudo_folder(
+    folder_id: str,
+    data: dict = Body(...),
+    current_user = Depends(get_current_user)
+):
+    """Renomeia uma pasta de laudos"""
+    new_name = (data.get('name') or '').strip()
+    if not new_name:
+        raise HTTPException(status_code=400, detail='Nome inválido')
+    result = await db.laudo_folders.update_one(
+        {'id': folder_id, 'deleted': False},
+        {'$set': {'name': new_name}}
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail='Pasta não encontrada')
+    return {'message': 'Pasta renomeada', 'name': new_name}
+
 @api_router.post('/laudos/upload')
 async def upload_laudo(
     folder_id: str,
@@ -2606,6 +2745,28 @@ async def delete_laudo_file(
     )
     
     return {'message': 'Arquivo deletado com sucesso'}
+
+
+@api_router.put('/laudos/files/{file_id}')
+async def rename_laudo_file(
+    file_id: str,
+    data: dict = Body(...),
+    current_user = Depends(get_current_user)
+):
+    """Renomeia um arquivo de laudo (apenas o nome exibido, mantém a extensão)."""
+    new_name = (data.get('filename') or '').strip()
+    if not new_name:
+        raise HTTPException(status_code=400, detail='Nome inválido')
+    # Preserva a extensão original se o usuário não incluiu uma
+    doc = await db.laudo_files.find_one({'id': file_id, 'deleted': {'$ne': True}}, {'_id': 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail='Arquivo não encontrado')
+    original = doc.get('filename', '')
+    if '.' in original and '.' not in new_name:
+        ext = original.rsplit('.', 1)[1]
+        new_name = f"{new_name}.{ext}"
+    await db.laudo_files.update_one({'id': file_id}, {'$set': {'filename': new_name}})
+    return {'message': 'Arquivo renomeado', 'filename': new_name}
 
 # ========== AMOSTRAS ROUTES ==========
 

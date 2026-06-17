@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Combobox } from '../components/ui/combobox';
 import { Checkbox } from '../components/ui/checkbox';
 import { toast } from 'sonner';
-import { Plus, Edit, Trash2, Boxes, Package, Search, Printer, RefreshCw } from 'lucide-react';
+import { Plus, Edit, Trash2, Boxes, Package, Search, Printer, RefreshCw, AlertTriangle, ShieldCheck } from 'lucide-react';
 
 export const RawMaterials = () => {
   const [materials, setMaterials] = useState([]);
@@ -33,6 +33,11 @@ export const RawMaterials = () => {
   });
 
   const [filteredBatchesByDate, setFilteredBatchesByDate] = useState([]);
+  
+  // Auditoria de receitas
+  const [auditOpen, setAuditOpen] = useState(false);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [auditData, setAuditData] = useState(null);
   
   const [suppliers, setSuppliers] = useState([]);
   const [formData, setFormData] = useState({
@@ -427,6 +432,19 @@ export const RawMaterials = () => {
     }
   };
 
+  const openAudit = async () => {
+    setAuditOpen(true);
+    setAuditLoading(true);
+    try {
+      const res = await api.get('/raw-materials/audit');
+      setAuditData(res.data);
+    } catch (err) {
+      toast.error('Erro ao carregar auditoria');
+    } finally {
+      setAuditLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -435,6 +453,16 @@ export const RawMaterials = () => {
           <p className="text-lg text-muted-foreground">Gerencie o estoque de matérias-primas</p>
         </div>
         <div className="flex flex-wrap gap-3">
+          {/* Botão Auditoria de Receitas */}
+          <Button 
+            variant="outline"
+            className="border-amber-500/40 text-amber-500 hover:bg-amber-500/10 hover:text-amber-500"
+            onClick={openAudit}
+            data-testid="audit-recipes-button"
+          >
+            <ShieldCheck className="w-4 h-4 mr-2" />
+            Auditar Receitas
+          </Button>
           {/* Botão Recalcular Estoque */}
           <Button 
             variant="outline" 
@@ -802,6 +830,78 @@ export const RawMaterials = () => {
           )}
         </div>
       )}
+
+      {/* Dialog: Auditoria de Receitas */}
+      <Dialog open={auditOpen} onOpenChange={setAuditOpen}>
+        <DialogContent className="bg-card border-border max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-foreground flex items-center gap-2">
+              <ShieldCheck className="w-5 h-5 text-amber-500" />
+              Auditoria de Receitas
+            </DialogTitle>
+          </DialogHeader>
+          {auditLoading ? (
+            <div className="py-10 text-center text-muted-foreground">Carregando...</div>
+          ) : auditData ? (
+            <div className="space-y-3">
+              <div className="grid grid-cols-3 gap-3 text-center">
+                <div className="rounded-md border border-border bg-muted/30 p-3">
+                  <p className="text-xs text-muted-foreground">Produtos analisados</p>
+                  <p className="text-2xl font-bold text-foreground">{auditData.total_products_checked}</p>
+                </div>
+                <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3">
+                  <p className="text-xs text-amber-500">Com problemas</p>
+                  <p className="text-2xl font-bold text-amber-500">{auditData.total_with_issues}</p>
+                </div>
+                <div className="rounded-md border border-green-500/40 bg-green-500/10 p-3">
+                  <p className="text-xs text-green-500">Sem problemas</p>
+                  <p className="text-2xl font-bold text-green-500">
+                    {auditData.total_products_checked - auditData.total_with_issues}
+                  </p>
+                </div>
+              </div>
+
+              {auditData.total_with_issues === 0 ? (
+                <div className="py-8 text-center">
+                  <ShieldCheck className="w-12 h-12 text-green-500 mx-auto mb-2" />
+                  <p className="text-foreground font-semibold">Tudo certo!</p>
+                  <p className="text-sm text-muted-foreground">Todos os produtos têm receita válida — a MP será descontada corretamente.</p>
+                </div>
+              ) : (
+                <>
+                  <p className="text-sm text-muted-foreground">
+                    Os produtos abaixo <span className="text-amber-500 font-semibold">não estão descontando MP corretamente</span> ao criar lotes. Corrija a receita do produto na aba <span className="text-foreground font-semibold">Produtos</span>.
+                  </p>
+                  <div className="space-y-2 max-h-96 overflow-y-auto">
+                    {auditData.products.map(p => (
+                      <Card key={p.product_id} className="bg-muted/20 border-amber-500/30 p-3">
+                        <div className="flex items-start gap-2">
+                          <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex flex-wrap items-baseline gap-2">
+                              <p className="font-bold text-foreground">{p.product_name}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {p.recipes_count} receita(s) · Litragem esperada: {p.expected_liters}
+                              </p>
+                            </div>
+                            <ul className="mt-1 space-y-0.5">
+                              {p.issues.map((issue, i) => (
+                                <li key={i} className="text-xs text-amber-400">• {issue}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          ) : (
+            <div className="py-10 text-center text-muted-foreground">Nada para mostrar.</div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
