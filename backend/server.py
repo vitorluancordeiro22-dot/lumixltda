@@ -1,6 +1,6 @@
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, UploadFile, File, Body
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, FileResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorGridFSBucket
@@ -2983,6 +2983,214 @@ async def download_generated_document(
 # ========== INDUSTRIAL OP ROUTES ==========
 from industrial_op_routes import setup_industrial_op_routes
 setup_industrial_op_routes(api_router, db, fs, get_current_user, generate_batch_number)
+
+
+# ========== DOCUMENTAÇÃO DE PRODUÇÃO (Ficha + OP via templates oficiais) ==========
+from services.documentation import (
+    fill_ficha_template, fill_op_template, convert_to_pdf, _fmt_date_br
+)
+import tempfile
+
+
+async def _build_documentation_payload(product_batch_id: str) -> dict:
+    """
+    Resolve product + batch + matérias-primas consumidas (com validade)
+    para alimentar os templates. Procura o lote tanto em product_batches (ativo)
+    quanto em archived_product_batches (lote arquivado).
+    """
+    batch = await db.product_batches.find_one({'id': product_batch_id}, {'_id': 0})
+    if not batch:
+        batch = await db.archived_product_batches.find_one({'id': product_batch_id}, {'_id': 0})
+    if not batch:
+        raise HTTPException(status_code=404, detail='Lote de produto não encontrado')
+
+    product = await db.products.find_one({'id': batch.get('product_id')}, {'_id': 0})
+    if not product:
+        raise HTTPException(status_code=404, detail='Produto não encontrado')
+
+    # OP number: usa o número do lote em si (formato AAMMNN) ou um número curto se houver
+    op_number = batch.get('op_number')
+    if not op_number:
+        # tenta encontrar a ficha_analise gerada automaticamente para esse mês/produto
+        from datetime import datetime as _dt
+        try:
+            dt = _dt.fromisoformat(str(batch.get('date')).split('T')[0])
+            ficha = await db.fichas_analise.find_one({
+                'product_id': product['id'],
+                'month': dt.month,
+                'year': dt.year
+            }, {'_id': 0})
+            if ficha:
+                op_number = ficha.get('op_number')
+        except Exception:
+            pass
+    op_number_str = str(op_number) if op_number else (batch.get('batch_number', '') or '')
+
+    # Materiais consumidos
+    materials = []
+    consumed = batch.get('raw_materials_used') or []
+    expected_liters = float(product.get('expected_liters') or 0)
+    planned_liters = float(batch.get('planned_liters') or 0)
+
+    if consumed:
+        # Caso o lote tenha consumido MP (via LIFO)
+        for mat in consumed:
+            # Pega validade do primeiro lote consumido
+            validade = ''
+            for b in (mat.get('batches_consumed') or []):
+                rm_b = await db.raw_material_batches.find_one(
+                    {'id': b.get('batch_id')}, {'_id': 0}
+                )
+                if rm_b and rm_b.get('expiration_date'):
+                    validade = _fmt_date_br(rm_b['expiration_date'])
+                    lote_mp = rm_b.get('batch_number') or ''
+                    break
+            else:
+                lote_mp = ''
+
+            qty = float(mat.get('quantity_needed') or 0)
+            # Percentual proporcional à litragem planejada (qty corresponde a planned_liters)
+            pct = (qty / planned_liters * 100) if planned_liters > 0 else 0
+
+            materials.append({
+                'name': (mat.get('raw_material_name') or '').upper(),
+                'lote': lote_mp,
+                'validade': validade,
+                'percent': round(pct, 4),
+                'quantity_kg': round(qty, 4),
+            })
+    else:
+        # Sem MP consumida ainda: usa a receita cadastrada do produto + lote MAIS RECENTE de cada MP
+        recipes = product.get('recipes') or []
+        for r in recipes:
+            rm_id = r.get('raw_material_id')
+            qty_per_recipe = float(r.get('quantity_per_liter') or 0)
+            if expected_liters > 0:
+                needed = qty_per_recipe * (planned_liters / expected_liters) if planned_liters else qty_per_recipe
+            else:
+                needed = qty_per_recipe
+            pct = (needed / planned_liters * 100) if planned_liters > 0 else (qty_per_recipe / expected_liters * 100 if expected_liters else 0)
+
+            rm = await db.raw_materials.find_one({'id': rm_id}, {'_id': 0})
+            rm_name = (rm.get('name') if rm else '') or ''
+
+            # Lote mais recente em estoque
+            latest = await db.raw_material_batches.find(
+                {'raw_material_id': rm_id, 'status': 'em_aberto', 'deleted': {'$ne': True}},
+                {'_id': 0}
+            ).sort('date', -1).limit(1).to_list(1)
+            lote_mp = latest[0].get('batch_number', '') if latest else ''
+            validade = _fmt_date_br(latest[0].get('expiration_date')) if latest else ''
+
+            materials.append({
+                'name': rm_name.upper(),
+                'lote': lote_mp,
+                'validade': validade,
+                'percent': round(pct, 4),
+                'quantity_kg': round(needed, 4),
+            })
+
+    return {
+        'product_name': (product.get('name') or '').upper(),
+        'op_number': op_number_str,
+        'lote_number': batch.get('batch_number') or '',
+        'fab_date': _fmt_date_br(batch.get('date')),
+        'quantity_liters': planned_liters,
+        'materials': materials,
+    }
+
+
+@api_router.get('/documentation/{product_batch_id}/preview-data')
+async def documentation_preview_data(
+    product_batch_id: str,
+    current_user = Depends(get_current_user)
+):
+    """Retorna os dados que serão usados para preencher os templates (preview)."""
+    return await _build_documentation_payload(product_batch_id)
+
+
+@api_router.get('/documentation/{product_batch_id}/{doc_type}')
+async def generate_production_documentation(
+    product_batch_id: str,
+    doc_type: str,
+    fmt: str = 'pdf',
+    current_user = Depends(get_current_user)
+):
+    """
+    Gera Ficha de Fabricação ou Ordem de Produção a partir dos templates oficiais
+    com dados reais do lote.
+
+    Parâmetros:
+      - product_batch_id: id do lote do produto
+      - doc_type: 'ficha' ou 'op'
+      - fmt: 'pdf' (padrão) ou 'native' (docx/xls)
+    """
+    if doc_type not in ('ficha', 'op'):
+        raise HTTPException(status_code=400, detail="doc_type deve ser 'ficha' ou 'op'")
+    if fmt not in ('pdf', 'native'):
+        raise HTTPException(status_code=400, detail="fmt deve ser 'pdf' ou 'native'")
+
+    payload = await _build_documentation_payload(product_batch_id)
+
+    tmpdir = tempfile.mkdtemp(prefix='lumix_doc_')
+    safe_lote = (payload['lote_number'] or 'lote').replace('/', '-')
+    safe_prod = (payload['product_name'] or 'produto').replace('/', '-').replace(' ', '_')
+
+    try:
+        if doc_type == 'ficha':
+            out_path = os.path.join(tmpdir, f'ficha_{safe_prod}_{safe_lote}.docx')
+            fill_ficha_template(
+                product_name=payload['product_name'],
+                op_number=payload['op_number'],
+                lote_number=payload['lote_number'],
+                fab_date=payload['fab_date'],
+                output_path=out_path,
+            )
+            mime_native = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+            filename_native = f'Ficha_{safe_prod}_{safe_lote}.docx'
+        else:
+            out_path = os.path.join(tmpdir, f'op_{safe_prod}_{safe_lote}.xls')
+            fill_op_template(
+                product_name=payload['product_name'],
+                op_number=payload['op_number'],
+                lote_number=payload['lote_number'],
+                fab_date=payload['fab_date'],
+                quantity_liters=payload['quantity_liters'],
+                materials=payload['materials'],
+                output_path=out_path,
+            )
+            mime_native = 'application/vnd.ms-excel'
+            filename_native = f'OP_{safe_prod}_{safe_lote}.xls'
+
+        if fmt == 'native':
+            with open(out_path, 'rb') as f:
+                content = f.read()
+            return StreamingResponse(
+                io.BytesIO(content),
+                media_type=mime_native,
+                headers={'Content-Disposition': f'attachment; filename="{filename_native}"'}
+            )
+
+        # Conversão para PDF via LibreOffice
+        pdf_path = convert_to_pdf(out_path, tmpdir)
+        if not pdf_path:
+            raise HTTPException(status_code=500, detail='Falha ao converter para PDF (LibreOffice).')
+        with open(pdf_path, 'rb') as f:
+            content = f.read()
+        pdf_filename = f'{("Ficha" if doc_type == "ficha" else "OP")}_{safe_prod}_{safe_lote}.pdf'
+        return StreamingResponse(
+            io.BytesIO(content),
+            media_type='application/pdf',
+            headers={'Content-Disposition': f'inline; filename="{pdf_filename}"'}
+        )
+    finally:
+        # cleanup
+        try:
+            import shutil as _sh
+            _sh.rmtree(tmpdir, ignore_errors=True)
+        except Exception:
+            pass
+
 
 app.include_router(api_router)
 
