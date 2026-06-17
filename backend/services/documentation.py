@@ -26,19 +26,30 @@ TEMPLATES_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'templa
 FICHA_TEMPLATE = os.path.join(TEMPLATES_DIR, 'ficha_template.docx')
 OP_TEMPLATE = os.path.join(TEMPLATES_DIR, 'op_template.xls')
 CUSTOM_TEMPLATES_DIR = os.path.join(TEMPLATES_DIR, 'custom_ficha')
+CUSTOM_OP_TEMPLATES_DIR = os.path.join(TEMPLATES_DIR, 'custom_op')
 os.makedirs(CUSTOM_TEMPLATES_DIR, exist_ok=True)
+os.makedirs(CUSTOM_OP_TEMPLATES_DIR, exist_ok=True)
 
 
 def get_ficha_template_path(product_id: Optional[str] = None) -> str:
-    """
-    Retorna o caminho do template DOCX para o produto, se ele tiver um custom,
-    ou o template padrão (CITRONELA GEL) como fallback.
-    """
+    """Retorna template da Ficha (custom do produto se existir, senão padrão)."""
     if product_id:
         custom = os.path.join(CUSTOM_TEMPLATES_DIR, f'{product_id}.docx')
         if os.path.isfile(custom):
             return custom
     return FICHA_TEMPLATE
+
+
+def get_op_template_path(product_id: Optional[str] = None) -> tuple:
+    """
+    Retorna (caminho do template XLS da OP, is_custom).
+    is_custom=True quando o produto tem template próprio.
+    """
+    if product_id:
+        custom = os.path.join(CUSTOM_OP_TEMPLATES_DIR, f'{product_id}.xls')
+        if os.path.isfile(custom):
+            return (custom, True)
+    return (OP_TEMPLATE, False)
 
 
 def _fmt_date_br(value) -> str:
@@ -128,90 +139,94 @@ def fill_op_template(
     quantity_liters: float,
     materials: List[Dict],
     output_path: str,
+    template_path: Optional[str] = None,
+    is_custom: bool = False,
 ):
     """
-    Preenche o XLS da Ordem de Produção mantendo TODA a formatação do template:
-    bordas, alinhamento, fontes, tamanho.
+    Preenche o XLS da Ordem de Produção mantendo TODA a formatação do template.
 
-    materials: lista de dicts no formato:
-        {
-            "name": "CONSERVANTE RN-BIO",
-            "lote": "2605075",
-            "validade": "DD/MM/AAAA" ou número serial ou string,
-            "percent": 0.2,
-            "quantity_kg": 2.0
-        }
-
-    A tabela começa na linha 5 (rowidx do xlrd) — mantém código e formatação.
+    Comportamento:
+      - is_custom=False (template padrão): substitui nome/lote/validade/%/qty da tabela
+        com os materiais da receita do sistema.
+      - is_custom=True (template do produto): mantém nome/% /qty como o usuário deixou
+        no template (porque cada produto tem sua fórmula). Substitui APENAS o cabeçalho
+        + lote e validade de cada MP (procurando pelo nome).
     """
-    rb = xlrd.open_workbook(OP_TEMPLATE, formatting_info=True)
+    src = template_path or OP_TEMPLATE
+    rb = xlrd.open_workbook(src, formatting_info=True)
     wb = xl_copy(rb)
     ws = wb.get_sheet(0)
     rs = rb.sheet_by_index(0)
 
-    # --- Cabeçalho ---
-    # Helper: escreve preservando o estilo (xlrd-xf-index) da célula
-    def write_keep_style(row, col, value):
-        xf_idx = rs.cell_xf_index(row, col)
-        # xlutils mantém os xf indices, usamos diretamente
-        ws.write(row, col, value, _xf(rb, xf_idx))
-
     def _xf(rb_local, xf_idx):
-        # Reutiliza o estilo do template — xlutils.copy preserva mas precisamos
-        # de um xlwt.XFStyle. Retornamos um Style ligado ao xf_idx do template.
         from xlwt.Style import XFStyle
         style = XFStyle()
         style._xf_index = xf_idx
         return style
 
-    # [0,5] = 'OP Nº: 02'
+    def write_keep_style(row, col, value):
+        try:
+            xf_idx = rs.cell_xf_index(row, col)
+            ws.write(row, col, value, _xf(rb, xf_idx))
+        except Exception:
+            ws.write(row, col, value)
+
+    # --- Cabeçalho (igual em ambos os modos) ---
     write_keep_style(0, 5, f'OP Nº: {op_number}')
-    # [2,0] = 'PRODUTO: ...'
     write_keep_style(2, 0, f'PRODUTO: {product_name}')
-    # [2,8] = quantidade em litros
     write_keep_style(2, 8, float(quantity_liters or 0))
-    # [3,0] = 'LOTE: ...'
     write_keep_style(3, 0, f'LOTE: {lote_number}')
-    # [3,2] = 'DATA: ...'
     write_keep_style(3, 2, f'DATA: {fab_date}')
 
-    # --- Tabela de matérias-primas ---
-    # Linhas 5..(5+N-1) do template original são preenchidas com MPs do CITRONELA.
-    # Limpamos essas linhas (mantendo as bordas) e gravamos as MPs reais.
     table_start = 5
-    table_end = 16  # última linha de MP no template (ÁGUA), inclusive
-    cols_to_clear = [1, 2, 3, 4, 5]  # nome, lote, validade, %, qty
+    table_end = 16
 
-    # Apaga os valores antigos (mantém estilo das células)
-    for r in range(table_start, table_end + 1):
-        for c in cols_to_clear:
+    # Mapa nome → (lote, validade) do sistema
+    mp_by_name = {}
+    for m in materials:
+        key = str(m.get('name') or '').strip().upper()
+        if key:
+            mp_by_name[key] = m
+
+    if is_custom:
+        # MODO CUSTOM: apenas atualiza Lote e Validade de cada linha existente,
+        # casando pelo nome da MP que o usuário deixou no template.
+        for r in range(table_start, table_end + 1):
             try:
-                xf_idx = rs.cell_xf_index(r, c)
-                ws.write(r, c, '', _xf(rb, xf_idx))
+                name_cell = rs.cell_value(r, 1) or ''
             except Exception:
-                pass
+                continue
+            name_key = str(name_cell).strip().upper()
+            if not name_key:
+                continue
+            mp = mp_by_name.get(name_key)
+            if mp:
+                write_keep_style(r, 2, str(mp.get('lote') or ''))
+                write_keep_style(r, 3, str(mp.get('validade') or ''))
+    else:
+        # MODO PADRÃO (template Lumix): limpa a tabela e popula com a receita.
+        cols_to_clear = [1, 2, 3, 4, 5]
+        for r in range(table_start, table_end + 1):
+            for c in cols_to_clear:
+                try:
+                    xf_idx = rs.cell_xf_index(r, c)
+                    ws.write(r, c, '', _xf(rb, xf_idx))
+                except Exception:
+                    pass
 
-    # Escreve as MPs reais começando na linha 5
-    total_pct = 0.0
-    total_qty = 0.0
-    for i, mat in enumerate(materials):
-        row = table_start + i
-        if row > table_end:
-            break  # respeita as 12 linhas do template
-        write_keep_style(row, 1, mat.get('name', ''))
-        write_keep_style(row, 2, mat.get('lote', '') or '')
-        write_keep_style(row, 3, mat.get('validade', '') or '')
-        pct = mat.get('percent') or 0
-        qty = mat.get('quantity_kg') or 0
-        if pct:
-            write_keep_style(row, 4, float(pct))
-            total_pct += float(pct)
-        if qty:
-            write_keep_style(row, 5, float(qty))
-            total_qty += float(qty)
-
-    # Linha total (linha 17 no template tinha 100 / 1000 — preserva)
-    # Se o usuário tiver poucos materiais, o total já cobre o que foi escrito.
+        for i, mat in enumerate(materials):
+            row = table_start + i
+            if row > table_end:
+                break
+            write_keep_style(row, 1, mat.get('name', ''))
+            write_keep_style(row, 2, str(mat.get('lote') or ''))
+            write_keep_style(row, 3, str(mat.get('validade') or ''))
+            pct = mat.get('percent') or 0
+            qty = mat.get('quantity_kg') or 0
+            if pct:
+                write_keep_style(row, 4, float(pct))
+            if qty:
+                write_keep_style(row, 5, float(qty))
 
     wb.save(output_path)
     return output_path

@@ -2988,9 +2988,11 @@ setup_industrial_op_routes(api_router, db, fs, get_current_user, generate_batch_
 # ========== DOCUMENTAÇÃO DE PRODUÇÃO (Ficha + OP via templates oficiais) ==========
 from services.documentation import (
     fill_ficha_template, fill_op_template, convert_to_pdf, _fmt_date_br,
-    CUSTOM_TEMPLATES_DIR, get_ficha_template_path
+    CUSTOM_TEMPLATES_DIR, CUSTOM_OP_TEMPLATES_DIR,
+    get_ficha_template_path, get_op_template_path,
 )
 import tempfile
+import xlrd
 
 
 async def _build_documentation_payload(product_batch_id: str) -> dict:
@@ -3173,6 +3175,11 @@ async def generate_production_documentation(
             filename_native = f'Ficha_{safe_prod}_{safe_lote}.docx'
         else:
             out_path = os.path.join(tmpdir, f'op_{safe_prod}_{safe_lote}.xls')
+            # usa template personalizado da OP se existir
+            batch_doc_op = await db.product_batches.find_one({'id': product_batch_id}, {'_id': 0, 'product_id': 1}) \
+                or await db.archived_product_batches.find_one({'id': product_batch_id}, {'_id': 0, 'product_id': 1})
+            product_id_for_op = batch_doc_op.get('product_id') if batch_doc_op else None
+            op_template_path, op_is_custom = get_op_template_path(product_id_for_op)
             fill_op_template(
                 product_name=payload['product_name'],
                 op_number=payload['op_number'],
@@ -3181,6 +3188,8 @@ async def generate_production_documentation(
                 quantity_liters=payload['quantity_liters'],
                 materials=payload['materials'],
                 output_path=out_path,
+                template_path=op_template_path,
+                is_custom=op_is_custom,
             )
             mime_native = 'application/vnd.ms-excel'
             filename_native = f'OP_{safe_prod}_{safe_lote}.xls'
@@ -3294,6 +3303,91 @@ async def delete_product_ficha_template(
         os.remove(target)
     await db.product_ficha_templates.delete_one({'product_id': product_id})
     return {'message': 'Template removido — usando o padrão agora'}
+
+
+# ----- Templates de OP por Produto -----
+
+@api_router.get('/products/{product_id}/op-template')
+async def get_product_op_template_status(
+    product_id: str,
+    current_user = Depends(get_current_user)
+):
+    """Retorna se o produto tem template de OP personalizado."""
+    custom_path = os.path.join(CUSTOM_OP_TEMPLATES_DIR, f'{product_id}.xls')
+    exists = os.path.isfile(custom_path)
+    if not exists:
+        return {'has_custom': False}
+    meta = await db.product_op_templates.find_one({'product_id': product_id}, {'_id': 0})
+    return {
+        'has_custom': True,
+        'filename': (meta or {}).get('filename', ''),
+        'uploaded_at': (meta or {}).get('uploaded_at', ''),
+        'size': os.path.getsize(custom_path),
+    }
+
+
+@api_router.post('/products/{product_id}/op-template')
+async def upload_product_op_template(
+    product_id: str,
+    file: UploadFile = File(...),
+    current_user = Depends(get_current_user)
+):
+    """
+    Faz upload do template XLS personalizado da OP para um produto.
+    Quando este template é usado, o sistema preserva % e QUANT(Kg) do template
+    (porque cada produto tem sua fórmula) e apenas atualiza cabeçalho + lote
+    e validade das matérias-primas pelo nome.
+    """
+    if not file.filename.lower().endswith('.xls'):
+        raise HTTPException(status_code=400, detail='Apenas arquivos .xls são aceitos')
+    product = await db.products.find_one({'id': product_id, 'deleted': False}, {'_id': 0})
+    if not product:
+        raise HTTPException(status_code=404, detail='Produto não encontrado')
+
+    content = await file.read()
+    if len(content) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail='Arquivo muito grande (limite 5MB)')
+
+    try:
+        from io import BytesIO
+        xlrd.open_workbook(file_contents=content, formatting_info=True)
+    except Exception:
+        raise HTTPException(status_code=400, detail='Arquivo XLS inválido ou corrompido')
+
+    target = os.path.join(CUSTOM_OP_TEMPLATES_DIR, f'{product_id}.xls')
+    with open(target, 'wb') as f:
+        f.write(content)
+
+    await db.product_op_templates.update_one(
+        {'product_id': product_id},
+        {'$set': {
+            'product_id': product_id,
+            'filename': file.filename,
+            'size': len(content),
+            'uploaded_at': datetime.now(timezone.utc).isoformat(),
+            'uploaded_by': current_user.get('email', ''),
+        }},
+        upsert=True
+    )
+
+    return {
+        'message': 'Template de OP enviado com sucesso',
+        'filename': file.filename,
+        'size': len(content),
+    }
+
+
+@api_router.delete('/products/{product_id}/op-template')
+async def delete_product_op_template(
+    product_id: str,
+    current_user = Depends(get_current_user)
+):
+    """Remove o template de OP personalizado e volta ao padrão."""
+    target = os.path.join(CUSTOM_OP_TEMPLATES_DIR, f'{product_id}.xls')
+    if os.path.isfile(target):
+        os.remove(target)
+    await db.product_op_templates.delete_one({'product_id': product_id})
+    return {'message': 'Template de OP removido — usando o padrão agora'}
 
 
 app.include_router(api_router)

@@ -30,16 +30,24 @@ export default function DocumentationButton({ productId, productName }) {
   const [previewData, setPreviewData] = useState(null);
   // Template personalizado
   const [templateStatus, setTemplateStatus] = useState(null); // {has_custom, filename, uploaded_at}
+  const [opTemplateStatus, setOpTemplateStatus] = useState(null);
   const [uploadingTpl, setUploadingTpl] = useState(false);
+  const [uploadingOpTpl, setUploadingOpTpl] = useState(false);
   const fileInputRef = useRef(null);
+  const opFileInputRef = useRef(null);
 
   const fetchTemplateStatus = async () => {
     if (!productId) return;
     try {
-      const r = await api.get(`/products/${productId}/ficha-template`);
-      setTemplateStatus(r.data);
+      const [r1, r2] = await Promise.all([
+        api.get(`/products/${productId}/ficha-template`),
+        api.get(`/products/${productId}/op-template`),
+      ]);
+      setTemplateStatus(r1.data);
+      setOpTemplateStatus(r2.data);
     } catch (e) {
       setTemplateStatus({ has_custom: false });
+      setOpTemplateStatus({ has_custom: false });
     }
   };
 
@@ -162,6 +170,41 @@ export default function DocumentationButton({ productId, productName }) {
     }
   };
 
+  const handleUploadOpTemplate = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith('.xls')) {
+      toast.error('Apenas arquivos .xls são aceitos');
+      return;
+    }
+    setUploadingOpTpl(true);
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      const r = await api.post(`/products/${productId}/op-template`, form, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      toast.success(r.data.message || 'Template de OP enviado!');
+      await fetchTemplateStatus();
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Erro ao enviar template de OP');
+    } finally {
+      setUploadingOpTpl(false);
+      if (opFileInputRef.current) opFileInputRef.current.value = '';
+    }
+  };
+
+  const handleRemoveOpTemplate = async () => {
+    if (!window.confirm('Remover o template de OP personalizado? O sistema voltará a usar o template padrão.')) return;
+    try {
+      await api.delete(`/products/${productId}/op-template`);
+      toast.success('Template de OP removido');
+      await fetchTemplateStatus();
+    } catch (err) {
+      toast.error('Erro ao remover template');
+    }
+  };
+
   return (
     <>
       <Button
@@ -189,37 +232,34 @@ export default function DocumentationButton({ productId, productName }) {
             </div>
           ) : batches.length === 0 ? (
             <div className="space-y-4">
-              {/* Status / Upload do Template Personalizado (mesmo sem lotes) */}
-              <Card className={`p-3.5 rounded-xl border ${
-                templateStatus?.has_custom 
-                  ? 'border-secondary/40 bg-secondary/5' 
-                  : 'border-border bg-muted/30'
-              }`}>
-                <div className="flex items-start gap-3">
-                  {templateStatus?.has_custom ? <CheckCircle2 className="w-5 h-5 text-secondary shrink-0 mt-0.5" /> : <Info className="w-5 h-5 text-muted-foreground shrink-0 mt-0.5" />}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Template da Ficha</p>
-                    {templateStatus?.has_custom ? (
-                      <p className="text-sm text-foreground font-semibold mt-0.5 truncate">
-                        Personalizado: <span className="font-mono text-xs text-secondary">{templateStatus.filename}</span>
-                      </p>
-                    ) : (
-                      <p className="text-sm text-foreground font-semibold mt-0.5">Padrão (CITRONELA GEL)</p>
-                    )}
-                  </div>
-                  <div className="flex gap-1.5 shrink-0">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <Card className={`p-3.5 rounded-xl border ${templateStatus?.has_custom ? 'border-secondary/40 bg-secondary/5' : 'border-border bg-muted/30'}`}>
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Template Ficha (.docx)</p>
+                  <p className="text-xs text-foreground font-semibold mt-0.5 truncate">
+                    {templateStatus?.has_custom ? <><span className="text-secondary">Personalizado:</span> <span className="font-mono text-[11px]">{templateStatus.filename}</span></> : 'Padrão (CITRONELA GEL)'}
+                  </p>
+                  <div className="flex gap-1.5 mt-2">
                     <input ref={fileInputRef} type="file" accept=".docx" onChange={handleUploadTemplate} className="hidden" />
-                    <Button size="sm" variant="outline" className="border-border h-8 rounded-lg text-xs" disabled={uploadingTpl} onClick={() => fileInputRef.current?.click()}>
+                    <Button size="sm" variant="outline" className="border-border h-7 rounded-lg text-[11px] flex-1" disabled={uploadingTpl} onClick={() => fileInputRef.current?.click()}>
                       {uploadingTpl ? <Loader2 className="w-3 h-3 animate-spin" /> : <><Upload className="w-3 h-3 mr-1" /> {templateStatus?.has_custom ? 'Trocar' : 'Enviar'}</>}
                     </Button>
-                    {templateStatus?.has_custom && (
-                      <Button size="sm" variant="outline" className="border-destructive/40 text-destructive hover:bg-destructive/10 h-8 rounded-lg" onClick={handleRemoveTemplate}>
-                        <Trash2 className="w-3 h-3" />
-                      </Button>
-                    )}
+                    {templateStatus?.has_custom && <Button size="sm" variant="outline" className="border-destructive/40 text-destructive hover:bg-destructive/10 h-7 rounded-lg" onClick={handleRemoveTemplate}><Trash2 className="w-3 h-3" /></Button>}
                   </div>
-                </div>
-              </Card>
+                </Card>
+                <Card className={`p-3.5 rounded-xl border ${opTemplateStatus?.has_custom ? 'border-primary/40 bg-primary/5' : 'border-border bg-muted/30'}`}>
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Template OP (.xls)</p>
+                  <p className="text-xs text-foreground font-semibold mt-0.5 truncate">
+                    {opTemplateStatus?.has_custom ? <><span className="text-primary">Personalizado:</span> <span className="font-mono text-[11px]">{opTemplateStatus.filename}</span></> : 'Padrão (mantém % e Kg do sistema)'}
+                  </p>
+                  <div className="flex gap-1.5 mt-2">
+                    <input ref={opFileInputRef} type="file" accept=".xls" onChange={handleUploadOpTemplate} className="hidden" />
+                    <Button size="sm" variant="outline" className="border-border h-7 rounded-lg text-[11px] flex-1" disabled={uploadingOpTpl} onClick={() => opFileInputRef.current?.click()}>
+                      {uploadingOpTpl ? <Loader2 className="w-3 h-3 animate-spin" /> : <><Upload className="w-3 h-3 mr-1" /> {opTemplateStatus?.has_custom ? 'Trocar' : 'Enviar'}</>}
+                    </Button>
+                    {opTemplateStatus?.has_custom && <Button size="sm" variant="outline" className="border-destructive/40 text-destructive hover:bg-destructive/10 h-7 rounded-lg" onClick={handleRemoveOpTemplate}><Trash2 className="w-3 h-3" /></Button>}
+                  </div>
+                </Card>
+              </div>
               <div className="py-6 text-center">
                 <Package className="w-10 h-10 text-muted-foreground mx-auto mb-2" />
                 <p className="text-foreground font-semibold">Nenhum lote encontrado</p>
@@ -228,68 +268,68 @@ export default function DocumentationButton({ productId, productName }) {
             </div>
           ) : (
             <div className="space-y-4">
-              {/* Status / Upload do Template Personalizado */}
-              <Card className={`p-3.5 rounded-xl border ${
-                templateStatus?.has_custom 
-                  ? 'border-secondary/40 bg-secondary/5' 
-                  : 'border-border bg-muted/30'
-              }`}>
-                <div className="flex items-start gap-3">
-                  {templateStatus?.has_custom ? (
-                    <CheckCircle2 className="w-5 h-5 text-secondary shrink-0 mt-0.5" />
-                  ) : (
-                    <Info className="w-5 h-5 text-muted-foreground shrink-0 mt-0.5" />
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Template da Ficha</p>
-                    {templateStatus?.has_custom ? (
-                      <>
-                        <p className="text-sm text-foreground font-semibold mt-0.5 truncate" data-testid="template-status">
-                          Personalizado: <span className="font-mono text-xs text-secondary">{templateStatus.filename || 'arquivo.docx'}</span>
+              {/* TEMPLATES: Ficha + OP */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {/* FICHA TEMPLATE */}
+                <Card className={`p-3.5 rounded-xl border ${
+                  templateStatus?.has_custom ? 'border-secondary/40 bg-secondary/5' : 'border-border bg-muted/30'
+                }`}>
+                  <div className="flex items-start gap-2">
+                    {templateStatus?.has_custom ? <CheckCircle2 className="w-4 h-4 text-secondary shrink-0 mt-0.5" /> : <Info className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Template Ficha (.docx)</p>
+                      {templateStatus?.has_custom ? (
+                        <p className="text-xs text-foreground font-semibold mt-0.5 truncate" data-testid="template-status">
+                          <span className="text-secondary">Personalizado:</span> <span className="font-mono text-[11px]">{templateStatus.filename}</span>
                         </p>
-                        <p className="text-[11px] text-muted-foreground">Este produto usa seu próprio template DOCX.</p>
-                      </>
-                    ) : (
-                      <>
-                        <p className="text-sm text-foreground font-semibold mt-0.5">Padrão (CITRONELA GEL)</p>
-                        <p className="text-[11px] text-muted-foreground">Envie um .docx para personalizar a Ficha deste produto.</p>
-                      </>
-                    )}
+                      ) : (
+                        <p className="text-xs text-foreground font-semibold mt-0.5">Padrão (CITRONELA GEL)</p>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex gap-1.5 shrink-0">
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept=".docx"
-                      onChange={handleUploadTemplate}
-                      className="hidden"
-                      data-testid="upload-template-input"
-                    />
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="border-border h-8 rounded-lg text-xs"
-                      disabled={uploadingTpl}
-                      onClick={() => fileInputRef.current?.click()}
-                      data-testid="upload-template-btn"
-                    >
+                  <div className="flex gap-1.5 mt-2">
+                    <input ref={fileInputRef} type="file" accept=".docx" onChange={handleUploadTemplate} className="hidden" data-testid="upload-template-input" />
+                    <Button size="sm" variant="outline" className="border-border h-7 rounded-lg text-[11px] flex-1" disabled={uploadingTpl} onClick={() => fileInputRef.current?.click()} data-testid="upload-template-btn">
                       {uploadingTpl ? <Loader2 className="w-3 h-3 animate-spin" /> : <><Upload className="w-3 h-3 mr-1" /> {templateStatus?.has_custom ? 'Trocar' : 'Enviar'}</>}
                     </Button>
                     {templateStatus?.has_custom && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="border-destructive/40 text-destructive hover:bg-destructive/10 h-8 rounded-lg"
-                        onClick={handleRemoveTemplate}
-                        data-testid="remove-template-btn"
-                        title="Remover template personalizado"
-                      >
+                      <Button size="sm" variant="outline" className="border-destructive/40 text-destructive hover:bg-destructive/10 h-7 rounded-lg" onClick={handleRemoveTemplate} data-testid="remove-template-btn">
                         <Trash2 className="w-3 h-3" />
                       </Button>
                     )}
                   </div>
-                </div>
-              </Card>
+                </Card>
+
+                {/* OP TEMPLATE */}
+                <Card className={`p-3.5 rounded-xl border ${
+                  opTemplateStatus?.has_custom ? 'border-primary/40 bg-primary/5' : 'border-border bg-muted/30'
+                }`}>
+                  <div className="flex items-start gap-2">
+                    {opTemplateStatus?.has_custom ? <CheckCircle2 className="w-4 h-4 text-primary shrink-0 mt-0.5" /> : <Info className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Template OP (.xls)</p>
+                      {opTemplateStatus?.has_custom ? (
+                        <p className="text-xs text-foreground font-semibold mt-0.5 truncate" data-testid="op-template-status">
+                          <span className="text-primary">Personalizado:</span> <span className="font-mono text-[11px]">{opTemplateStatus.filename}</span>
+                        </p>
+                      ) : (
+                        <p className="text-xs text-foreground font-semibold mt-0.5">Padrão (mantém % e Kg do sistema)</p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex gap-1.5 mt-2">
+                    <input ref={opFileInputRef} type="file" accept=".xls" onChange={handleUploadOpTemplate} className="hidden" data-testid="upload-op-template-input" />
+                    <Button size="sm" variant="outline" className="border-border h-7 rounded-lg text-[11px] flex-1" disabled={uploadingOpTpl} onClick={() => opFileInputRef.current?.click()} data-testid="upload-op-template-btn">
+                      {uploadingOpTpl ? <Loader2 className="w-3 h-3 animate-spin" /> : <><Upload className="w-3 h-3 mr-1" /> {opTemplateStatus?.has_custom ? 'Trocar' : 'Enviar'}</>}
+                    </Button>
+                    {opTemplateStatus?.has_custom && (
+                      <Button size="sm" variant="outline" className="border-destructive/40 text-destructive hover:bg-destructive/10 h-7 rounded-lg" onClick={handleRemoveOpTemplate} data-testid="remove-op-template-btn">
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
+                    )}
+                  </div>
+                </Card>
+              </div>
 
               {/* Seleção de lote */}
               <div>
