@@ -5,6 +5,7 @@ import { Card } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
+import DocumentationButton from '../components/DocumentationButton';
 import { toast } from 'sonner';
 import {
   FolderPlus, Folder, Plus, ArrowLeft, FlaskConical, Pencil, Trash2,
@@ -17,7 +18,7 @@ const DEFAULT_FIELDS = [
   { name: 'Odor', order: 2, spec: '', quick_answer: true },
   { name: 'pH', order: 3, spec: '', quick_answer: false },
   { name: 'Viscosidade', order: 4, spec: '', quick_answer: false },
-  { name: 'Massa Específica', order: 5, spec: '', quick_answer: false },
+  { name: 'Densidade gm/3', order: 5, spec: '', quick_answer: false },
 ];
 
 // Soma N dias a uma data "YYYY-MM-DD" sem cair em problemas de fuso horário.
@@ -366,6 +367,9 @@ export default function FichaAnalise() {
           <h2 className="text-xl font-bold text-foreground">{selectedItem?.name}</h2>
         </div>
         <div className="ml-auto flex gap-2 flex-wrap">
+          {activeTab === 'produto' && (
+            <DocumentationButton productId={selectedItem?.id} productName={selectedItem?.name} />
+          )}
           <Button variant="outline" size="sm" className="border-border" onClick={() => { setEditingFields([...fields]); setView('edit_fields'); }} data-testid="edit-fields-btn">
             <Pencil className="w-4 h-4 mr-1" /> Editar Campos
           </Button>
