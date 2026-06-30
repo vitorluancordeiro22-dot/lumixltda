@@ -24,7 +24,8 @@ import {
   Smartphone,
   Monitor,
   FlaskConical,
-  Factory
+  Factory,
+  ShoppingCart
 } from 'lucide-react';
 
 import {
@@ -40,6 +41,7 @@ const allMenuItems = [
   { path: '/samples', icon: FlaskConical, label: 'Amostras', roles: ['laboratorio', 'producao'] },
   { path: '/fichas-analise', icon: ClipboardCheck, label: 'Ordem de Produção', roles: ['laboratorio'], emailOnly: 'laboratoriolumix@outlook.com' },
   { path: '/ficha-analise', icon: FlaskIcon, label: 'Ficha de Análise', roles: ['laboratorio'], emailOnly: 'laboratoriolumix@outlook.com' },
+  { path: '/pedidos', icon: ShoppingCart, label: 'Pedidos', roles: ['laboratorio'], emailAllowlist: ['leonicelaboratorio@lumix.com', 'laboratoriolumix@outlook.com'], testId: 'nav-pedidos' },
   { path: '/batch-management', icon: ListChecks, label: 'Gerenciar Lotes', roles: ['laboratorio'] },
   { path: '/suppliers', icon: Truck, label: 'Fornecedores', roles: ['laboratorio'] },
   { path: '/laudos', icon: FileCheck, label: 'Pastas', roles: ['laboratorio'] },
@@ -57,6 +59,7 @@ const Sidebar = ({ mobile = false, onItemClick }) => {
   const menuItems = allMenuItems.filter(item => {
     if (!item.roles.includes(role || 'producao')) return false;
     if (item.emailOnly && user?.email !== item.emailOnly) return false;
+    if (item.emailAllowlist && !item.emailAllowlist.some(e => e.toLowerCase() === (user?.email || '').toLowerCase())) return false;
     return true;
   });
 

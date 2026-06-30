@@ -3,8 +3,8 @@ import api from '../lib/api';
 
 const AuthContext = createContext();
 
-// Email do usuário com acesso completo ao Laboratório
-const LAB_EMAIL = 'laboratoriolumix@outlook.com';
+// Emails do usuário com acesso completo ao Laboratório
+const LAB_EMAILS = ['laboratoriolumix@outlook.com', 'leonicelaboratorio@lumix.com'];
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
@@ -37,7 +37,7 @@ export const AuthProvider = ({ children }) => {
     // Determina a role baseada no email e na seleção
     // Apenas o email do laboratório pode acessar o modo "Laboratório"
     let finalRole = selectedRole;
-    if (selectedRole === 'laboratorio' && email.toLowerCase() !== LAB_EMAIL.toLowerCase()) {
+    if (selectedRole === 'laboratorio' && !LAB_EMAILS.some(e => e.toLowerCase() === email.toLowerCase())) {
       finalRole = 'producao'; // Força produção se não for o email autorizado
     }
     

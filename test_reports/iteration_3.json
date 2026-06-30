@@ -1,0 +1,43 @@
+{
+  "summary": "Full E2E testing of the Pedidos (Purchase Orders) module - backend + frontend. 16/16 pytest backend tests passed (auth allowlist, catalog CRUD, order CRUD, status workflow, PDF, sequential numbering, custom item auto-save). Frontend Playwright walked the complete flow: login as leonicelaboratorio@lumix.com (Laboratorio mode) -> nav-pedidos visible -> /pedidos page renders with fazer-pedido-button and both tabs -> open dialog -> select real supplier -> add custom item via '+ adicionar item novo' -> item appears in catalog -> add to cart with qty -> edit cart qty -> observations -> Finalize -> order PED-0007 appears in Histórico -> status workflow pendente -> enviado -> recebido -> reabrir all work -> PDF endpoint returns HTTP 200 application/pdf. The 403 access-control endpoints are also verified server-side for a freshly-registered non-allowlisted user.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "passed_tests": [
+    "TestAccessControl: allowed login, list orders (both allowlisted emails), 403 for non-allowlisted user on list/create/catalog",
+    "TestCatalog: GET empty catalog, POST custom item persists, duplicate POST returns same id",
+    "TestPurchaseOrders: create increments PED-NNNN sequential, custom item auto-saved to supplier catalog on POST /purchase-orders, empty items rejected (400), status workflow pendente/enviado/recebido/reopen, invalid status rejected (400), PDF returns 200 application/pdf %PDF, delete removes from list",
+    "Frontend E2E: nav-pedidos visible for leonicelaboratorio@lumix.com, /pedidos page UI, new-order-dialog opens, supplier selection (real supplier), '+ adicionar item novo' adds to catalog, add to cart with quantity, cart qty edit, observations, Finalize creates PED-XXXX, status buttons (mark-sent, mark-received, reopen), PDF network call returns 200 application/pdf, navigator between Histórico and Pendentes/Entregues tabs"
+  ],
+  "test_report_links": [
+    "/app/backend/tests/test_pedidos.py",
+    "/app/test_reports/pytest/pedidos_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Allowlist comparison is case-insensitive (good) and centralised in require_pedidos_access().",
+    "Sequential PED-NNNN numbering uses a per-document 'seq' field with sort -1; safe under low concurrency, but two simultaneous POSTs could race. Consider db.purchase_orders.find_one_and_update on a counters collection if higher concurrency is expected.",
+    "_get_lumix_logo_path() caches the downloaded logo in /tmp; if download fails initially it returns None and PDF still renders (graceful).",
+    "Custom catalog items are auto-saved on order creation only when supplier_id is non-empty (avulso typed names are NOT saved to any catalog, which matches the spec).",
+    "delete_purchase_order does soft-delete only (sets deleted=True), as expected.",
+    "All endpoints exclude MongoDB _id via projection. Good.",
+    "Pedidos.js: all required data-testid attributes are present and behave as expected."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_pedidos.py (new)"
+  ],
+  "success_rate": { "backend": "100% (16/16)", "frontend": "~95% (all critical flows passed; one non-essential re-open of dialog hit a click race, but the underlying flow was already verified)" },
+  "test_credentials": {
+    "leonice": "leonicelaboratorio@lumix.com / Lumix2002 (Laboratório mode)",
+    "lumix": "laboratoriolumix@outlook.com / Lumix2002 (Laboratório mode)",
+    "non_allowlisted": "Freshly-registered TESTuser_<rand>@example.com / TestPass123"
+  },
+  "seed_data_creation": "Created one TEST_Fornecedor for backend tests; all test suppliers/orders/catalog items are cleaned up in teardown. Frontend test PED-0007 was created with 'Fornecedor Teste' and cleaned up post-run via API.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Pedidos module is fully working backend + frontend. Test file at /app/backend/tests/test_pedidos.py uses ALLOWED_EMAIL=laboratoriolumix@outlook.com / Lumix2002 and registers a random TEST user for 403 checks. The test cleans up its own data. To re-run: pytest /app/backend/tests/test_pedidos.py -v. UI testids in Pedidos.js are stable and complete.",
+  "rca of the issue": "No bugs found."
+}

@@ -15,6 +15,7 @@ import jwt
 from uuid import uuid4
 import uuid
 import io
+import re
 from bson import ObjectId
 
 # Industrial OP imports
@@ -3456,6 +3457,282 @@ async def delete_product_op_template(
         os.remove(target)
     await db.product_op_templates.delete_one({'product_id': product_id})
     return {'message': 'Template de OP removido — usando o padrão agora'}
+
+
+# ==========================================================================
+# ========== MÓDULO PEDIDOS (Compras a Fornecedores) =======================
+# Independente do módulo de vendas/produção. Acesso restrito.
+# ==========================================================================
+import urllib.request as _urllib_request
+
+PEDIDOS_ALLOWED_EMAILS = ['leonicelaboratorio@lumix.com', 'laboratoriolumix@outlook.com']
+LUMIX_LOGO_URL = 'https://customer-assets.emergentagent.com/job_prodman-lumix/artifacts/aod9p9yw_images.png'
+_LUMIX_LOGO_PATH = '/tmp/lumix_logo.png'
+
+
+def require_pedidos_access(current_user):
+    email = (current_user.get('email') or '').lower()
+    if email not in [e.lower() for e in PEDIDOS_ALLOWED_EMAILS]:
+        raise HTTPException(status_code=403, detail='Acesso não autorizado ao módulo de Pedidos')
+
+
+def _get_lumix_logo_path():
+    if not os.path.isfile(_LUMIX_LOGO_PATH):
+        try:
+            _urllib_request.urlretrieve(LUMIX_LOGO_URL, _LUMIX_LOGO_PATH)
+        except Exception:
+            return None
+    return _LUMIX_LOGO_PATH
+
+
+class POItem(BaseModel):
+    name: str
+    unit: str = ''
+    quantity: float
+    raw_material_id: Optional[str] = None
+
+
+class PurchaseOrderCreate(BaseModel):
+    supplier_id: str = ''
+    supplier_name: str
+    items: List[POItem]
+    observations: str = ''
+
+
+class PurchaseOrderStatusUpdate(BaseModel):
+    status: str  # pendente, enviado, recebido
+
+
+class SupplierCatalogItemCreate(BaseModel):
+    name: str
+    unit: str = ''
+
+
+async def _next_order_number():
+    last = await db.purchase_orders.find_one({}, sort=[('seq', -1)])
+    seq = (last.get('seq', 0) + 1) if last else 1
+    return seq, f'PED-{seq:04d}'
+
+
+@api_router.get('/suppliers/{supplier_id}/catalog')
+async def get_supplier_catalog(supplier_id: str, current_user=Depends(get_current_user)):
+    require_pedidos_access(current_user)
+    items = []
+    rms = await db.raw_materials.find({'supplier_id': supplier_id, 'deleted': False}, {'_id': 0}).to_list(1000)
+    for rm in rms:
+        items.append({
+            'id': f"rm-{rm['id']}",
+            'name': rm['name'],
+            'unit': rm.get('type', 'Kg'),
+            'source': 'raw_material',
+            'raw_material_id': rm['id'],
+        })
+    cats = await db.supplier_catalog_items.find({'supplier_id': supplier_id, 'deleted': {'$ne': True}}, {'_id': 0}).to_list(1000)
+    for c in cats:
+        items.append({
+            'id': c['id'],
+            'name': c['name'],
+            'unit': c.get('unit', ''),
+            'source': 'custom',
+            'raw_material_id': None,
+        })
+    items.sort(key=lambda x: x['name'].lower())
+    return items
+
+
+@api_router.post('/suppliers/{supplier_id}/catalog')
+async def add_supplier_catalog_item(supplier_id: str, data: SupplierCatalogItemCreate, current_user=Depends(get_current_user)):
+    require_pedidos_access(current_user)
+    name = data.name.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail='Nome do item é obrigatório')
+    existing = await db.supplier_catalog_items.find_one({
+        'supplier_id': supplier_id,
+        'name': {'$regex': f'^{re.escape(name)}$', '$options': 'i'},
+        'deleted': {'$ne': True},
+    })
+    if existing:
+        return {'id': existing['id'], 'name': existing['name'], 'unit': existing.get('unit', ''), 'source': 'custom', 'raw_material_id': None}
+    item_id = str(uuid.uuid4())
+    doc = {'id': item_id, 'supplier_id': supplier_id, 'name': name, 'unit': data.unit, 'created_at': datetime.now(timezone.utc).isoformat(), 'deleted': False}
+    await db.supplier_catalog_items.insert_one(doc)
+    return {'id': item_id, 'name': name, 'unit': data.unit, 'source': 'custom', 'raw_material_id': None}
+
+
+@api_router.delete('/suppliers/{supplier_id}/catalog/{item_id}')
+async def delete_supplier_catalog_item(supplier_id: str, item_id: str, current_user=Depends(get_current_user)):
+    require_pedidos_access(current_user)
+    await db.supplier_catalog_items.update_one({'id': item_id, 'supplier_id': supplier_id}, {'$set': {'deleted': True}})
+    return {'message': 'Item removido do catálogo'}
+
+
+@api_router.get('/purchase-orders')
+async def get_purchase_orders(current_user=Depends(get_current_user)):
+    require_pedidos_access(current_user)
+    orders = await db.purchase_orders.find({'deleted': {'$ne': True}}, {'_id': 0}).sort('seq', -1).to_list(2000)
+    return orders
+
+
+@api_router.post('/purchase-orders')
+async def create_purchase_order(data: PurchaseOrderCreate, current_user=Depends(get_current_user)):
+    require_pedidos_access(current_user)
+    if not data.items:
+        raise HTTPException(status_code=400, detail='Adicione ao menos um item ao pedido')
+
+    # Salva itens avulsos (sem matéria-prima vinculada) no catálogo do fornecedor para reuso
+    if data.supplier_id:
+        for item in data.items:
+            if not item.raw_material_id:
+                name = item.name.strip()
+                if not name:
+                    continue
+                existing = await db.supplier_catalog_items.find_one({
+                    'supplier_id': data.supplier_id,
+                    'name': {'$regex': f'^{re.escape(name)}$', '$options': 'i'},
+                    'deleted': {'$ne': True},
+                })
+                if not existing:
+                    await db.supplier_catalog_items.insert_one({
+                        'id': str(uuid.uuid4()), 'supplier_id': data.supplier_id,
+                        'name': name, 'unit': item.unit,
+                        'created_at': datetime.now(timezone.utc).isoformat(), 'deleted': False,
+                    })
+
+    seq, order_number = await _next_order_number()
+    order_id = str(uuid.uuid4())
+    doc = {
+        'id': order_id,
+        'seq': seq,
+        'order_number': order_number,
+        'supplier_id': data.supplier_id,
+        'supplier_name': data.supplier_name,
+        'items': [item.model_dump() for item in data.items],
+        'observations': data.observations,
+        'status': 'pendente',
+        'created_by': current_user.get('name') or current_user.get('email', ''),
+        'created_by_email': current_user.get('email', ''),
+        'created_at': datetime.now(timezone.utc).isoformat(),
+        'delivered_at': None,
+        'deleted': False,
+    }
+    await db.purchase_orders.insert_one(doc)
+    doc.pop('_id', None)
+    return doc
+
+
+@api_router.put('/purchase-orders/{order_id}/status')
+async def update_purchase_order_status(order_id: str, data: PurchaseOrderStatusUpdate, current_user=Depends(get_current_user)):
+    require_pedidos_access(current_user)
+    if data.status not in ('pendente', 'enviado', 'recebido'):
+        raise HTTPException(status_code=400, detail='Status inválido')
+    update = {'status': data.status}
+    update['delivered_at'] = datetime.now(timezone.utc).isoformat() if data.status == 'recebido' else None
+    result = await db.purchase_orders.update_one({'id': order_id}, {'$set': update})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail='Pedido não encontrado')
+    order = await db.purchase_orders.find_one({'id': order_id}, {'_id': 0})
+    return order
+
+
+@api_router.delete('/purchase-orders/{order_id}')
+async def delete_purchase_order(order_id: str, current_user=Depends(get_current_user)):
+    require_pedidos_access(current_user)
+    await db.purchase_orders.update_one({'id': order_id}, {'$set': {'deleted': True}})
+    return {'message': 'Pedido excluído'}
+
+
+@api_router.get('/purchase-orders/{order_id}/pdf')
+async def purchase_order_pdf(order_id: str, current_user=Depends(get_current_user)):
+    require_pedidos_access(current_user)
+    order = await db.purchase_orders.find_one({'id': order_id}, {'_id': 0})
+    if not order:
+        raise HTTPException(status_code=404, detail='Pedido não encontrado')
+
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib import colors
+    from reportlab.lib.units import mm
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image as RLImage
+
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A4, topMargin=18 * mm, bottomMargin=18 * mm, leftMargin=18 * mm, rightMargin=18 * mm)
+    styles = getSampleStyleSheet()
+    primary = colors.HexColor('#2563EB')
+    title_style = ParagraphStyle('t', parent=styles['Title'], textColor=primary, fontSize=20, spaceAfter=2)
+    sub_style = ParagraphStyle('s', parent=styles['Normal'], fontSize=10, textColor=colors.HexColor('#475569'))
+    label_style = ParagraphStyle('l', parent=styles['Normal'], fontSize=10, textColor=colors.HexColor('#0f172a'))
+    cell_style = ParagraphStyle('c', parent=styles['Normal'], fontSize=10)
+
+    elements = []
+    logo_path = _get_lumix_logo_path()
+    header_left = []
+    if logo_path:
+        try:
+            img = RLImage(logo_path, width=42 * mm, height=22 * mm, kind='proportional')
+            header_left.append(img)
+        except Exception:
+            pass
+    title_block = [Paragraph('PEDIDO DE COMPRA', title_style), Paragraph(order.get('order_number', ''), sub_style)]
+    header_tbl = Table([[header_left or Paragraph('LUMIX', title_style), title_block]], colWidths=[80 * mm, 90 * mm])
+    header_tbl.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('ALIGN', (1, 0), (1, 0), 'RIGHT'),
+    ]))
+    elements.append(header_tbl)
+    elements.append(Spacer(1, 8))
+    elements.append(Table([['']], colWidths=[174 * mm], style=TableStyle([('LINEBELOW', (0, 0), (-1, -1), 1.2, primary)])))
+    elements.append(Spacer(1, 10))
+
+    created = order.get('created_at', '')
+    try:
+        created_fmt = datetime.fromisoformat(created).strftime('%d/%m/%Y %H:%M')
+    except Exception:
+        created_fmt = created
+    info_rows = [
+        [Paragraph('<b>Fornecedor:</b>', label_style), Paragraph(order.get('supplier_name', '-'), cell_style)],
+        [Paragraph('<b>Data:</b>', label_style), Paragraph(created_fmt, cell_style)],
+        [Paragraph('<b>Responsável:</b>', label_style), Paragraph(order.get('created_by', '-'), cell_style)],
+        [Paragraph('<b>Pedido Nº:</b>', label_style), Paragraph(order.get('order_number', '-'), cell_style)],
+    ]
+    info_tbl = Table(info_rows, colWidths=[35 * mm, 139 * mm])
+    info_tbl.setStyle(TableStyle([('VALIGN', (0, 0), (-1, -1), 'TOP'), ('BOTTOMPADDING', (0, 0), (-1, -1), 4)]))
+    elements.append(info_tbl)
+    elements.append(Spacer(1, 12))
+
+    data_rows = [[Paragraph('<b>#</b>', cell_style), Paragraph('<b>Produto</b>', cell_style),
+                  Paragraph('<b>Unidade</b>', cell_style), Paragraph('<b>Quantidade</b>', cell_style)]]
+    for i, it in enumerate(order.get('items', []), 1):
+        qty = it.get('quantity', 0)
+        qty_str = str(int(qty)) if float(qty) == int(qty) else str(qty)
+        data_rows.append([Paragraph(str(i), cell_style), Paragraph(it.get('name', ''), cell_style),
+                          Paragraph(it.get('unit', ''), cell_style), Paragraph(qty_str, cell_style)])
+    items_tbl = Table(data_rows, colWidths=[12 * mm, 102 * mm, 30 * mm, 30 * mm], repeatRows=1)
+    items_tbl.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), primary),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cbd5e1')),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f1f5f9')]),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('ALIGN', (0, 0), (0, -1), 'CENTER'),
+        ('ALIGN', (3, 0), (3, -1), 'CENTER'),
+        ('ALIGN', (2, 0), (2, -1), 'CENTER'),
+        ('TOPPADDING', (0, 0), (-1, -1), 6),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+    ]))
+    elements.append(items_tbl)
+    elements.append(Spacer(1, 14))
+
+    if order.get('observations'):
+        elements.append(Paragraph('<b>Observações:</b>', label_style))
+        elements.append(Spacer(1, 4))
+        elements.append(Paragraph(order.get('observations', '').replace('\n', '<br/>'), cell_style))
+
+    doc.build(elements)
+    buf.seek(0)
+    filename = f"{order.get('order_number', 'pedido')}.pdf"
+    return StreamingResponse(buf, media_type='application/pdf',
+                             headers={'Content-Disposition': f'inline; filename="{filename}"'})
 
 
 app.include_router(api_router)
