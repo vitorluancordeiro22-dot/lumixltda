@@ -1,112 +1,149 @@
 {
-  "project_context": {
-    "theme": "Light",
-    "archetype": "Swiss & High-Contrast (Soft Utility Variation)",
-    "inspirations": ["Linear", "Notion", "Stripe", "Vercel"],
-    "core_rules": [
-      "NEVER modify any business logic, API calls, state management, routing or component props.",
-      "ONLY modify classes, HTML wrappers, and CSS/Tailwind configs.",
-      "Ensure ALL interactive elements retain or gain a data-testid attribute in kebab-case."
-    ]
-  },
-  "design_tokens": {
-    "typography": {
-      "font_family": "Manrope, sans-serif",
-      "h1": "text-3xl font-bold tracking-tight text-slate-900",
-      "h2": "text-xl font-semibold tracking-tight text-slate-800",
-      "h3": "text-lg font-medium tracking-tight text-slate-800",
-      "body": "text-sm text-slate-600 leading-relaxed",
-      "metric_value": "text-4xl font-bold tracking-tighter text-slate-900",
-      "metric_label": "text-xs font-semibold text-slate-500 uppercase tracking-widest"
-    },
-    "colors": {
-      "primary": "#2563EB",
-      "secondary": "#10B981",
-      "background": "#FAFAFA",
-      "surface": "#FFFFFF",
-      "border": "#E4E4E7",
-      "text_main": "#0F172A",
-      "text_muted": "#64748B"
-    },
-    "css_variables_for_index_css": {
-      "--background": "0 0% 98%",
-      "--foreground": "222.2 84% 4.9%",
+  "project_name": "Lumix ERP",
+  "theme": "light",
+  "archetype": "Archetype 4 (Swiss & High-Contrast / Authority) customized for premium SaaS and Bespoke Chemical Industry",
+  "colors": {
+    "css_variables": {
+      "--background": "210 20% 98%",
+      "--foreground": "197 64% 15%",
       "--card": "0 0% 100%",
-      "--card-foreground": "222.2 84% 4.9%",
+      "--card-foreground": "197 64% 15%",
       "--popover": "0 0% 100%",
-      "--popover-foreground": "222.2 84% 4.9%",
-      "--primary": "221.2 83.2% 53.3%",
-      "--primary-foreground": "210 40% 98%",
-      "--secondary": "160 84% 39%",
-      "--secondary-foreground": "210 40% 98%",
-      "--muted": "210 40% 96.1%",
-      "--muted-foreground": "215.4 16.3% 46.9%",
-      "--accent": "210 40% 96.1%",
-      "--accent-foreground": "222.2 47.4% 11.2%",
-      "--destructive": "0 84.2% 60.2%",
-      "--destructive-foreground": "210 40% 98%",
-      "--border": "214.3 31.8% 91.4%",
-      "--input": "214.3 31.8% 91.4%",
-      "--ring": "221.2 83.2% 53.3%",
-      "--radius": "1rem"
+      "--popover-foreground": "197 64% 15%",
+      "--primary": "156 86% 30%",
+      "--primary-foreground": "0 0% 100%",
+      "--primary-dark": "156 89% 22%",
+      "--secondary": "197 64% 24%",
+      "--secondary-foreground": "0 0% 100%",
+      "--muted": "210 20% 96%",
+      "--muted-foreground": "215 16% 47%",
+      "--accent": "156 86% 96%",
+      "--accent-foreground": "156 86% 30%",
+      "--destructive": "0 84% 60%",
+      "--border": "210 20% 92%",
+      "--input": "210 20% 92%",
+      "--ring": "156 86% 30%",
+      "--radius": "0.75rem",
+      "--radius-lg": "1.125rem",
+      "--sidebar-bg": "0 0% 100%",
+      "--topbar-bg": "0 0% 100%"
     },
-    "shadows_and_radii": {
-      "radius": "rounded-2xl (1rem) for main cards, rounded-xl (0.75rem) for inner elements like buttons/inputs",
-      "shadow_card": "shadow-[0_2px_10px_rgba(0,0,0,0.03)]",
-      "shadow_hover": "hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] hover:-translate-y-[1px]",
-      "border_card": "border border-slate-200/70"
+    "tailwind_config_additions": {
+      "lumix-green": "#0B8F5A",
+      "lumix-green-dark": "#066A43",
+      "petrol-blue": "#164E63",
+      "lumix-bg": "#F8FAFC"
+    }
+  },
+  "typography": {
+    "font_family": "Geist, Inter, sans-serif",
+    "headings": {
+      "weight": "700",
+      "tracking": "tracking-tight",
+      "max_size": "text-2xl",
+      "notes": "No giant titles (e.g., 'Dashboard'). Use clean, contained headings with a professional tone."
+    },
+    "body": {
+      "weight": "500",
+      "color": "text-slate-600"
+    }
+  },
+  "spacing_and_layout": {
+    "global_bg": "bg-[#F8FAFC]",
+    "card_padding": "p-6",
+    "grid_gap": "gap-5",
+    "general_radius": "rounded-xl",
+    "card_radius": "rounded-[18px]",
+    "shadows": {
+      "card_soft": "0 2px 10px rgba(0, 0, 0, 0.02), 0 4px 20px rgba(0, 0, 0, 0.04)",
+      "card_hover": "0 8px 30px rgba(0, 0, 0, 0.08)"
     }
   },
   "components": {
-    "layout": "bg-[#FAFAFA] min-h-screen text-slate-900 flex font-sans",
+    "topbar": {
+      "height": "h-[70px]",
+      "background": "bg-white",
+      "border": "border-b border-slate-100",
+      "elements": ["Logo", "Search", "Notifications", "Date", "Profile", "Settings"]
+    },
     "sidebar": {
-      "container": "w-64 bg-[#FAFAFA] border-r border-slate-200/70 flex flex-col py-6 px-4 shrink-0 h-screen sticky top-0",
-      "link_default": "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-100/80 hover:text-slate-900 transition-all duration-200",
-      "link_active": "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold bg-white shadow-[0_1px_3px_rgba(0,0,0,0.02)] border border-slate-200/50 text-blue-600",
-      "icon_size": "w-4 h-4"
+      "background": "bg-white",
+      "active_state": "text-[#0B8F5A] bg-[#0B8F5A]/10 font-semibold",
+      "inactive_state": "text-slate-500 hover:text-slate-800",
+      "categories": [
+        {
+          "name": "GERAL",
+          "items": ["Dashboard", "Pedidos", "Relatórios"]
+        },
+        {
+          "name": "PRODUÇÃO",
+          "items": ["Ordens", "Produção", "Lotes"]
+        },
+        {
+          "name": "LABORATÓRIO",
+          "items": ["Análises", "Amostras", "Fichas"]
+        },
+        {
+          "name": "ESTOQUE",
+          "items": ["Produtos", "Matérias-primas", "Fornecedores", "Entradas", "Saídas", "Inventário"]
+        }
+      ]
     },
-    "page_header": {
-      "wrapper": "flex flex-col gap-1.5 mb-8 w-full",
-      "title": "text-2xl font-bold tracking-tight text-slate-900",
-      "breadcrumb": "text-sm font-medium text-slate-500 flex items-center gap-2"
-    },
-    "dashboard_cards": {
-      "wrapper": "bg-white p-6 rounded-2xl border border-slate-200/70 shadow-[0_2px_10px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] transition-all duration-300 ease-out flex flex-col gap-3",
-      "header": "flex justify-between items-center",
-      "title": "text-sm font-semibold text-slate-500",
-      "value": "text-3xl font-bold text-slate-900 tracking-tighter",
-      "icon_wrapper": "w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-blue-600 border border-slate-100"
-    },
-    "recharts": {
-      "tooltip": "contentStyle={{ backgroundColor: '#fff', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 20px rgba(0,0,0,0.08)', padding: '12px', fontSize: '12px', fontWeight: '500' }}",
-      "cartesian_grid": "strokeDasharray='3 3' stroke='#f8fafc' vertical={false}",
-      "line": "type='monotone' strokeWidth={2.5} activeDot={{r: 6, strokeWidth: 0, fill: '#2563EB'}}",
-      "bar": "radius={[6, 6, 0, 0]}",
-      "colors": ["#2563EB", "#10B981", "#64748B"]
-    },
-    "tables_and_lists": {
-      "wrapper": "bg-white rounded-2xl border border-slate-200/70 shadow-[0_2px_10px_rgba(0,0,0,0.03)] overflow-hidden",
-      "header": "bg-slate-50/50 border-b border-slate-200/70 text-slate-500 text-xs uppercase tracking-wider font-semibold",
-      "row": "hover:bg-slate-50/50 transition-colors border-b border-slate-100 last:border-0",
-      "cell": "py-4 px-6 text-sm text-slate-700"
+    "kpi_cards": {
+      "style": "bg-white rounded-[18px] p-6 shadow-[0_2px_10px_rgba(0,0,0,0.02),_0_4px_20px_rgba(0,0,0,0.04)] transition-all duration-250 ease-out hover:-translate-y-1 hover:shadow-[0_8px_30px_rgba(0,0,0,0.08)]",
+      "layout": "flex flex-col gap-4",
+      "icon_container": "w-10 h-10 rounded-full flex items-center justify-center bg-[#0B8F5A]/10 text-[#0B8F5A]",
+      "number": "text-3xl font-bold text-slate-900",
+      "description": "text-sm font-medium text-slate-500",
+      "growth_indicator": "inline-flex items-center gap-1 text-xs font-medium text-green-600 bg-green-50 px-2 py-0.5 rounded-full w-fit"
     },
     "buttons": {
-      "primary": "bg-blue-600 hover:bg-blue-700 text-white shadow-sm hover:shadow-md transition-all rounded-xl px-4 py-2 text-sm font-semibold",
-      "secondary": "bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 shadow-sm transition-all rounded-xl px-4 py-2 text-sm font-semibold"
+      "primary": "bg-[#0B8F5A] text-white hover:bg-[#066A43] font-medium rounded-lg transition-colors shadow-sm",
+      "secondary": "bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 font-medium rounded-lg transition-colors shadow-sm"
+    },
+    "charts": {
+      "style": "Modern, smooth lines (monotoneX or spline). Minimal grid lines.",
+      "gradients": "Subtle fill gradients under lines (e.g., #0B8F5A fading to transparent at the bottom).",
+      "tooltips": "Modern, white background, soft shadow, minimal clean text, no heavy borders. Use Recharts with customized tooltip content."
+    },
+    "icons": {
+      "library": "lucide-react",
+      "usage": "Always place inside a colored circular container in cards. No loose/floating icons."
     }
   },
+  "animations": {
+    "timing": "250ms (duration-250)",
+    "easing": "ease-out",
+    "types_allowed": ["Fade", "Scale", "Slide", "Hover"],
+    "notes": "Keep it subtle. Do not exaggerate. Hover state should elevate the card slightly."
+  },
+  "media": {
+    "images": [
+      {
+        "url": "https://images.unsplash.com/photo-1740252117027-4275d3f84385?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NjZ8MHwxfHNlYXJjaHwxfHxwcm9mZXNzaW9uYWwlMjBidXNpbmVzcyUyMHByb2ZpbGUlMjBhdmF0YXJ8ZW58MHx8fHwxNzgyODM5NDI1fDA&ixlib=rb-4.1.0&q=85",
+        "description": "User profile avatar for the TopBar",
+        "category": "avatar"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1602052577122-f73b9710adba?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMzN8MHwxfHNlYXJjaHwxfHxtb2Rlcm4lMjBjbGVhbiUyMGNoZW1pY2FsJTIwbGFib3JhdG9yeXxlbnwwfHx8fDE3ODI4Mzk0MjV8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Modern clean chemical laboratory background, useful for Auth/Login screen or hero banners if needed.",
+        "category": "background"
+      }
+    ]
+  },
   "testing": {
-    "rule": "Every interactive element (buttons, links, form inputs, tabs) MUST include a data-testid attribute.",
-    "format": "kebab-case describing the action/role, e.g., 'data-testid=\"sidebar-dashboard-link\"'"
+    "attributes": "All interactive and key informational elements MUST include a data-testid attribute in kebab-case format, representing the role (e.g., data-testid='sidebar-producao-link', data-testid='kpi-card-producao-hoje')."
   },
   "instructions_to_main_agent": [
-    "1. Start by updating /app/frontend/src/index.css with the provided --radius and css_variables_for_index_css exactly.",
-    "2. Update /app/frontend/tailwind.config.js to include font family 'Manrope' under theme.extend.fontFamily.sans.",
-    "3. Restructure /app/frontend/src/components/Layout.js to use the premium Vercel/Linear style sidebar guidelines (hover states, rounded-xl links, spacing).",
-    "4. Apply the 'dashboard_cards' and 'page_header' classes to the corresponding components in /app/frontend/src/pages/.",
-    "5. For charts (Recharts), apply smooth monotone lines, hidden vertical grids, and the custom rounded tooltip style.",
-    "6. Apply the 'tables_and_lists' styles to any data tables in products, raw materials, etc.",
-    "7. CRITICAL: Do NOT alter any functionality, hooks, fetch calls, logic, or database structures.",
-    "8. Check all interactive components to ensure data-testid is present."
+    "CRITICAL: Use .js or .jsx extensions for React files. Do not use TypeScript (.ts/.tsx).",
+    "Replace generic dashboard templates with this highly custom styling.",
+    "Implement the Exact CSS Variables into frontend/src/index.css under :root.",
+    "Configure tailwind.config.js to include Geist/Inter fonts and the custom colors (#0B8F5A, #066A43, #164E63).",
+    "Create an AppLayout component wrapping Sidebar (left) and TopBar (top). The main content area MUST have bg-[#F5F7FA] or bg-[#F8FAFC].",
+    "Ensure Sidebar items match the exact categories requested: GERAL, PRODUÇÃO, LABORATÓRIO, ESTOQUE.",
+    "KPI cards must strictly follow the requested structure: 18px border radius, extremely soft shadow, circular colored icon container, large value, description, and growth indicator.",
+    "Apply Recharts for charts with smooth monotone lines, no grid lines (or very faint dashed), and a subtle gradient fill.",
+    "Do not add any 'Dashboard' giant header title. Let the KPI cards lead the visual hierarchy.",
+    "Add transition-all duration-250 ease-out on cards with hover:-translate-y-1 hover:shadow-lg for the 0.25s subtle interaction."
   ]
 }
