@@ -43,13 +43,21 @@ const PrivateRoute = ({ children }) => {
 // Componente para proteger rotas baseado na role
 const RoleRoute = ({ children, allowedRoles }) => {
   const { role } = useAuth();
-  
-  // Se a role do usuário está na lista de permitidas, renderiza o componente
+
   if (allowedRoles.includes(role)) {
     return children;
   }
-  
-  // Caso contrário, redireciona para a página de contagem (acessível para todos)
+
+  // Fallback baseado na role do usuário
+  const fallback = role === 'pedidos' ? '/pedidos' : '/counting';
+  return <Navigate to={fallback} replace />;
+};
+
+// Redirecionamento inicial baseado na role
+const HomeRedirect = () => {
+  const { role } = useAuth();
+  if (role === 'pedidos') return <Navigate to="/pedidos" replace />;
+  if (role === 'laboratorio') return <Navigate to="/dashboard" replace />;
   return <Navigate to="/counting" replace />;
 };
 
@@ -61,15 +69,15 @@ function App() {
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/" element={<PrivateRoute><Layout /></PrivateRoute>}>
-              <Route index element={<Navigate to="/counting" replace />} />
+              <Route index element={<HomeRedirect />} />
               <Route path="dashboard" element={<RoleRoute allowedRoles={['laboratorio']}><Dashboard /></RoleRoute>} />
               <Route path="products" element={<RoleRoute allowedRoles={['laboratorio']}><Products /></RoleRoute>} />
               <Route path="raw-materials" element={<RoleRoute allowedRoles={['laboratorio']}><RawMaterials /></RoleRoute>} />
               <Route path="production-orders" element={<RoleRoute allowedRoles={['laboratorio']}><ProductionOrders /></RoleRoute>} />
-              <Route path="in-production" element={<InProduction />} />
-              <Route path="counting" element={<Counting />} />
-              <Route path="samples" element={<Samples />} />
-              <Route path="archives" element={<Archives />} />
+              <Route path="in-production" element={<RoleRoute allowedRoles={['laboratorio', 'producao']}><InProduction /></RoleRoute>} />
+              <Route path="counting" element={<RoleRoute allowedRoles={['laboratorio', 'producao']}><Counting /></RoleRoute>} />
+              <Route path="samples" element={<RoleRoute allowedRoles={['laboratorio', 'producao']}><Samples /></RoleRoute>} />
+              <Route path="archives" element={<RoleRoute allowedRoles={['laboratorio', 'producao']}><Archives /></RoleRoute>} />
               <Route path="batches" element={<RoleRoute allowedRoles={['laboratorio']}><Batches /></RoleRoute>} />
               <Route path="suppliers" element={<RoleRoute allowedRoles={['laboratorio']}><Suppliers /></RoleRoute>} />
               <Route path="industrial-ops" element={<RoleRoute allowedRoles={['laboratorio']}><IndustrialOPs /></RoleRoute>} />
@@ -77,7 +85,7 @@ function App() {
               <Route path="fichas-analise" element={<RoleRoute allowedRoles={['laboratorio']}><FichasAnalise /></RoleRoute>} />
               <Route path="ficha-analise" element={<RoleRoute allowedRoles={['laboratorio']}><FichaAnalise /></RoleRoute>} />
               <Route path="batch-management" element={<RoleRoute allowedRoles={['laboratorio']}><BatchManagement /></RoleRoute>} />
-              <Route path="pedidos" element={<RoleRoute allowedRoles={['laboratorio']}><Pedidos /></RoleRoute>} />
+              <Route path="pedidos" element={<RoleRoute allowedRoles={['laboratorio', 'pedidos']}><Pedidos /></RoleRoute>} />
               <Route path="team" element={<RoleRoute allowedRoles={['laboratorio']}><Team /></RoleRoute>} />
               <Route path="trash" element={<RoleRoute allowedRoles={['laboratorio']}><Trash /></RoleRoute>} />
               <Route path="settings" element={<RoleRoute allowedRoles={['laboratorio']}><Settings /></RoleRoute>} />

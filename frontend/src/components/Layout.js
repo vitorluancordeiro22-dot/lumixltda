@@ -41,7 +41,7 @@ const allMenuItems = [
   { path: '/samples', icon: FlaskConical, label: 'Amostras', roles: ['laboratorio', 'producao'] },
   { path: '/fichas-analise', icon: ClipboardCheck, label: 'Ordem de Produção', roles: ['laboratorio'], emailOnly: 'laboratoriolumix@outlook.com' },
   { path: '/ficha-analise', icon: FlaskIcon, label: 'Ficha de Análise', roles: ['laboratorio'], emailOnly: 'laboratoriolumix@outlook.com' },
-  { path: '/pedidos', icon: ShoppingCart, label: 'Pedidos', roles: ['laboratorio'], emailAllowlist: ['leonicelaboratorio@lumix.com', 'laboratoriolumix@outlook.com'], testId: 'nav-pedidos' },
+  { path: '/pedidos', icon: ShoppingCart, label: 'Pedidos', roles: ['laboratorio', 'pedidos'], emailAllowlist: ['leonicelaboratorio@lumix.com', 'laboratoriolumix@outlook.com'], testId: 'nav-pedidos' },
   { path: '/batch-management', icon: ListChecks, label: 'Gerenciar Lotes', roles: ['laboratorio'] },
   { path: '/suppliers', icon: Truck, label: 'Fornecedores', roles: ['laboratorio'] },
   { path: '/laudos', icon: FileCheck, label: 'Pastas', roles: ['laboratorio'] },
@@ -81,10 +81,12 @@ const Sidebar = ({ mobile = false, onItemClick }) => {
         <div className={`mt-4 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold tracking-wide ${
           role === 'laboratorio' 
             ? 'bg-primary/10 text-primary ring-1 ring-primary/20' 
+            : role === 'pedidos'
+            ? 'bg-emerald-500/10 text-emerald-600 ring-1 ring-emerald-500/20'
             : 'bg-orange-500/10 text-orange-600 ring-1 ring-orange-500/20'
         }`}>
-          {role === 'laboratorio' ? <FlaskConical className="h-3 w-3" /> : <Factory className="h-3 w-3" />}
-          {role === 'laboratorio' ? 'Laboratório' : 'Produção'}
+          {role === 'laboratorio' ? <FlaskConical className="h-3 w-3" /> : role === 'pedidos' ? <ShoppingCart className="h-3 w-3" /> : <Factory className="h-3 w-3" />}
+          {role === 'laboratorio' ? 'Laboratório' : role === 'pedidos' ? 'Pedidos' : 'Produção'}
         </div>
       </div>
 

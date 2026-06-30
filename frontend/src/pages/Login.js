@@ -6,7 +6,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Card } from '../components/ui/card';
 import { toast } from 'sonner';
-import { Loader2, FlaskConical, Factory } from 'lucide-react';
+import { Loader2, FlaskConical, Factory, ShoppingCart } from 'lucide-react';
 
 export const Login = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -73,6 +73,8 @@ export const Login = () => {
           // Verifica se o modo solicitado foi concedido
           if (selectedMode === 'laboratorio' && result.role !== 'laboratorio') {
             toast.error('Acesso ao Laboratório negado. Entrando em modo Produção.');
+          } else if (selectedMode === 'pedidos' && result.role !== 'pedidos') {
+            toast.error('Acesso a Pedidos negado. Entrando em modo Produção.');
           } else {
             toast.success('Login realizado com sucesso!');
           }
@@ -82,6 +84,8 @@ export const Login = () => {
               // Redireciona baseado na role
               if (result.role === 'producao') {
                 navigate('/counting');
+              } else if (result.role === 'pedidos') {
+                navigate('/pedidos');
               } else {
                 navigate('/dashboard');
               }
@@ -148,6 +152,17 @@ export const Login = () => {
               <span className="font-semibold text-lg">Produção</span>
               <span className="text-xs text-muted-foreground">Contagem e Amostras</span>
             </Button>
+
+            <Button
+              onClick={() => handleModeSelect('pedidos')}
+              data-testid="mode-pedidos-btn"
+              variant="outline"
+              className="w-full h-20 flex flex-col items-center justify-center gap-2 border-2 hover:border-emerald-500 hover:bg-emerald-500/5 transition-all"
+            >
+              <ShoppingCart className="h-8 w-8 text-emerald-600" />
+              <span className="font-semibold text-lg">Pedidos</span>
+              <span className="text-xs text-muted-foreground">Pedidos a fornecedores</span>
+            </Button>
           </div>
 
           <div className="mt-6 text-center">
@@ -180,10 +195,12 @@ export const Login = () => {
             <div className={`mt-3 inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium ${
               selectedMode === 'laboratorio' 
                 ? 'bg-primary/10 text-primary' 
+                : selectedMode === 'pedidos'
+                ? 'bg-emerald-500/10 text-emerald-600'
                 : 'bg-orange-500/10 text-orange-600'
             }`}>
-              {selectedMode === 'laboratorio' ? <FlaskConical className="h-4 w-4" /> : <Factory className="h-4 w-4" />}
-              Modo {selectedMode === 'laboratorio' ? 'Laboratório' : 'Produção'}
+              {selectedMode === 'laboratorio' ? <FlaskConical className="h-4 w-4" /> : selectedMode === 'pedidos' ? <ShoppingCart className="h-4 w-4" /> : <Factory className="h-4 w-4" />}
+              Modo {selectedMode === 'laboratorio' ? 'Laboratório' : selectedMode === 'pedidos' ? 'Pedidos' : 'Produção'}
             </div>
           )}
         </div>

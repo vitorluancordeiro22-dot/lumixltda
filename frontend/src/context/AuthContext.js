@@ -5,6 +5,8 @@ const AuthContext = createContext();
 
 // Emails do usuário com acesso completo ao Laboratório
 const LAB_EMAILS = ['laboratoriolumix@outlook.com', 'leonicelaboratorio@lumix.com'];
+// Emails autorizados a entrar no modo Pedidos
+const PEDIDOS_EMAILS = ['leonicelaboratorio@lumix.com', 'laboratoriolumix@outlook.com'];
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
@@ -39,6 +41,9 @@ export const AuthProvider = ({ children }) => {
     let finalRole = selectedRole;
     if (selectedRole === 'laboratorio' && !LAB_EMAILS.some(e => e.toLowerCase() === email.toLowerCase())) {
       finalRole = 'producao'; // Força produção se não for o email autorizado
+    }
+    if (selectedRole === 'pedidos' && !PEDIDOS_EMAILS.some(e => e.toLowerCase() === email.toLowerCase())) {
+      finalRole = 'producao'; // Força produção se não for autorizado para Pedidos
     }
     
     localStorage.setItem('token', token);
