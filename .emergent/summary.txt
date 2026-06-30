@@ -1,143 +1,188 @@
-<analysis>**original_problem_statement:**
-The user wants to enhance the Gestão Inteligente de Produção – Lumix application. The core requirements involve refining the raw material inventory deduction system, adding complex QA (Quality Assurance) tracking features (Ficha de Análise), standardizing and formatting production printing templates (Ordem de Produção and Ficha de Análise), and improving UI workflows and data filters for production and laboratory roles. 
+<analysis>**original_problem_statement**: 
+The user wants to enhance the Gestão Inteligente de Produção – Lumix application. Core requirements involve refining the Ficha de Análise (QA tracking), creating custom label printing logic for samples, fixing raw material LIFO inventory deductions, performing a complete visual UI/UX redesign (without changing logic), and implementing an automated document generation system (Ficha de Fabricação and Ordem de Produção) using specific DOCX/XLS templates. 
 
 PRODUCT REQUIREMENTS:
 - Accurate DOM-based printing for production labels and forms.
-- LIFO (Last-In-First-Out) automatic deduction for raw materials during product batch creation.
-- A QA system to organize products/materials by category, save fixed product specifications, and record analysis results.
-- Automated creation of Ordem de Produção records for the lab to review when the first batch of a product is created each month.
+- LIFO automatic deduction for raw materials with audit capabilities.
+- Modern SaaS-like UI/UX (Linear/Stripe/Vercel styling) using Lumix brand colors (Blue and Green).
+- Automated generation and PDF conversion of DOCX and XLS production templates, supporting customized template uploads per product.
 
 **User's preferred language**: Portuguese
 *(INSTRUCT next agent to respond in the user's preferred language only)*
 
 **what currently exists?** 
-A full-stack application (React, FastAPI, MongoDB) with recent major additions: 
-- Perfected DOM-based printing mimicking original Excel templates for OP and Ficha de Análise.
-- Automated LIFO inventory deduction for raw materials, including auto-finalization of empty batches and a recalculation tool.
-- A new Ordem de Produção tab (exclusive to the lab role) showing compact daily production orders.
-- A comprehensive Ficha de Análise tab allowing the QA team to group items into categories (alphabetically sorted), set fixed spec thresholds, and record Approved/Rejected analysis results.
+A full-stack ERP (React, FastAPI, MongoDB). It includes advanced QA tracking, precise label printing, raw material deduction logic with auditing tools, file management (Pastas), and a complete modern UI built with custom Tailwind tokens. It also features a LibreOffice-powered backend service to inject data into user-uploaded DOCX/XLS templates and convert them to PDFs.
 
 **Last working item**:
-- **Last item agent was working**: The user requested a modification to the Ficha de Análise result date. Currently, the system uses the manual registration date. The user wants the analysis date (Data da Ficha) to automatically default to exactly **1 day after the selected Batch Date (Data do Lote)**, because the physical analysis is completed the day after production, regardless of when it is typed into the system. The agent just opened  to begin implementing this logic.
-- **Status**: IN PROGRESS
-- **Agent Testing Done**: N
-- **Which testing method agent to use?**: Frontend testing agent / Screenshot tool
+- **Last item agent was working**: A **CRITICAL EMERGENCY**. The user deployed the application, which resulted in a catastrophic data loss on their production environment (likely the preview database overwrote the production database). The agent instructed the user to halt all actions, use the Emergent Rollback tool to restore an older checkpoint, and contact support. Prior to this, the agent was about to implement accent/case-insensitive matching for raw materials in uploaded XLS templates.
+- **Status**: BLOCKED (Waiting on user to confirm if the rollback restored their data).
+- **Agent Testing Done**: N/A
+- **Which testing method agent to use?**: None currently (wait for data restoration).
 - **User Testing Done**: N
 
 **All Pending/In progress Issue list**:
-- **Issue 1**: Ficha de Análise date logic needs to be Batch Date + 1 day (P0)
-  - **Attempted fixes**: The agent viewed  but made no edits yet.
-  - **Next debug checklist**: Modify the  or the  dependent on  in  to calculate  as . Ensure timezone/date parsing doesn't shift the date backward. 
-  - **Why fix this issue and what will be achieved with the fix?**: Ensures accurate QA compliance dates based on physical production times rather than delayed data entry times.
-  - **Status**: IN PROGRESS
-  - **Is recurring issue?**: N
-  - **Should Test frontend/backend/both after fix?**: Frontend
-  - **Blocked on other issue**: None
+- **Issue 1**: Critical Production Data Loss / DB Overwrite (P0)
+   - **Attempted fixes**: Guided the user to the Emergent Rollback tool and escalated to Emergent support. User found the button but hasn't confirmed success yet.
+   - **Next debug checklist**: Ask the user if the rollback successfully restored their official data. DO NOT implement any code changes until the database integrity is confirmed, to avoid creating new checkpoints that could overwrite their backups.
+   - **Why fix this issue and what will be achieved with the fix?**: It's a critical production outage preventing the company from operating.
+   - **Status**: BLOCKED
+   - **Is recurring issue?**: Y (Data persistence issues upon deploy occurred previously).
+   - **Should Test frontend/backend/both after fix?**: Both
+   - **Blocked on other issue**: None
+
+- **Issue 2**: Relax matching rules for raw materials in OP templates (P1)
+   - **Attempted fixes**: Discussed with user, but interrupted by the emergency.
+   - **Next debug checklist**: In , modify the  logic where it matches  with the product's . Apply  and remove accents/diacritics using  before comparing strings.
+   - **Why fix this issue and what will be achieved with the fix?**: Prevents document generation from failing if the user types ÁCIDO in the template but Acido in the database.
+   - **Status**: NOT STARTED
+   - **Is recurring issue?**: N
+   - **Should Test frontend/backend/both after fix?**: Backend
 
 **In progress Task List**:
 - **Task 1**: Complete E2E testing for Reabrir Lote Arquivado functionality (P1)
-  - **Where to resume**: The feature was implemented in a previous fork but repeatedly skipped in this session due to new high-priority requests. Perform a full test cycle: archive a batch, use the Reabrir button, and confirm it reappears as active.
-  - **What will be achieved with this?**: Verification that users can recover accidentally archived batches.
-  - **Status**: TESTING PENDING
-  - **Should Test frontend/backend/both after fix?**: Both
-  - **Blocked on something**: None
+   - **Where to resume**: This has been pushed back across multiple forks. Perform a full test cycle: archive a batch, use the Reabrir button, and confirm it reappears as active.
+   - **What will be achieved with this?**: Verification that users can recover accidentally archived batches.
+   - **Status**: TESTING PENDING
+   - **Should Test frontend/backend/both after fix?**: Both
+   - **Blocked on something**: Wait for Issue 1 (Data recovery) to be resolved first.
 
-**Upcoming and Future Tasks**:
-- (P1) **Implement PDF Upload in Laudos**: The folder structure exists, but PDF upload functionality is missing. (File: Frontend  component / Backend upload routes).
-- (P2) **Refactor **: Replace native alerts with Shadcn  across the app to prevent dev-server blocking.
-- (P2) **Refactor **: The backend file is now approaching 3000 lines. Break it down into modular routers (, , etc.).
-- (P2) **Deprecate/update **: Remove or update outdated components.
+**Upcoming and Future Tasks**
+- (P1) **Match raw material names dynamically in uploaded templates** (ignoring accents/case).
+- (P2) **Refactor **: Replace native alerts with Shadcn .
+- (P2) **Refactor **: Break the 3400+ line backend file into modular routers (, , etc.).
+- (P2) **Anexar PDFs gerados ao lote**: Automatically save the generated DOCX/XLS/PDF documents to the batch's history.
+- (P2) **Deprecate/update **.
 
-**Completed work in this session**:
--  and  endpoints verified and updated (DONE)
-- Perfected  and created  to strictly match the user's layout requirements (DONE)
-- LIFO Raw Material deduction logic added to  (DONE)
--  label filtering UI redesigned to Última Leva / Por Mês (DONE)
-- Renamed Fichas de Análises to Ordem de Produção, added daily sequence numbering (), and created a compact UI (DONE)
-- Created completely new  for QA with categories, alphabetical sorting, fixed specifications, and Approved/Rejected toggles (DONE)
+**Completed work in this session**
+- Ficha de Análise date logic (Batch Date + 1 day) & Quick Answer toggles (DONE)
+- Custom Sample Labels printing with word-wrap and specific styling (DONE)
+- Bugfix: Show archived batches in the Samples modal (DONE)
+- Bugfix: Raw material stock precise deductions (DELETE/UPDATE restorations) + Audit UI (DONE)
+- Renamed Laudos to Pastas, added file/folder rename and multi-file upload (DONE)
+- Complete UI/UX redesign (tokens, Tailwind config, CSS variables) matching Linear/Stripe/Vercel (DONE)
+- Automated document generation (DOCX/XLS) & per-product template upload + PDF conversion (DONE)
+- Backfill script to create OP records for all existing older batches (DONE)
+- Removed Made with Emergent badge (DONE)
 
-**Earlier issues found/mentioned but not fixed**:
+**Earlier issues found/mentioned but not fixed**
 - None.
 
-**Known issue recurrence from previous fork**:
-- None. (The DNS deployment issue from the previous fork was resolved by the user externally).
+**Known issue recurrence from previous fork**
+- **Issue recurrence in previous fork**: The E2E test for Reabrir Lote Arquivado keeps getting skipped.
+- **Recurrence count**: 2
+- **Status**: TESTING PENDING
 
-**Code Architecture**:
+**Code Architecture**
 
 
-**Key Technical Concepts**:
-- **Print Layouts**: Uses hidden browser windows, injected custom HTML/CSS, and  to generate precise, pixel-perfect documentation.
-- **Inventory Deduction**: Backend dynamically checks the  sorted by date to deduct stock using a LIFO methodology, storing  inside the product batch for traceability.
-- **QA Specs**: Dynamic form generation where fixed specs () are pre-populated as read-only, and results () are recorded per item batch.
+**Key Technical Concepts**
+- **UI/UX Tokens**: Global UI uses , , etc., in  mapped to . Official colors:  (Primary Blue),  (Secondary Green).
+- **Document Generation**: Backend container has LibreOffice installed.  uses  for Word files, // for Excel files, and  to generate PDFs.
+- **Inventory Deduction**: Real-time auditing implemented in  pointing to .
 
-**key DB schema**:
-- : Stores Ordem de Produção data auto-generated once per month per product.
-- : QA Categories (e.g., Desinfetantes).
-- : Fixed specifications per product/material.
-- : QA testing results tied to specific batches.
-- : Now contains  detailing exactly which raw material batches were consumed (LIFO).
+**key DB schema**
+- : Includes  and .
+- : QA/Production records, now 1:1 with batches.
+- : Handled via GridFS or local disk to store user-uploaded DOCX/XLS templates per product.
 
-**changes in tech stack**:
-- None.
+**changes in tech stack**
+- Installed , ,  via pip.
+- Installed , , and  in the backend container via apt 2.6.1 (arm64)
+Usage: apt-get [options] command
+       apt-get [options] install|remove pkg1 [pkg2 ...]
+       apt-get [options] source pkg1 [pkg2 ...]
 
-**All files of reference**:
-- : Heavily updated with new LIFO deduction logic and QA endpoints.
-- : **NEW** QA module.
-- : **UPDATED** to Ordem de Produção compact view.
-- : **UPDATED** to match real Excel OP model.
-- : **NEW** matching real Ficha model.
-- : Updated multiple times with new features and backlog.
+apt-get is a command line interface for retrieval of packages
+and information about them from authenticated sources and
+for installation, upgrade and removal of packages together
+with their dependencies.
 
-**Areas that need refactoring**:
--  is critically large and needs modularization.
+Most used commands:
+  update - Retrieve new lists of packages
+  upgrade - Perform an upgrade
+  install - Install new packages (pkg is libc6 not libc6.deb)
+  reinstall - Reinstall packages (pkg is libc6 not libc6.deb)
+  remove - Remove packages
+  purge - Remove packages and config files
+  autoremove - Remove automatically all unused packages
+  dist-upgrade - Distribution upgrade, see apt-get(8)
+  dselect-upgrade - Follow dselect selections
+  build-dep - Configure build-dependencies for source packages
+  satisfy - Satisfy dependency strings
+  clean - Erase downloaded archive files
+  autoclean - Erase old downloaded archive files
+  check - Verify that there are no broken dependencies
+  source - Download source archives
+  download - Download the binary package into the current directory
+  changelog - Download and display the changelog for the given package
 
-**key api endpoints**:
-- : Modified to handle LIFO deduction and Ordem de Produção generation.
-- : Cleans up ghost inventory and auto-finalizes empty batches.
-- , : New endpoints for the QA Ficha de Análise system.
+See apt-get(8) for more information about the available commands.
+Configuration options and syntax is detailed in apt.conf(5).
+Information about how to configure sources can be found in sources.list(5).
+Package and version choices can be expressed via apt_preferences(5).
+Security details are available in apt-secure(8).
+                                        This APT has Super Cow Powers. for PDF conversion.
 
-**Critical Info for New Agent**:
-- **Environment Notice**: The user has deployed to production. If they report a bug, assume you are fixing it in the PREVIEW environment, and they will deploy it later. **Do not use any preview or production URLs in your messages or summaries.**
-- **Dates & Timezones**: Be extremely careful when doing  math in JS to avoid timezone offsets pushing the date backwards. Use robust date parsing. 
-- **User Language**: Always respond in Portuguese.
+**All files of reference**
+- : Contains all new documentation logic, libreoffice conversion, and inventory fix endpoints.
+- : Handles template uploading and PDF previewing.
+-  & : Core design system files.
+- : Generated by the Design Agent, contains the UX rules.
 
-**documents and test reports created in this job**:
+**Areas that need refactoring**
+-  is critically large (3400+ lines) and urgently needs refactoring into modular routers.
+
+**key api endpoints**
+- : Uploads/fetches custom templates.
+- : Generates the actual DOCX/XLS/PDF.
+- : Generates missing OP records for old batches.
+
+**Critical Info for New Agent**
+- **CRITICAL DATA LOSS**: The user suffered severe data loss upon deploying to production. Before doing *anything* else, ask the user if they were able to restore their data using the Rollback tool. 
+- **DO NOT** make code edits until the user confirms their environment is stable, as any new code commit saves a checkpoint that might bury their viable rollback points.
+- Once stable, the immediate next feature is making the template raw material matching accent-insensitive.
+- Always respond in Portuguese.
+
+**documents and test reports created in this job**
+- 
 - 
 
-**Last 10 User Messages and any pending HUMAN messages**:
-1. **User**: Requests changing Fichas de Análises to Ordem de Produção and creating a complex new QA Ficha de Análise with categories and specific questions per product. (COMPLETED)
-2. **User**: Clarifies that the QA system must filter by specific batch, and applies to raw materials too. (COMPLETED)
-3. **User**: Asks to add fixed specification thresholds, an Approved/Rejected button, and a search bar to the QA categories. (COMPLETED)
-4. **User**: Requests sorting items in categories alphabetically. (COMPLETED)
-5. **User**: Asks to include the Ficha date manually instead of relying on creation date. (COMPLETED)
-6. **User**: Asks for daily OP numbering (OP 1, OP 2) on the Ordem de Produção tab, and to make the UI cards compact/expandable. (COMPLETED)
-7. **User**: Reports that the manual date on the Ficha de Análise isn't exactly what they need. It must automatically default to 1 day AFTER the Data do Lote (Batch Date), because analysis happens the next day, even if recorded in the system weeks later. (PENDING - P0)
+**Last 10 User Messages and any pending HUMAN messages**
+1. **User**: Asks for an easier way to upload templates per product rather than sending them all in chat. (COMPLETED)
+2. **User**: Clarifies they want to send templates with fields already filled, and wants to see ALL batches of the month in the modal. (COMPLETED)
+3. **User**: Asks to remove Made with Emergent badge. (COMPLETED)
+4. **User**: Requests a custom template system for the OP (.xls) document as well, respecting the % and QUANT(kg) columns. (COMPLETED)
+5. **User**: Asks for a shortcut button for document generation directly on the Ordem de Produção tab. (COMPLETED)
+6. **User**: Corrects the agent—wanted the shortcut on the sidebar list, not replacing the QA button. Shows all batches until closed. (COMPLETED)
+7. **User**: Points out the agent accidentally removed the original QA documentation button. (COMPLETED)
+8. **User**: Requests renaming a field label from Massa Específica to Densidade gm/3. (COMPLETED)
+9. **User**: Asks how the system matches the raw material names from the uploaded template to the DB (needs exact match vs automated). (COMPLETED - explained exact match).
+10. **User**: **meu deus o site fez deploy novamente e tudo que tinha salvo sumiu e agora?** (Reports total data loss after deployment). (PENDING - Agent instructed rollback, awaiting user confirmation).
 
 **Project Health Check:**
-- Broken: None (Pending logic adjustment on date).
+- Broken: Database state is critical/overwritten in production.
 - Mocked: None.
 
-**3rd Party Integrations**:
-None added in this session.
+**3rd Party Integrations**
+- None.
 
-**Testing status**:
-- Testing agent used after significant changes: NO (Agent relied heavily on screenshot tool and API curl verifications).
+**Testing status**
+- Testing agent used after significant changes: NO
 - Troubleshoot agent used after agent stuck in loop: NO
 - Test files created: None
-- Known regressions: None
+- Known regressions: Deployment overwrote the production database.
 
 **Credentials to test flow:**
-- **Laboratório (Admin)**:  /  (Use this to see Ordem de Produção and Ficha de Análise tabs).
-- **Produção (Restricted)**:  / 
+- **Laboratório (Admin)**:  / 
 
-**What agent forgot to execute**:
-- The agent continuously pushed the E2E testing of Reabrir Lote Arquivado to the backlog and never executed it.
-- The agent opened  to fix the  issue but the session ended before edits were made.
+**What agent forgot to execute**
+- Did not implement the accent-insensitive matching for raw material templates (interrupted by the data loss emergency).
+- Missed the E2E testing of Reabrir Lote Arquivado again.
 
 **Debugging checklist for current issue**
-Issue: Ficha de Análise default date should be Batch Date + 1 day.
+Issue: Relax matching rules for raw materials in OP templates (to be done AFTER data is restored).
 
-Frontend files to check: 
--  
-Look for the  state initialization and how it reacts when  changes.
+Backend files to check: 
+- 
+Around line 3100+ (), locate where  is compared to .
 </analysis>

@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 
 class FocusedLumixTester:
     def __init__(self):
-        self.base_url = "https://lumix-ficha-system.preview.emergentagent.com"
+        self.base_url = "https://lumix-prod-docs.preview.emergentagent.com"
         self.token = None
         self.results = []
 

@@ -9,7 +9,7 @@ import sys
 
 class PDFGenerationTester:
     def __init__(self):
-        self.base_url = "https://lumix-ficha-system.preview.emergentagent.com"
+        self.base_url = "https://lumix-prod-docs.preview.emergentagent.com"
         self.token = None
         
     def login(self):
