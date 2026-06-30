@@ -92,6 +92,8 @@ Sistema de gestão de produção industrial com controle de lotes, matérias-pri
 - [x] **Campos de Resposta Rápida (OK/REPROVADO)** (02/2026) - Toggle "TEXTO LIVRE / OK / REPROV." na edição de campos; renderiza botões OK/REPROVADO em vez de input ao registrar análise
 - [x] **Impressão de Etiquetas de Amostras** (02/2026) - Nova folha em Papel Carta (21,6×27,9cm) com grid 4×20=80 etiquetas. Filtro por mês/ano, seleção de quantidade por amostra, pré-visualização em nova janela e impressão. Layout fiel: margem 1,3cm, etiquetas 4,4×1,3cm, gap horizontal 0,3cm. Cada etiqueta exibe NOME centralizado + LOTE/FAB.
 
+- [x] **Módulo Pedidos (Compras a Fornecedores)** (06/2026) - Nova aba "Pedidos" restrita a leonicelaboratorio@lumix.com e laboratoriolumix@outlook.com. Independente de vendas/produção. Fluxo: selecionar fornecedor (lista pesquisável ou avulso) → catálogo pré-carregado (matérias-primas vinculadas + itens avulsos salvos por fornecedor) → adicionar itens c/ qtd → resumo editável + observações → Finalizar (gera PED-NNNN sequencial). Abas Histórico e Pendentes/Entregues (status manual pendente→enviado→recebido→reabrir). Geração de PDF estilo tabela com logo Lumix (reportlab). Compartilhar via WhatsApp/navigator.share. Conta nova leonicelaboratorio@lumix.com criada (perfil Laboratório). Testado: 16/16 backend + E2E frontend OK.
+
 ## Backlog (P1/P2)
 - [ ] (P1) Testar E2E funcionalidade "Reabrir Lote"
 - [ ] (P1) Melhorar campo de data de validade nas matérias-primas
