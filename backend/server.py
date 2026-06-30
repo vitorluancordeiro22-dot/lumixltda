@@ -3496,6 +3496,7 @@ class PurchaseOrderCreate(BaseModel):
     supplier_id: str = ''
     supplier_name: str
     items: List[POItem]
+    unit: str = 'Kg'
     observations: str = ''
 
 
@@ -3600,13 +3601,15 @@ async def create_purchase_order(data: PurchaseOrderCreate, current_user=Depends(
 
     seq, order_number = await _next_order_number()
     order_id = str(uuid.uuid4())
+    order_unit = data.unit or 'Kg'
     doc = {
         'id': order_id,
         'seq': seq,
         'order_number': order_number,
         'supplier_id': data.supplier_id,
         'supplier_name': data.supplier_name,
-        'items': [item.model_dump() for item in data.items],
+        'unit': order_unit,
+        'items': [{**item.model_dump(), 'unit': order_unit} for item in data.items],
         'observations': data.observations,
         'status': 'pendente',
         'created_by': current_user.get('name') or current_user.get('email', ''),

@@ -21,7 +21,7 @@ import {
   MessageCircle, CheckCircle2, Send, Clock, PackageCheck, X, ChevronLeft,
 } from 'lucide-react';
 
-const UNIT_OPTIONS = ['Kg', 'L', 'Unidade', 'Litros', 'Caixa', 'Pacote', 'Saco', 'Galão'];
+const ORDER_UNITS = ['Kg', 'Litros', 'Fardos', 'Unidades'];
 
 const STATUS_META = {
   pendente: { label: 'Pendente', cls: 'bg-amber-500/10 text-amber-600 ring-1 ring-amber-500/20', icon: Clock },
@@ -64,12 +64,12 @@ const NewOrderDialog = ({ open, onOpenChange, onCreated }) => {
   const [cart, setCart] = useState([]);
   const [observations, setObservations] = useState('');
   const [newName, setNewName] = useState('');
-  const [newUnit, setNewUnit] = useState('');
+  const [orderUnit, setOrderUnit] = useState('Kg');
   const [submitting, setSubmitting] = useState(false);
 
   const reset = useCallback(() => {
     setSupplierSearch(''); setSelectedSupplier(null); setCatalog([]);
-    setQtyMap({}); setCart([]); setObservations(''); setNewName(''); setNewUnit('');
+    setQtyMap({}); setCart([]); setObservations(''); setNewName(''); setOrderUnit('Kg');
   }, []);
 
   useEffect(() => {
@@ -112,13 +112,13 @@ const NewOrderDialog = ({ open, onOpenChange, onCreated }) => {
     // Persiste no catálogo do fornecedor (se houver) para reaparecer da próxima vez
     if (selectedSupplier?.id) {
       try {
-        const r = await api.post(`/suppliers/${selectedSupplier.id}/catalog`, { name, unit: newUnit });
+        const r = await api.post(`/suppliers/${selectedSupplier.id}/catalog`, { name, unit: '' });
         setCatalog((prev) => (prev.find((p) => p.id === r.data.id) ? prev : [...prev, r.data].sort((a, b) => a.name.localeCompare(b.name))));
       } catch { /* segue mesmo assim */ }
     }
     const key = `c-${name.toLowerCase()}`;
-    setCart((prev) => (prev.find((c) => c.key === key) ? prev : [...prev, { key, name, unit: newUnit, quantity: 0, raw_material_id: null }]));
-    setNewName(''); setNewUnit('');
+    setCart((prev) => (prev.find((c) => c.key === key) ? prev : [...prev, { key, name, quantity: 0, raw_material_id: null }]));
+    setNewName('');
     toast.success('Item adicionado — defina a quantidade no resumo');
   };
 
@@ -128,7 +128,7 @@ const NewOrderDialog = ({ open, onOpenChange, onCreated }) => {
   const finalize = async () => {
     if (!selectedSupplier) { toast.error('Selecione um fornecedor'); return; }
     const items = cart.filter((c) => parseFloat(c.quantity) > 0).map((c) => ({
-      name: c.name, unit: c.unit || '', quantity: parseFloat(c.quantity), raw_material_id: c.raw_material_id,
+      name: c.name, unit: orderUnit, quantity: parseFloat(c.quantity), raw_material_id: c.raw_material_id,
     }));
     if (items.length === 0) { toast.error('Adicione itens com quantidade ao pedido'); return; }
     setSubmitting(true);
@@ -137,6 +137,7 @@ const NewOrderDialog = ({ open, onOpenChange, onCreated }) => {
         supplier_id: selectedSupplier.id || '',
         supplier_name: selectedSupplier.name,
         items,
+        unit: orderUnit,
         observations,
       });
       toast.success('Pedido criado com sucesso!');
@@ -220,6 +221,24 @@ const NewOrderDialog = ({ open, onOpenChange, onCreated }) => {
               </Button>
             </div>
 
+            {/* Unidade de medida (única para todo o pedido) */}
+            <div className="space-y-2">
+              <Label className="text-foreground">Unidade de medida <span className="text-muted-foreground font-normal">(vale para todos os itens)</span></Label>
+              <div className="grid grid-cols-4 gap-2">
+                {ORDER_UNITS.map((u) => (
+                  <button
+                    key={u}
+                    type="button"
+                    data-testid={`order-unit-${u}`}
+                    onClick={() => setOrderUnit(u)}
+                    className={`py-2 rounded-xl text-sm font-medium border transition-all ${orderUnit === u ? 'bg-primary text-primary-foreground border-primary' : 'border-border text-foreground hover:bg-primary/5'}`}
+                  >
+                    {u}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* ETAPA 2 — Catálogo */}
             <div className="space-y-2">
               <Label className="text-foreground">2. Itens do fornecedor</Label>
@@ -233,7 +252,6 @@ const NewOrderDialog = ({ open, onOpenChange, onCreated }) => {
                     <div key={item.id} data-testid={`catalog-item-${item.id}`} className="flex items-center gap-2 p-2 rounded-lg border border-border">
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-foreground truncate">{item.name}</p>
-                        <p className="text-xs text-muted-foreground">{item.unit || '—'}</p>
                       </div>
                       <Input
                         type="number" min="0" step="any"
@@ -252,7 +270,7 @@ const NewOrderDialog = ({ open, onOpenChange, onCreated }) => {
               )}
 
               {/* Adicionar item novo */}
-              <div className="flex flex-col sm:flex-row gap-2 pt-2 border-t border-border/60">
+              <div className="flex gap-2 pt-2 border-t border-border/60">
                 <Input
                   placeholder="+ Adicionar item novo (ex: Galão 5L)"
                   value={newName}
@@ -260,17 +278,6 @@ const NewOrderDialog = ({ open, onOpenChange, onCreated }) => {
                   className="flex-1 bg-input border-border text-foreground"
                   data-testid="new-item-name-input"
                 />
-                <Input
-                  list="unit-options"
-                  placeholder="Unidade"
-                  value={newUnit}
-                  onChange={(e) => setNewUnit(e.target.value)}
-                  className="sm:w-28 bg-input border-border text-foreground"
-                  data-testid="new-item-unit-input"
-                />
-                <datalist id="unit-options">
-                  {UNIT_OPTIONS.map((u) => <option key={u} value={u} />)}
-                </datalist>
                 <Button onClick={addNewItem} variant="outline" className="border-border text-foreground" data-testid="add-new-item-button">
                   <Plus className="w-4 h-4 mr-1" /> Add
                 </Button>
@@ -294,7 +301,7 @@ const NewOrderDialog = ({ open, onOpenChange, onCreated }) => {
                         className="w-20 h-8 bg-input border-border text-foreground"
                         data-testid={`cart-qty-${c.key}`}
                       />
-                      <span className="text-xs text-muted-foreground w-14 truncate">{c.unit}</span>
+                      <span className="text-xs text-muted-foreground w-16 truncate">{orderUnit}</span>
                       <Button size="icon" variant="ghost" onClick={() => removeFromCart(c.key)} className="text-red-600 hover:text-red-500 h-8 w-8" data-testid={`cart-remove-${c.key}`}>
                         <X className="w-4 h-4" />
                       </Button>
