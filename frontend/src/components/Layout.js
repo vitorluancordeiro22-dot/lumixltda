@@ -1,141 +1,219 @@
-import React, { useState, useEffect } from 'react';
-import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
+import React, { useState } from 'react';
+import { Link, useLocation, Outlet } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useMobile } from '../context/MobileContext';
 import { Button } from './ui/button';
 import { Sheet, SheetContent, SheetTrigger } from './ui/sheet';
-import { 
-  LayoutDashboard, 
-  Package, 
-  Boxes, 
-  ClipboardList, 
-  Calculator, 
-  Users, 
-  Trash2, 
-  Settings, 
+import {
+  LayoutDashboard,
+  Package,
+  Boxes,
+  Calculator,
+  Users,
+  Trash2,
+  Settings,
   Menu,
   LogOut,
-  Zap,
   ListChecks,
   Truck,
   Archive,
-  FileText,
   FileCheck,
   Smartphone,
   Monitor,
   FlaskConical,
   Factory,
-  ShoppingCart
+  ShoppingCart,
+  ClipboardCheck,
+  Beaker,
+  Bell,
+  Search,
 } from 'lucide-react';
 
-import {
-  ClipboardCheck, FlaskConical as FlaskIcon
-} from 'lucide-react';
+const LAB_EMAIL = 'laboratoriolumix@outlook.com';
+const PEDIDOS_ALLOWLIST = ['leonicelaboratorio@lumix.com', 'laboratoriolumix@outlook.com'];
 
-const allMenuItems = [
-  { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', roles: ['laboratorio'] },
-  { path: '/products', icon: Package, label: 'Produtos', roles: ['laboratorio'] },
-  { path: '/raw-materials', icon: Boxes, label: 'Matérias-Primas', roles: ['laboratorio'] },
-  { path: '/in-production', icon: Factory, label: 'Em Produção', roles: ['laboratorio', 'producao'], testId: 'nav-in-production' },
-  { path: '/counting', icon: Calculator, label: 'Contagem', roles: ['laboratorio', 'producao'] },
-  { path: '/samples', icon: FlaskConical, label: 'Amostras', roles: ['laboratorio', 'producao'] },
-  { path: '/fichas-analise', icon: ClipboardCheck, label: 'Ordem de Produção', roles: ['laboratorio'], emailOnly: 'laboratoriolumix@outlook.com' },
-  { path: '/ficha-analise', icon: FlaskIcon, label: 'Ficha de Análise', roles: ['laboratorio'], emailOnly: 'laboratoriolumix@outlook.com' },
-  { path: '/pedidos', icon: ShoppingCart, label: 'Pedidos', roles: ['laboratorio', 'pedidos'], emailAllowlist: ['leonicelaboratorio@lumix.com', 'laboratoriolumix@outlook.com'], testId: 'nav-pedidos' },
-  { path: '/batch-management', icon: ListChecks, label: 'Gerenciar Lotes', roles: ['laboratorio'] },
-  { path: '/suppliers', icon: Truck, label: 'Fornecedores', roles: ['laboratorio'] },
-  { path: '/laudos', icon: FileCheck, label: 'Pastas', roles: ['laboratorio'] },
-  { path: '/archives', icon: Archive, label: 'Arquivos', roles: ['laboratorio', 'producao'] },
-  { path: '/team', icon: Users, label: 'Equipe', roles: ['laboratorio'] },
-  { path: '/trash', icon: Trash2, label: 'Lixeira', roles: ['laboratorio'] },
-  { path: '/settings', icon: Settings, label: 'Configurações', roles: ['laboratorio'] },
+const menuCategories = [
+  {
+    title: 'GERAL',
+    items: [
+      { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', roles: ['laboratorio'] },
+      { path: '/pedidos', icon: ShoppingCart, label: 'Pedidos', roles: ['laboratorio', 'pedidos'], emailAllowlist: PEDIDOS_ALLOWLIST },
+    ],
+  },
+  {
+    title: 'PRODUÇÃO',
+    items: [
+      { path: '/fichas-analise', icon: ClipboardCheck, label: 'Ordem de Produção', roles: ['laboratorio'], emailOnly: LAB_EMAIL },
+      { path: '/in-production', icon: Factory, label: 'Em Produção', roles: ['laboratorio', 'producao'] },
+      { path: '/batch-management', icon: ListChecks, label: 'Gerenciar Lotes', roles: ['laboratorio'] },
+    ],
+  },
+  {
+    title: 'LABORATÓRIO',
+    items: [
+      { path: '/ficha-analise', icon: FlaskConical, label: 'Ficha de Análise', roles: ['laboratorio'], emailOnly: LAB_EMAIL },
+      { path: '/samples', icon: Beaker, label: 'Amostras', roles: ['laboratorio', 'producao'] },
+    ],
+  },
+  {
+    title: 'ESTOQUE',
+    items: [
+      { path: '/products', icon: Package, label: 'Produtos', roles: ['laboratorio'] },
+      { path: '/raw-materials', icon: Boxes, label: 'Matérias-Primas', roles: ['laboratorio'] },
+      { path: '/suppliers', icon: Truck, label: 'Fornecedores', roles: ['laboratorio'] },
+      { path: '/counting', icon: Calculator, label: 'Contagem', roles: ['laboratorio', 'producao'] },
+    ],
+  },
+  {
+    title: 'SISTEMA',
+    items: [
+      { path: '/laudos', icon: FileCheck, label: 'Pastas', roles: ['laboratorio'] },
+      { path: '/archives', icon: Archive, label: 'Arquivos', roles: ['laboratorio', 'producao'] },
+      { path: '/team', icon: Users, label: 'Equipe', roles: ['laboratorio'] },
+      { path: '/trash', icon: Trash2, label: 'Lixeira', roles: ['laboratorio'] },
+      { path: '/settings', icon: Settings, label: 'Configurações', roles: ['laboratorio'] },
+    ],
+  },
 ];
 
-const Sidebar = ({ mobile = false, onItemClick }) => {
+const logoUrl = 'https://customer-assets.emergentagent.com/job_prodman-lumix/artifacts/aod9p9yw_images.png';
+
+const Sidebar = ({ onItemClick }) => {
   const location = useLocation();
   const { user, role, logout } = useAuth();
 
-  // Filtra itens do menu baseado na role do usuário e email
-  const menuItems = allMenuItems.filter(item => {
+  const isVisible = (item) => {
     if (!item.roles.includes(role || 'producao')) return false;
     if (item.emailOnly && user?.email !== item.emailOnly) return false;
-    if (item.emailAllowlist && !item.emailAllowlist.some(e => e.toLowerCase() === (user?.email || '').toLowerCase())) return false;
+    if (item.emailAllowlist && !item.emailAllowlist.some((e) => e.toLowerCase() === (user?.email || '').toLowerCase())) return false;
     return true;
-  });
+  };
 
-  // URL da logo oficial Lumix
-  const logoUrl = "https://customer-assets.emergentagent.com/job_prodman-lumix/artifacts/aod9p9yw_images.png";
+  const roleMeta = role === 'laboratorio'
+    ? { label: 'Laboratório', icon: FlaskConical, cls: 'bg-primary/10 text-primary ring-1 ring-primary/20' }
+    : role === 'pedidos'
+    ? { label: 'Pedidos', icon: ShoppingCart, cls: 'bg-emerald-500/10 text-emerald-600 ring-1 ring-emerald-500/20' }
+    : { label: 'Produção', icon: Factory, cls: 'bg-orange-500/10 text-orange-600 ring-1 ring-orange-500/20' };
+  const RoleIcon = roleMeta.icon;
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Header com Logo */}
-      <div className="px-5 pt-6 pb-5 border-b border-border/60">
-        <div className="flex items-center gap-3">
-          <img 
-            src={logoUrl} 
-            alt="Lumix - Produtos de Limpeza" 
-            className="h-12 w-auto object-contain"
-          />
-        </div>
-        {/* Role Badge */}
-        <div className={`mt-4 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold tracking-wide ${
-          role === 'laboratorio' 
-            ? 'bg-primary/10 text-primary ring-1 ring-primary/20' 
-            : role === 'pedidos'
-            ? 'bg-emerald-500/10 text-emerald-600 ring-1 ring-emerald-500/20'
-            : 'bg-orange-500/10 text-orange-600 ring-1 ring-orange-500/20'
-        }`}>
-          {role === 'laboratorio' ? <FlaskConical className="h-3 w-3" /> : role === 'pedidos' ? <ShoppingCart className="h-3 w-3" /> : <Factory className="h-3 w-3" />}
-          {role === 'laboratorio' ? 'Laboratório' : role === 'pedidos' ? 'Pedidos' : 'Produção'}
+    <div className="flex flex-col h-full bg-white">
+      {/* Logo */}
+      <div className="h-[70px] flex items-center px-5 border-b border-slate-100 shrink-0">
+        <img src={logoUrl} alt="Lumix" className="h-9 w-auto object-contain" />
+      </div>
+
+      {/* Role badge */}
+      <div className="px-5 pt-4 pb-1">
+        <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold tracking-wide ${roleMeta.cls}`}>
+          <RoleIcon className="h-3 w-3" /> {roleMeta.label}
         </div>
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-        {menuItems.map((item) => {
-          const Icon = item.icon;
-          const isActive = location.pathname === item.path;
+      {/* Navigation por categorias */}
+      <nav className="flex-1 px-3 py-3 overflow-y-auto">
+        {menuCategories.map((category) => {
+          const visibleItems = category.items.filter(isVisible);
+          if (visibleItems.length === 0) return null;
           return (
-            <Link
-              key={item.path}
-              to={item.path}
-              data-testid={`nav-${item.path.slice(1)}`}
-              onClick={onItemClick}
-              className={`group relative flex items-center gap-3 px-3 py-2 rounded-xl text-sm transition-all duration-200 ${
-                isActive
-                  ? 'bg-primary text-primary-foreground font-semibold shadow-soft'
-                  : 'text-muted-foreground font-medium hover:bg-primary/10 hover:text-primary'
-              }`}
-            >
-              <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-primary-foreground' : 'text-muted-foreground group-hover:text-primary'}`} strokeWidth={isActive ? 2.25 : 1.75} />
-              <span className="truncate">{item.label}</span>
-            </Link>
+            <div key={category.title} className="mb-5">
+              <p className="px-3 mb-1.5 text-[10px] font-bold tracking-[0.12em] text-slate-400">{category.title}</p>
+              <div className="space-y-0.5">
+                {visibleItems.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = location.pathname === item.path;
+                  return (
+                    <Link
+                      key={item.path}
+                      to={item.path}
+                      data-testid={`nav-${item.path.slice(1)}`}
+                      onClick={onItemClick}
+                      className={`group flex items-center gap-3 px-3 py-2 rounded-xl text-sm transition-all duration-250 ${
+                        isActive
+                          ? 'bg-primary/10 text-primary font-semibold'
+                          : 'text-slate-500 font-medium hover:text-slate-800 hover:bg-slate-50'
+                      }`}
+                    >
+                      <span className={`flex items-center justify-center w-7 h-7 rounded-lg shrink-0 transition-colors duration-250 ${
+                        isActive ? 'bg-primary text-white' : 'bg-slate-100 text-slate-500 group-hover:bg-slate-200 group-hover:text-slate-700'
+                      }`}>
+                        <Icon className="w-4 h-4" strokeWidth={2} />
+                      </span>
+                      <span className="truncate">{item.label}</span>
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
           );
         })}
       </nav>
 
-      {/* User Section */}
-      <div className="px-4 py-4 border-t border-border/60">
+      {/* User */}
+      <div className="px-4 py-4 border-t border-slate-100">
         <div className="flex items-center gap-2.5 mb-3">
-          <div className="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm font-semibold shrink-0 ring-1 ring-primary/15">
+          <div className="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm font-bold shrink-0 ring-1 ring-primary/15">
             {(user?.name || user?.email || '?').charAt(0).toUpperCase()}
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold text-foreground truncate">{user?.name}</p>
-            <p className="text-[11px] text-muted-foreground truncate">{user?.email}</p>
+            <p className="text-sm font-semibold text-slate-800 truncate">{user?.name}</p>
+            <p className="text-[11px] text-slate-400 truncate">{user?.email}</p>
           </div>
         </div>
         <Button
           onClick={logout}
           data-testid="logout-button"
           variant="outline"
-          className="w-full justify-start h-9 text-sm border-border hover:bg-muted hover:text-foreground rounded-xl"
+          className="w-full justify-start h-9 text-sm border-slate-200 text-slate-600 hover:bg-slate-50 rounded-xl"
         >
-          <LogOut className="w-4 h-4 mr-2" />
-          Sair
+          <LogOut className="w-4 h-4 mr-2" /> Sair
         </Button>
       </div>
     </div>
+  );
+};
+
+const TopBar = ({ onMenuClick, hideMenuOnDesktop }) => {
+  const { user } = useAuth();
+  const today = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
+
+  return (
+    <header className="h-[70px] bg-white border-b border-slate-100 flex items-center justify-between gap-4 px-4 md:px-6">
+      <div className="flex items-center gap-3 flex-1 min-w-0">
+        <Button variant="ghost" size="icon" data-testid="mobile-menu-button" onClick={onMenuClick} className={`shrink-0 ${hideMenuOnDesktop ? 'md:hidden' : ''}`}>
+          <Menu className="h-5 w-5" />
+        </Button>
+        {/* Pesquisa (visual) */}
+        <div className="relative max-w-md w-full hidden sm:block" data-testid="topbar-search">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Pesquisar..."
+            className="w-full h-10 pl-9 pr-4 rounded-xl bg-slate-50 border border-transparent text-sm text-slate-700 placeholder:text-slate-400 focus:bg-white focus:border-slate-200 focus:outline-none transition-all duration-250"
+          />
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2 md:gap-3 shrink-0">
+        <span className="hidden md:inline text-sm font-medium text-slate-500 capitalize">{today}</span>
+        <button data-testid="topbar-notifications" className="relative w-10 h-10 rounded-xl flex items-center justify-center text-slate-500 hover:bg-slate-50 transition-colors duration-250">
+          <Bell className="w-5 h-5" />
+          <span className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-primary ring-2 ring-white" />
+        </button>
+        <Link to="/settings" data-testid="topbar-settings" className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-500 hover:bg-slate-50 transition-colors duration-250">
+          <Settings className="w-5 h-5" />
+        </Link>
+        <div className="flex items-center gap-2.5 pl-2 md:pl-3 md:border-l md:border-slate-100">
+          <div className="w-9 h-9 rounded-full bg-primary text-white flex items-center justify-center text-sm font-bold shrink-0">
+            {(user?.name || user?.email || '?').charAt(0).toUpperCase()}
+          </div>
+          <div className="hidden lg:block leading-tight">
+            <p className="text-sm font-semibold text-slate-800 truncate max-w-[140px]">{user?.name}</p>
+            <p className="text-[11px] text-slate-400 truncate max-w-[140px]">{user?.email}</p>
+          </div>
+        </div>
+      </div>
+    </header>
   );
 };
 
@@ -143,59 +221,47 @@ export const Layout = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { forceMobileView, toggleMobileView } = useMobile();
 
-  // Se forceMobileView está ativo, escondemos a sidebar desktop e mostramos o menu mobile
-  const showDesktopSidebar = !forceMobileView;
+  const showDesktopShell = !forceMobileView;
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Desktop Sidebar - escondido se forceMobileView está ativo */}
-      {showDesktopSidebar && (
-        <aside className="hidden md:fixed md:inset-y-0 md:flex md:w-64 md:flex-col bg-card border-r border-border/60 z-50">
+      {/* Sidebar desktop fixa */}
+      {showDesktopShell && (
+        <aside className="hidden md:flex md:fixed md:inset-y-0 md:left-0 md:w-64 md:flex-col bg-white border-r border-slate-100 z-40">
           <Sidebar />
         </aside>
       )}
 
-      {/* Mobile Sidebar - sempre disponível quando forceMobileView ou em tela pequena */}
+      {/* Sidebar mobile (Sheet) */}
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-        <SheetTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            data-testid="mobile-menu-button"
-            className={`${forceMobileView ? 'fixed' : 'md:hidden fixed'} top-4 left-4 z-50 bg-card shadow-md border border-border`}
-          >
-            <Menu className="h-6 w-6" />
-          </Button>
-        </SheetTrigger>
-        <SheetContent side="left" className="p-0 w-64 bg-card border-r border-border">
-          <Sidebar mobile onItemClick={() => setMobileOpen(false)} />
+        <SheetContent side="left" className="p-0 w-64 bg-white border-r border-slate-100">
+          <Sidebar onItemClick={() => setMobileOpen(false)} />
         </SheetContent>
       </Sheet>
 
-      {/* Botão Flutuante - Alternar Modo Mobile/Desktop */}
+      {/* TopBar fixa */}
+      <div className={`fixed top-0 right-0 left-0 ${showDesktopShell ? 'md:left-64' : ''} z-30`}>
+        <TopBar onMenuClick={() => setMobileOpen(true)} hideMenuOnDesktop={showDesktopShell} />
+      </div>
+
+      {/* Botão flutuante alternar mobile/desktop */}
       <Button
         onClick={toggleMobileView}
         variant="outline"
         size="sm"
-        className="fixed bottom-20 right-4 z-50 bg-card shadow-lg border-primary/50 hover:bg-primary/10 gap-2"
+        className="fixed bottom-6 right-4 z-50 bg-white shadow-premium border-primary/40 hover:bg-primary/5 gap-2 rounded-xl"
         title={forceMobileView ? 'Voltar para modo Desktop' : 'Usar no Celular'}
       >
         {forceMobileView ? (
-          <>
-            <Monitor className="h-4 w-4" />
-            <span className="hidden sm:inline">Modo Desktop</span>
-          </>
+          <><Monitor className="h-4 w-4" /><span className="hidden sm:inline">Modo Desktop</span></>
         ) : (
-          <>
-            <Smartphone className="h-4 w-4" />
-            <span className="hidden sm:inline">Usar no Celular</span>
-          </>
+          <><Smartphone className="h-4 w-4" /><span className="hidden sm:inline">Usar no Celular</span></>
         )}
       </Button>
 
-      {/* Main Content */}
-      <main className={`${showDesktopSidebar ? 'md:pl-64' : 'pl-0'} min-h-screen`}>
-        <div className={`p-4 ${showDesktopSidebar ? 'md:p-8' : 'pt-16 px-4 pb-4'}`}>
+      {/* Conteúdo principal */}
+      <main className={`${showDesktopShell ? 'md:pl-64' : ''} pt-[70px] min-h-screen`}>
+        <div className="p-4 md:p-8 max-w-[1600px] mx-auto animate-fade-up">
           <Outlet />
         </div>
       </main>
