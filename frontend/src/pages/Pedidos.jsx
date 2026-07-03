@@ -147,6 +147,59 @@ const AddSupplierDialog = ({ open, onOpenChange, onCreated }) => {
   );
 };
 
+// ====================== Componente: Carrinho de Itens ======================
+const CartPreview = ({ cart, orderUnit, onRemove, onUpdateQty, showDeleteButtons = false }) => {
+  if (cart.length === 0) {
+    return <p className="text-sm text-muted-foreground text-center py-4">Nenhum item adicionado.</p>;
+  }
+
+  return (
+    <div className="space-y-2 max-h-64 overflow-y-auto pr-2 border border-border/30 rounded-lg p-3 bg-muted/30">
+      {cart.map((c) => (
+        <div
+          key={c.key}
+          className="flex items-center gap-2 p-2 rounded-lg bg-card border border-border/50 hover:bg-muted/50 transition-all group"
+        >
+          <span className="flex-1 text-sm text-foreground truncate font-medium">{c.name}</span>
+          <div className="flex items-center gap-2">
+            <Input
+              type="number"
+              min="0"
+              step="any"
+              value={c.quantity || ''}
+              onChange={(e) => onUpdateQty(c.key, e.target.value)}
+              className="w-16 h-8 bg-input border-border text-foreground text-sm"
+            />
+            <span className="text-xs text-muted-foreground w-12 text-right">{orderUnit}</span>
+            {showDeleteButtons && (
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => onRemove(c.key)}
+                className="text-red-600 hover:text-red-500 hover:bg-red-50 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                title="Remover item"
+              >
+                <Trash2 className="w-4 h-4" />
+              </Button>
+            )}
+            {!showDeleteButtons && (
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => onRemove(c.key)}
+                className="text-red-600 hover:text-red-500 hover:bg-red-50 h-8 w-8"
+                title="Remover item"
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
 // ====================== Novo Pedido (modal) ======================
 const NewOrderDialog = ({ open, onOpenChange, onCreated }) => {
   const [step, setStep] = useState('suppliers'); // suppliers, items, summary
@@ -248,8 +301,14 @@ const NewOrderDialog = ({ open, onOpenChange, onCreated }) => {
     toast.success('Item adicionado ao carrinho');
   };
 
-  const updateCartQty = (key, qty) => setCart((prev) => prev.map((c) => (c.key === key ? { ...c, quantity: qty } : c)));
-  const removeFromCart = (key) => setCart((prev) => prev.filter((c) => c.key !== key));
+  const updateCartQty = (key, qty) => {
+    setCart((prev) => prev.map((c) => (c.key === key ? { ...c, quantity: parseFloat(qty) || 0 } : c)));
+  };
+
+  const removeFromCart = (key) => {
+    setCart((prev) => prev.filter((c) => c.key !== key));
+    toast.success('Item removido do carrinho');
+  };
 
   const nextStep = () => {
     if (step === 'items') {
@@ -492,6 +551,31 @@ const NewOrderDialog = ({ open, onOpenChange, onCreated }) => {
                   </Button>
                 </div>
               </div>
+
+              {/* Preview do carrinho na etapa de items */}
+              {cart.length > 0 && (
+                <div className="space-y-2 border-t border-border/60 pt-4">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-foreground text-sm">
+                      Carrinho (
+                      {cartTotalItems}
+                      )
+                    </Label>
+                    <span className="text-xs text-muted-foreground">
+                      Total:
+                      {' '}
+                      {fmtQty(cartTotalQty)}
+                    </span>
+                  </div>
+                  <CartPreview
+                    cart={cart}
+                    orderUnit={orderUnit}
+                    onRemove={removeFromCart}
+                    onUpdateQty={updateCartQty}
+                    showDeleteButtons
+                  />
+                </div>
+              )}
             </div>
           )}
 
@@ -520,35 +604,13 @@ const NewOrderDialog = ({ open, onOpenChange, onCreated }) => {
               {/* Itens do carrinho */}
               <div className="space-y-2">
                 <Label className="text-foreground text-base">Itens do pedido</Label>
-                <div className="space-y-2 max-h-64 overflow-y-auto pr-2 border border-border/30 rounded-lg p-3 bg-muted/30">
-                  {cart.map((c) => (
-                    <div
-                      key={c.key}
-                      className="flex items-center gap-2 p-2 rounded-lg bg-card border border-border/50 hover:bg-muted/50 transition-all"
-                    >
-                      <span className="flex-1 text-sm text-foreground truncate font-medium">{c.name}</span>
-                      <div className="flex items-center gap-2">
-                        <Input
-                          type="number"
-                          min="0"
-                          step="any"
-                          value={c.quantity || ''}
-                          onChange={(e) => updateCartQty(c.key, e.target.value)}
-                          className="w-16 h-8 bg-input border-border text-foreground text-sm"
-                        />
-                        <span className="text-xs text-muted-foreground w-12 text-right">{orderUnit}</span>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => removeFromCart(c.key)}
-                          className="text-red-600 hover:text-red-500 hover:bg-red-50 h-8 w-8"
-                        >
-                          <X className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <CartPreview
+                  cart={cart}
+                  orderUnit={orderUnit}
+                  onRemove={removeFromCart}
+                  onUpdateQty={updateCartQty}
+                  showDeleteButtons
+                />
               </div>
 
               {/* Observações */}
