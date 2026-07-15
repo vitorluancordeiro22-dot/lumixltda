@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useLocation, Outlet } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useMobile } from '../context/MobileContext';
+import api from '../lib/api';
 import { Button } from './ui/button';
 import { Sheet, SheetContent, SheetTrigger } from './ui/sheet';
 import {
@@ -177,6 +178,40 @@ const TopBar = ({ onMenuClick, hideMenuOnDesktop }) => {
   const { user } = useAuth();
   const today = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
 
+  const [notifs, setNotifs] = useState([]);
+  const [openNotif, setOpenNotif] = useState(false);
+  const [lastSeen, setLastSeen] = useState(() => Number(localStorage.getItem('notifLastSeen') || 0));
+
+  const fetchNotifs = useCallback(async () => {
+    try { const r = await api.get('/notifications'); setNotifs(r.data); } catch { /* silencioso */ }
+  }, []);
+
+  useEffect(() => {
+    fetchNotifs();
+    const t = setInterval(fetchNotifs, 60000);
+    return () => clearInterval(t);
+  }, [fetchNotifs]);
+
+  const unread = notifs.filter((n) => new Date(n.created_at).getTime() > lastSeen).length;
+
+  const toggleNotif = () => {
+    if (!openNotif) {
+      const now = Date.now();
+      setLastSeen(now);
+      localStorage.setItem('notifLastSeen', String(now));
+    }
+    setOpenNotif((o) => !o);
+  };
+
+  const dismiss = async (id) => {
+    try { await api.delete(`/notifications/${id}`); fetchNotifs(); } catch { /* noop */ }
+  };
+
+  const fmt = (iso) => {
+    try { return new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); }
+    catch { return ''; }
+  };
+
   return (
     <header className="h-[70px] bg-white border-b border-slate-100 flex items-center justify-between gap-4 px-4 md:px-6">
       <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -196,10 +231,42 @@ const TopBar = ({ onMenuClick, hideMenuOnDesktop }) => {
 
       <div className="flex items-center gap-2 md:gap-3 shrink-0">
         <span className="hidden md:inline text-sm font-medium text-slate-500 capitalize">{today}</span>
-        <button data-testid="topbar-notifications" className="relative w-10 h-10 rounded-xl flex items-center justify-center text-slate-500 hover:bg-slate-50 transition-colors duration-250">
-          <Bell className="w-5 h-5" />
-          <span className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-primary ring-2 ring-white" />
-        </button>
+
+        {/* Notificações */}
+        <div className="relative">
+          <button data-testid="topbar-notifications" onClick={toggleNotif} className="relative w-10 h-10 rounded-xl flex items-center justify-center text-slate-500 hover:bg-slate-50 transition-colors duration-250">
+            <Bell className="w-5 h-5" />
+            {unread > 0 && (
+              <span data-testid="notif-badge" className="absolute top-1 right-1 min-w-[16px] h-4 px-1 rounded-full bg-primary text-white text-[10px] font-bold flex items-center justify-center ring-2 ring-white">{unread}</span>
+            )}
+          </button>
+          {openNotif && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setOpenNotif(false)} />
+              <div data-testid="notification-panel" className="absolute right-0 mt-2 w-80 max-h-[70vh] overflow-y-auto bg-white rounded-2xl shadow-premium border border-slate-100 z-50">
+                <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+                  <p className="text-sm font-bold text-slate-800">Notificações</p>
+                  <Link to="/notificar" onClick={() => setOpenNotif(false)} data-testid="notif-panel-link" className="text-xs font-semibold text-primary hover:underline">Gerenciar</Link>
+                </div>
+                {notifs.length === 0 ? (
+                  <p className="px-4 py-6 text-sm text-slate-400 text-center">Nenhuma notificação.</p>
+                ) : (
+                  notifs.map((n) => (
+                    <div key={n.id} className="px-4 py-3 border-b border-slate-50 flex items-start gap-2 hover:bg-slate-50">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-slate-800 truncate">{n.product_name}</p>
+                        {n.message && <p className="text-xs text-slate-500 mt-0.5">{n.message}</p>}
+                        <p className="text-[10px] text-slate-400 mt-1">{n.created_by} • {fmt(n.created_at)}</p>
+                      </div>
+                      <button onClick={() => dismiss(n.id)} className="text-slate-300 hover:text-red-500 text-xs shrink-0" title="Remover">✕</button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </>
+          )}
+        </div>
+
         <Link to="/settings" data-testid="topbar-settings" className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-500 hover:bg-slate-50 transition-colors duration-250">
           <Settings className="w-5 h-5" />
         </Link>

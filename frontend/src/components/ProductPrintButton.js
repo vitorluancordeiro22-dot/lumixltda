@@ -74,114 +74,205 @@ export const ProductPrintButton = ({ product, rawMaterials = [] }) => {
         <style>
           @media print {
             @page { 
-              margin: 10mm; 
+              margin: 8mm; 
               size: A4 portrait;
             }
             .no-print { display: none !important; }
+            body { padding: 0; }
           }
           * { margin: 0; padding: 0; box-sizing: border-box; }
           body {
-            font-family: Arial, sans-serif;
-            font-size: 10pt;
-            padding: 10mm;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-size: 9pt;
+            line-height: 1.3;
+            color: #333;
+            background: #fff;
+            padding: 8mm;
           }
           .op-container {
             width: 100%;
             max-width: 210mm;
             margin: 0 auto;
+            background: white;
+            position: relative;
           }
 
           /* HEADER */
-          .header-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 0;
+          .header-section {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            border-bottom: 3px solid #16a34a;
+            padding-bottom: 8px;
           }
-          .header-table td {
-            border: 2px solid #000;
-            padding: 6px 10px;
+          .header-left {
+            flex: 1;
           }
           .header-title {
-            font-size: 16pt;
-            font-weight: bold;
-            text-align: center;
+            font-size: 18pt;
+            font-weight: 700;
+            color: #16a34a;
+            letter-spacing: 0.5px;
           }
-          .header-op {
-            font-size: 12pt;
+          .header-subtitle {
+            font-size: 8pt;
+            color: #666;
+            margin-top: 2px;
+          }
+          .header-right {
+            text-align: right;
+            border-left: 2px solid #dcfce7;
+            padding-left: 12px;
+          }
+          .op-number-label {
+            font-size: 8pt;
+            color: #16a34a;
+            font-weight: 600;
+          }
+          .op-number-input {
+            font-size: 14pt;
             font-weight: bold;
+            color: #16a34a;
+            border: 1px dashed #86efac;
+            padding: 2px 6px;
+            width: 120px;
             text-align: center;
+            margin-top: 2px;
           }
 
           /* PRODUCT INFO */
-          .info-table {
-            width: 100%;
-            border-collapse: collapse;
+          .info-section {
+            margin-bottom: 10px;
+            background: #f0fdf4;
+            border-radius: 4px;
+            overflow: hidden;
+            border: 1px solid #dcfce7;
           }
-          .info-table td {
-            border: 1px solid #000;
-            padding: 5px 8px;
-            font-size: 10pt;
+          .info-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 0;
+            font-size: 9pt;
+          }
+          .info-row.full {
+            grid-template-columns: 1fr;
+          }
+          .info-cell {
+            padding: 6px 10px;
+            border-right: 1px solid #dcfce7;
+            border-bottom: 1px solid #dcfce7;
+            display: flex;
+            align-items: center;
+          }
+          .info-cell:last-child {
+            border-right: none;
+          }
+          .info-row:last-child .info-cell {
+            border-bottom: none;
           }
           .info-label {
-            font-weight: bold;
+            font-weight: 700;
+            color: #16a34a;
+            margin-right: 8px;
+            min-width: 60px;
+          }
+          .info-value {
+            color: #1f2937;
+            font-weight: 500;
+          }
+          .info-input {
+            border: 1px solid #86efac;
+            padding: 3px 6px;
+            border-radius: 2px;
+            font-size: 8pt;
+            flex: 1;
+            background: white;
           }
 
           /* MATERIALS TABLE */
+          .section-header {
+            background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
+            color: white;
+            font-weight: 700;
+            padding: 8px 10px;
+            margin-top: 10px;
+            margin-bottom: 6px;
+            font-size: 10pt;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+          }
+
           .materials-table {
             width: 100%;
             border-collapse: collapse;
+            margin-bottom: 10px;
+            background: white;
+            border: 1px solid #86efac;
           }
           .materials-table th {
-            border: 2px solid #000;
-            padding: 4px 6px;
-            font-size: 9pt;
-            font-weight: bold;
+            background: #dcfce7;
+            border: 1px solid #86efac;
+            padding: 5px 4px;
+            font-size: 8pt;
+            font-weight: 700;
             text-align: center;
-            background-color: #f0f0f0;
+            color: #16a34a;
+            height: 24px;
           }
           .materials-table td.cell {
-            border: 1px solid #000;
-            padding: 3px 6px;
-            font-size: 9pt;
-            height: 20px;
+            border: 1px solid #f0fdf4;
+            padding: 4px 4px;
+            font-size: 8pt;
+            height: 18px;
           }
           .materials-table td.center {
             text-align: center;
           }
+          .materials-table tbody tr:nth-child(odd) {
+            background: #f0fdf4;
+          }
+          .materials-table tbody tr:hover {
+            background: #e7f5ed;
+          }
           .total-row td {
-            border: 2px solid #000 !important;
-            font-weight: bold;
+            background: #bbf7d0 !important;
+            border: 2px solid #16a34a !important;
+            font-weight: 700;
+            color: #16a34a;
+            padding: 5px 4px;
           }
 
           /* PACKAGING SECTION */
-          .section-title {
-            font-weight: bold;
-            font-size: 11pt;
-            border: 2px solid #000;
-            padding: 4px 8px;
-            background-color: #f0f0f0;
-            text-align: center;
-            margin-top: 8px;
-          }
           .pack-table {
             width: 100%;
             border-collapse: collapse;
+            margin-bottom: 10px;
+            background: white;
+            border: 1px solid #86efac;
           }
           .pack-table th, .pack-table td {
-            border: 1px solid #000;
-            padding: 3px 6px;
-            font-size: 9pt;
+            border: 1px solid #f0fdf4;
+            padding: 4px 4px;
+            font-size: 8pt;
             text-align: center;
-            height: 22px;
+            height: 20px;
           }
           .pack-table th {
-            font-weight: bold;
-            background-color: #f0f0f0;
+            background: #dcfce7;
+            font-weight: 700;
+            color: #16a34a;
           }
           .pack-table td.label-cell {
             text-align: left;
-            font-weight: bold;
-            background-color: #fafafa;
+            font-weight: 700;
+            background: #ecfdf5;
+            color: #16a34a;
+            width: 100px;
+          }
+          .pack-table tbody tr:nth-child(odd) {
+            background: #f0fdf4;
           }
 
           /* SIGNATURE SECTION */
@@ -189,129 +280,205 @@ export const ProductPrintButton = ({ product, rawMaterials = [] }) => {
             width: 100%;
             border-collapse: collapse;
             margin-top: 10px;
+            background: white;
+            border: 1px solid #86efac;
           }
           .sig-table td {
-            border: 1px solid #000;
+            border: 1px solid #f0fdf4;
             padding: 3px 6px;
-            font-size: 9pt;
-            height: 22px;
+            font-size: 8pt;
+            height: 20px;
           }
           .sig-table td.sig-header {
-            font-weight: bold;
+            background: #dcfce7;
+            font-weight: 700;
             text-align: center;
-            background-color: #f0f0f0;
+            color: #16a34a;
+            padding: 5px 6px;
           }
           .sig-table td.sig-label {
-            font-weight: bold;
-            width: 80px;
+            font-weight: 600;
+            background: #ecfdf5;
+            color: #16a34a;
+            width: 70px;
+          }
+          .sig-table td.sig-input {
+            background: white;
+            border-bottom: 1px solid #86efac;
           }
 
           .print-buttons {
             margin-top: 20px;
             text-align: center;
+            gap: 10px;
           }
           .print-buttons button {
             padding: 10px 24px;
             border: none;
-            border-radius: 4px;
+            border-radius: 6px;
             cursor: pointer;
-            font-size: 14px;
+            font-size: 13px;
             margin: 0 5px;
+            font-weight: 600;
+            transition: all 0.2s;
           }
-          .btn-print { background: #2563eb; color: white; }
-          .btn-close { background: #666; color: white; }
+          .btn-print { 
+            background: #16a34a; 
+            color: white;
+          }
+          .btn-print:hover {
+            background: #15803d;
+          }
+          .btn-close { 
+            background: #6b7280; 
+            color: white;
+          }
+          .btn-close:hover {
+            background: #4b5563;
+          }
+
+          /* FOOTER WITH LOGO */
+          .footer-section {
+            position: fixed;
+            bottom: 8mm;
+            right: 8mm;
+            width: 60px;
+            height: 60px;
+            opacity: 0.15;
+            z-index: 0;
+            pointer-events: none;
+          }
+          .footer-section img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+          }
+
+          @media print {
+            .footer-section {
+              position: absolute;
+              bottom: 15px;
+              right: 15px;
+              opacity: 0.12;
+            }
+          }
         </style>
       </head>
       <body>
         <div class="op-container">
 
           <!-- HEADER -->
-          <table class="header-table">
-            <tr>
-              <td class="header-title" style="width:60%">ORDEM DE PRODU&Ccedil;&Atilde;O</td>
-              <td class="header-op" style="width:40%">OP N&ordm;: ______</td>
-            </tr>
-          </table>
+          <div class="header-section">
+            <div class="header-left">
+              <div class="header-title"> ORDEM DE PRODUÇÃO</div>
+              <div class="header-subtitle">Lumix - Sistema de Gestão de Produção</div>
+            </div>
+            <div class="header-right">
+              <div class="op-number-label">OP Nº</div>
+              <input type="text" class="op-number-input" placeholder="______">
+            </div>
+          </div>
 
           <!-- PRODUCT INFO -->
-          <table class="info-table">
-            <tr>
-              <td class="info-label" colspan="5">PRODUTO: ${product.name.toUpperCase()}</td>
-              <td class="info-label" style="text-align:right">QUANT(${product.unit === 'Litros' ? 'Lts' : 'Kg'}):</td>
-              <td style="text-align:center; font-weight:bold">${expectedLiters}</td>
-            </tr>
-            <tr>
-              <td class="info-label" colspan="2">LOTE:</td>
-              <td class="info-label" colspan="2">DATA: ${today}</td>
-              <td>Hora I:</td>
-              <td>Hora F:</td>
-              <td></td>
-            </tr>
-          </table>
+          <div class="info-section">
+            <div class="info-row full">
+              <div class="info-cell">
+                <span class="info-label">PRODUTO:</span>
+                <span class="info-value">${product.name.toUpperCase()}</span>
+              </div>
+            </div>
+            <div class="info-row">
+              <div class="info-cell">
+                <span class="info-label">LOTE:</span>
+                <input type="text" class="info-input" placeholder="">
+              </div>
+              <div class="info-cell">
+                <span class="info-label">DATA:</span>
+                <span class="info-value">${today}</span>
+              </div>
+              <div class="info-cell">
+                <span class="info-label">QUANT. (${product.unit === 'Litros' ? 'Lts' : 'Kg'}):</span>
+                <span class="info-value" style="font-weight: bold;">${expectedLiters}</span>
+              </div>
+            </div>
+            <div class="info-row">
+              <div class="info-cell">
+                <span class="info-label">HORA INÍCIO:</span>
+                <input type="text" class="info-input" placeholder="">
+              </div>
+              <div class="info-cell">
+                <span class="info-label">HORA FIM:</span>
+                <input type="text" class="info-input" placeholder="">
+              </div>
+              <div class="info-cell">
+                <span class="info-label">OBSERVAÇÕES:</span>
+                <input type="text" class="info-input" placeholder="">
+              </div>
+            </div>
+          </div>
 
           <!-- MATERIALS TABLE -->
+          <div class="section-header">📋 Matérias-Primas</div>
           <table class="materials-table">
             <thead>
               <tr>
-                <th style="width:5%">C&Oacute;D</th>
-                <th style="width:25%">MAT&Eacute;RIAS-PRIMAS</th>
-                <th style="width:12%">LOTE</th>
-                <th style="width:12%">VALIDADE</th>
-                <th style="width:8%">%</th>
-                <th style="width:12%">QUANT. (kg)</th>
-                <th style="width:10%">CORRE&Ccedil;&Atilde;O</th>
-                <th style="width:10%">TOTAL</th>
-                <th style="width:6%">OBS</th>
+                <th style="width:4%">CÓD</th>
+                <th style="width:22%">MATÉRIAS-PRIMAS</th>
+                <th style="width:10%">LOTE</th>
+                <th style="width:10%">VALIDADE</th>
+                <th style="width:7%">%</th>
+                <th style="width:11%">QUANT.(kg)</th>
+                <th style="width:9%">CORREÇÃO</th>
+                <th style="width:9%">TOTAL</th>
+                <th style="width:5%">OBS</th>
               </tr>
             </thead>
             <tbody>
               ${materialRows}
               ${emptyRows}
               <tr class="total-row">
-                <td class="cell" colspan="4" style="text-align:right; font-weight:bold; border:2px solid #000">TOTAL</td>
-                <td class="cell center" style="border:2px solid #000">${totalPercent % 1 === 0 ? totalPercent : totalPercent.toFixed(2)}</td>
-                <td class="cell center" style="border:2px solid #000">${totalQuant % 1 === 0 ? totalQuant : totalQuant.toFixed(2)}</td>
-                <td class="cell" style="border:2px solid #000"></td>
-                <td class="cell" style="border:2px solid #000"></td>
-                <td class="cell" style="border:2px solid #000"></td>
+                <td class="cell" colspan="4" style="text-align:right; padding-right:8px;">TOTAL</td>
+                <td class="cell center">${totalPercent % 1 === 0 ? totalPercent : totalPercent.toFixed(2)}</td>
+                <td class="cell center">${totalQuant % 1 === 0 ? totalQuant : totalQuant.toFixed(2)}</td>
+                <td class="cell"></td>
+                <td class="cell"></td>
+                <td class="cell"></td>
               </tr>
             </tbody>
           </table>
 
           <!-- PACKAGING SECTION -->
-          <div class="section-title">EMBALAGENS</div>
+          <div class="section-header">📦 Embalagens</div>
           <table class="pack-table">
             <thead>
               <tr>
-                <th style="width:14%">EMBALAGENS</th>
-                <th>2LTS</th>
-                <th>5 LTS</th>
-                <th>20 LTS</th>
-                <th>50 LTS</th>
-                <th>TB</th>
+                <th style="width:14%">EMBALAGEM</th>
+                <th>2L</th>
+                <th>5L</th>
+                <th>20L</th>
+                <th>50L</th>
+                <th>TAMBOR</th>
                 <th>SOBRA</th>
                 <th>PERDA</th>
-                <th></th>
+                <th>%</th>
               </tr>
             </thead>
             <tbody>
               <tr>
                 <td class="label-cell">Peso Bruto</td>
-                <td></td><td></td><td></td><td></td><td></td><td></td><td></td>
-                <td>%</td>
+                <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
               </tr>
               <tr>
                 <td class="label-cell">Tara</td>
                 <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
               </tr>
               <tr>
-                <td class="label-cell">Peso L&iacute;quido</td>
+                <td class="label-cell">Peso Líquido</td>
                 <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
               </tr>
               <tr>
                 <td class="label-cell">Quantidade</td>
-                <td></td><td></td><td></td><td></td><td></td><td></td><td></td>
-                <td>Litros</td>
+                <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
               </tr>
               <tr>
                 <td class="label-cell">Total (Litros)</td>
@@ -321,49 +488,55 @@ export const ProductPrintButton = ({ product, rawMaterials = [] }) => {
           </table>
 
           <!-- SIGNATURE SECTION -->
+          <div class="section-header">✍️ Responsáveis</div>
           <table class="sig-table">
             <tr>
-              <td class="sig-header" colspan="2">Respons&aacute;vel pela pesagem</td>
-              <td class="sig-header" colspan="2">Respons&aacute;vel pela prepara&ccedil;&atilde;o</td>
-              <td class="sig-header" colspan="2">Respons&aacute;vel pelo envase</td>
+              <td class="sig-header" colspan="2">Pesagem</td>
+              <td class="sig-header" colspan="2">Preparação</td>
+              <td class="sig-header" colspan="2">Envase</td>
             </tr>
             <tr>
-              <td class="sig-label">Ass.</td><td></td>
-              <td class="sig-label">Ass.</td><td></td>
-              <td class="sig-label">Ass.</td><td></td>
+              <td class="sig-label">Assinatura:</td><td class="sig-input"></td>
+              <td class="sig-label">Assinatura:</td><td class="sig-input"></td>
+              <td class="sig-label">Assinatura:</td><td class="sig-input"></td>
             </tr>
             <tr>
-              <td class="sig-label">Nome</td><td></td>
-              <td class="sig-label">Nome</td><td></td>
-              <td class="sig-label">Nome</td><td></td>
+              <td class="sig-label">Nome:</td><td class="sig-input"></td>
+              <td class="sig-label">Nome:</td><td class="sig-input"></td>
+              <td class="sig-label">Nome:</td><td class="sig-input"></td>
             </tr>
             <tr>
-              <td class="sig-label">H In&iacute;cio</td><td></td>
-              <td class="sig-label">H In&iacute;cio</td><td></td>
-              <td class="sig-label">H In&iacute;cio</td><td></td>
+              <td class="sig-label">H Início:</td><td class="sig-input"></td>
+              <td class="sig-label">H Início:</td><td class="sig-input"></td>
+              <td class="sig-label">H Início:</td><td class="sig-input"></td>
             </tr>
             <tr>
-              <td class="sig-label">H T&eacute;rm</td><td></td>
-              <td class="sig-label">H T&eacute;rm</td><td></td>
-              <td class="sig-label">H T&eacute;rm</td><td></td>
+              <td class="sig-label">H Término:</td><td class="sig-input"></td>
+              <td class="sig-label">H Término:</td><td class="sig-input"></td>
+              <td class="sig-label">H Término:</td><td class="sig-input"></td>
             </tr>
             <tr>
-              <td class="sig-header" colspan="2">Conferente / Analista</td>
-              <td class="sig-label">Ass.:</td><td></td>
-              <td class="sig-label">Ass.</td><td></td>
+              <td class="sig-header" colspan="2">Conferente/Analista</td>
+              <td class="sig-label">Assinatura:</td><td class="sig-input"></td>
+              <td class="sig-label">Assinatura:</td><td class="sig-input"></td>
             </tr>
             <tr>
               <td colspan="2"></td>
-              <td class="sig-label">Nome:</td><td></td>
-              <td class="sig-label">Nome:</td><td></td>
+              <td class="sig-label">Nome:</td><td class="sig-input"></td>
+              <td class="sig-label">Nome:</td><td class="sig-input"></td>
             </tr>
           </table>
+
+          <!-- FOOTER WITH LOGO -->
+          <div class="footer-section">
+            <img src="https://customer-assets.emergentagent.com/job_prodman-lumix/artifacts/aod9p9yw_images.png" alt="Logo Lumix">
+          </div>
 
         </div>
 
         <div class="print-buttons no-print">
-          <button class="btn-print" onclick="window.print()">Imprimir</button>
-          <button class="btn-close" onclick="window.close()">Fechar</button>
+          <button class="btn-print" onclick="window.print()">🖨️ Imprimir</button>
+          <button class="btn-close" onclick="window.close()">✕ Fechar</button>
         </div>
       </body>
       </html>
@@ -378,7 +551,7 @@ export const ProductPrintButton = ({ product, rawMaterials = [] }) => {
     <Button
       size="sm"
       variant="outline"
-      className="border-border text-foreground hover:bg-muted"
+      className="border-green-300 text-green-700 hover:bg-green-50"
       onClick={handlePrint}
       data-testid="print-op-button"
     >

@@ -240,11 +240,37 @@ class TestPurchaseOrders:
         body = {"supplier_id": supplier_id, "supplier_name": "TEST", "items": [{"name": "X", "unit": "Kg", "quantity": 1}]}
         r = requests.post(f"{API}/purchase-orders", json=body, headers=headers, timeout=30)
         order_id = r.json()['id']
+        order_number = r.json()['order_number']
         _created_orders.append(order_id)
         r2 = requests.get(f"{API}/purchase-orders/{order_id}/pdf", headers=headers, timeout=60)
         assert r2.status_code == 200, r2.text[:300]
         assert 'application/pdf' in r2.headers.get('content-type', '').lower()
         assert r2.content[:4] == b'%PDF'
+
+    def test_pdf_endpoint_has_attachment_content_disposition(self, headers, supplier_id):
+        """Regression: ensure PDF is served with Content-Disposition: attachment (forces download on mobile)."""
+        body = {"supplier_id": supplier_id, "supplier_name": "TEST", "items": [
+            {"name": "Pão de queijo", "unit": "Kg", "quantity": 3},
+            {"name": "Leite", "unit": "Litros", "quantity": 5},
+        ], "observations": "Pedido com 2 itens para validar PDF"}
+        r = requests.post(f"{API}/purchase-orders", json=body, headers=headers, timeout=30)
+        assert r.status_code == 200
+        order_id = r.json()['id']
+        order_number = r.json()['order_number']
+        _created_orders.append(order_id)
+
+        r2 = requests.get(f"{API}/purchase-orders/{order_id}/pdf", headers=headers, timeout=60)
+        assert r2.status_code == 200
+        # Content-Type must be application/pdf
+        assert 'application/pdf' in r2.headers.get('content-type', '').lower()
+        # Content-Disposition must be "attachment" (NOT inline) and reference order number
+        cd = r2.headers.get('content-disposition', '')
+        assert 'attachment' in cd.lower(), f"Expected attachment disposition, got: {cd}"
+        assert order_number in cd, f"Expected filename to contain {order_number}, got: {cd}"
+        assert '.pdf' in cd.lower()
+        # Body is valid PDF and has non-trivial size (logo + table embedded)
+        assert r2.content[:4] == b'%PDF'
+        assert len(r2.content) > 2000, f"PDF body too small ({len(r2.content)} bytes), expected >2KB"
 
     def test_delete_order_removes_from_list(self, headers, supplier_id):
         body = {"supplier_id": supplier_id, "supplier_name": "TEST", "items": [{"name": "X", "unit": "Kg", "quantity": 1}]}

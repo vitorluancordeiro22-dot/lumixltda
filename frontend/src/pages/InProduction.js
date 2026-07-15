@@ -19,7 +19,10 @@ export const InProduction = () => {
   const isMountedRef = useRef(true);
 
   // Emails autorizados para liberar lotes
-  const authorizedEmails = ['laboratoriolumix@outlook.com', 'luan_ssss@hotmail.com'];
+  const authorizedEmails = [
+  'laboratoriolumix@outlook.com',
+  'luan_ssss@hotmail.com'
+];
   const canRelease = authorizedEmails.includes(user?.email);
 
   useEffect(() => {

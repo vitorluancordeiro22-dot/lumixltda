@@ -1,0 +1,40 @@
+{
+  "summary": "Focused regression for the Pedidos PDF download fix (Content-Disposition: attachment + green palette + frontend anchor download + success toast). Backend: 17/17 pytest tests passed including a new dedicated test_pdf_endpoint_has_attachment_content_disposition that asserts HTTP 200, content-type application/pdf, Content-Disposition contains 'attachment' AND the order number filename, body starts with %PDF, size > 2KB (logo embedded). Frontend Playwright: logged in as leonicelaboratorio@lumix.com (Laboratorio mode), created PED-0008 with 2 items (TEST_LeitePDF, TEST_CafePDF), clicked order-pdf-{id} -> Playwright download event fired with filename PED-0008.pdf (9291 bytes, %PDF signature) AND in-page success toast 'PDF gerado — verifique seus downloads' rendered. Direct in-page fetch confirmed headers: content-disposition='attachment; filename=\"PED-0008.pdf\"' and content-type='application/pdf'. Regression: order-share-{id}, order-mark-sent-{id}, order-mark-received-{id} all present on the same card. Test order was cleaned up via the trash button (Pedido excluido toast confirmed).",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "passed_tests": [
+    "test_pdf_endpoint_returns_pdf (pre-existing)",
+    "test_pdf_endpoint_has_attachment_content_disposition (new) — asserts Content-Disposition: attachment; filename=\"PED-XXXX.pdf\" and PDF size > 2KB",
+    "All 15 other pre-existing pedidos tests (access control, catalog CRUD, order CRUD, status workflow, delete)",
+    "Frontend E2E: login -> /pedidos -> Fazer Pedido -> avulso supplier -> Litros -> 2 new items -> finalize -> PED-0008 card -> click order-pdf-{id} -> Playwright download event fired (PED-0008.pdf, 9291B, %PDF) -> toast 'PDF gerado — verifique seus downloads' visible",
+    "Frontend regression: Share + status buttons still present and rendered on the order card"
+  ],
+  "test_report_links": [
+    "/app/backend/tests/test_pedidos.py",
+    "/app/test_reports/pytest/pedidos_iteration_4.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Backend purchase_order_pdf now correctly uses Content-Disposition: attachment (line 3786 of server.py) and the green Lumix palette #0B8F5A / #066A43 / soft #ECFAF3 (lines 3665-3666).",
+    "Frontend handlePdf in Pedidos.js (line 451) creates a real anchor with download attribute and revokeObjectURL after 60s — cross-platform safe including mobile.",
+    "Success toast uses sonner and was verified to render with exact text 'PDF gerado — verifique seus downloads'.",
+    "Minor (non-blocking): two console warnings 'Missing Description or aria-describedby for DialogContent' — accessibility-only, not functional. Consider adding <DialogDescription> inside the Novo Pedido dialog and the Excluir Pedido dialog."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_pedidos.py (added test_pdf_endpoint_has_attachment_content_disposition)"
+  ],
+  "success_rate": { "backend": "100% (17/17)", "frontend": "100% (PDF download + toast + regression all verified)" },
+  "test_credentials": {
+    "leonice": "leonicelaboratorio@lumix.com / Lumix2002 (Laboratorio mode)",
+    "lumix": "laboratoriolumix@outlook.com / Lumix2002 (Laboratorio mode)"
+  },
+  "seed_data_creation": "Created and cleaned up: 1 ephemeral avulso order (PED-0008) via frontend (deleted via order-delete trash button); backend tests create TEST_Fornecedor + TEST_ items and clean up in teardown_module.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Pedidos PDF fix is fully validated: backend serves PDF with Content-Disposition: attachment and green palette; frontend triggers a true file download via anchor[download] + shows success toast. Two cosmetic a11y warnings remain (missing DialogDescription in Novo Pedido and Excluir Pedido dialogs); not a blocker. Test file path: /app/backend/tests/test_pedidos.py. Run: pytest /app/backend/tests/test_pedidos.py -v.",
+  "rca of the issue": "Root cause of original bug: backend was sending Content-Disposition: inline (browsers open inline PDFs on mobile in a new tab instead of saving). Fix: changed to 'attachment; filename=\"PED-XXXX.pdf\"' and frontend now builds an <a download> anchor from the blob URL — both layers cooperate to force a real download on every platform. PDF color migrated from blue to green Lumix palette (#0B8F5A primary, #066A43 dark, #ECFAF3 soft green for table zebra). Verified end-to-end."
+}

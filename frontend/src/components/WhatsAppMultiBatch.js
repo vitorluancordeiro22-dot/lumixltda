@@ -85,13 +85,17 @@ export const WhatsAppMultiBatch = () => {
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
     
-    // Configurações da tabela
-    const padding = 40;
-    const headerHeight = 80;
-    const rowHeight = 50;
-    const colWidths = [180, 400, 120, 150]; // DATA, PRODUTO, QTD, LOTE
+    const selectedBatchesData = batches.filter(b => selectedBatches.includes(b.id));
+    
+    // Configurações da tabela - Design corporativo verde Lumix
+    const padding = 50;
+    const logoSize = 80;
+    const titleMargin = 100;
+    const headerHeight = 60;
+    const rowHeight = 48;
+    const colWidths = [140, 380, 100, 140];
     const totalWidth = colWidths.reduce((a, b) => a + b, 0) + padding * 2;
-    const totalHeight = headerHeight + (selectedBatchesData.length * rowHeight) + padding * 2;
+    const totalHeight = titleMargin + headerHeight + (selectedBatchesData.length * rowHeight) + padding * 2 + 40;
     
     canvas.width = totalWidth;
     canvas.height = totalHeight;
@@ -100,75 +104,117 @@ export const WhatsAppMultiBatch = () => {
     ctx.fillStyle = '#FFFFFF';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     
-    // Título
-    ctx.fillStyle = '#1E293B';
-    ctx.font = 'bold 28px Arial';
-    ctx.fillText('LOTES LIBERADOS', padding, 50);
+    // Fundo verde na parte superior (header decorativo)
+    const gradient = ctx.createLinearGradient(0, 0, canvas.width, 0);
+    gradient.addColorStop(0, '#21d463');
+    gradient.addColorStop(1, '#21be5b');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, canvas.width, titleMargin - 20);
+    
+    // Título corporativo em branco
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 32px "Segoe UI", Arial, sans-serif';
+    ctx.fillText('LOTES LIBERADOS', padding + 100, padding + 20);
+    
+    // Subtítulo em branco
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+    ctx.font = '14px "Segoe UI", Arial, sans-serif';
+    ctx.fillText(`Gerado em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`, padding + 100, padding + 42);
+    
+    // Carregar e desenhar logo
+    const logoImg = new Image();
+    logoImg.crossOrigin = 'anonymous';
+    logoImg.src = 'https://customer-assets.emergentagent.com/job_prodman-lumix/artifacts/aod9p9yw_images.png';
+    
+    // Logo circle background
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+    ctx.beginPath();
+    ctx.arc(padding + 40, padding + 20, logoSize / 2, 0, Math.PI * 2);
+    ctx.fill();
     
     // Cabeçalho da tabela
-    let x = padding;
-    const headerY = headerHeight + padding;
+    const headerY = padding + titleMargin;
+    const tableWidth = colWidths.reduce((a, b) => a + b, 0);
     
-    // Fundo do cabeçalho
-    ctx.fillStyle = '#0EA5E9';
-    ctx.fillRect(x, headerY, colWidths.reduce((a, b) => a + b, 0), rowHeight);
+    // Fundo gradiente do cabeçalho - Verde
+    const headerGradient = ctx.createLinearGradient(padding, headerY, padding, headerY + headerHeight);
+    headerGradient.addColorStop(0, '#51e788');
+    headerGradient.addColorStop(1, '#3cd674');
+    ctx.fillStyle = headerGradient;
+    ctx.fillRect(padding, headerY, tableWidth, headerHeight);
     
     // Texto do cabeçalho
     ctx.fillStyle = '#FFFFFF';
-    ctx.font = 'bold 18px Arial';
+    ctx.font = 'bold 16px "Segoe UI", Arial, sans-serif';
     const headers = ['DATA', 'PRODUTO', 'QTD', 'LOTE'];
+    let x = padding;
     headers.forEach((header, i) => {
-      ctx.fillText(header, x + 15, headerY + 32);
+      ctx.textAlign = 'left';
+      ctx.fillText(header, x + 12, headerY + 38);
       x += colWidths[i];
     });
     
-    // Linhas da tabela
+    // Linhas da tabela com design corporativo
     selectedBatchesData.forEach((batch, index) => {
       const product = products.find(p => p.id === batch.product_id);
       
-      // Formatar data corretamente (pode vir como YYYY-MM-DD ou ISO)
       let date;
       if (batch.date.includes('T')) {
-        // Data ISO (com hora)
         date = batch.date.split('T')[0].split('-').reverse().join('/');
       } else {
-        // Data YYYY-MM-DD
         date = batch.date.split('-').reverse().join('/');
       }
       
-      const rowY = headerY + rowHeight + (index * rowHeight);
+      const rowY = headerY + headerHeight + (index * rowHeight);
       
-      // Fundo alternado
-      ctx.fillStyle = index % 2 === 0 ? '#F8FAFC' : '#FFFFFF';
-      ctx.fillRect(padding, rowY, colWidths.reduce((a, b) => a + b, 0), rowHeight);
+      // Fundo alternado com cores verdes suaves
+      if (index % 2 === 0) {
+        ctx.fillStyle = '#f0fdf4';
+      } else {
+        ctx.fillStyle = '#FFFFFF';
+      }
+      ctx.fillRect(padding, rowY, tableWidth, rowHeight);
       
-      // Bordas
-      ctx.strokeStyle = '#E2E8F0';
+      // Bordas horizontais
+      ctx.strokeStyle = '#dcfce7';
       ctx.lineWidth = 1;
-      ctx.strokeRect(padding, rowY, colWidths.reduce((a, b) => a + b, 0), rowHeight);
+      ctx.strokeRect(padding, rowY, tableWidth, rowHeight);
       
       // Dados
-      ctx.fillStyle = '#1E293B';
-      ctx.font = '16px Arial';
+      ctx.fillStyle = '#1f2937';
+      ctx.font = '15px "Segoe UI", Arial, sans-serif';
+      ctx.textAlign = 'left';
       
       let colX = padding;
       const values = [
         date,
-        (product?.name || 'N/A').substring(0, 35),
+        (product?.name || 'N/A').substring(0, 32),
         `${batch.planned_liters}L`,
         batch.batch_number
       ];
       
       values.forEach((value, i) => {
-        ctx.fillText(value, colX + 15, rowY + 32);
+        ctx.fillText(value, colX + 12, rowY + 30);
         colX += colWidths[i];
       });
     });
     
-    // Bordas da tabela
-    ctx.strokeStyle = '#0EA5E9';
-    ctx.lineWidth = 3;
-    ctx.strokeRect(padding, headerY, colWidths.reduce((a, b) => a + b, 0), rowHeight + (selectedBatchesData.length * rowHeight));
+    // Bordas corporativas da tabela - Verde
+    ctx.strokeStyle = '#57e78c';
+    ctx.lineWidth = 2.5;
+    ctx.strokeRect(padding, headerY, tableWidth, headerHeight + (selectedBatchesData.length * rowHeight));
+    
+    // Rodapé corporativo com linha divisória verde
+    ctx.strokeStyle = '#dcfce7';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(padding, totalHeight - 35);
+    ctx.lineTo(padding + tableWidth, totalHeight - 35);
+    ctx.stroke();
+    
+    ctx.fillStyle = '#000000';
+    ctx.font = 'bold 13px "Segoe UI", Arial, sans-serif';
+    ctx.fillText(' Lumix - Sistema de Gestão de Produção', padding, totalHeight - 12);
     
     return canvas.toDataURL('image/png');
   };
@@ -231,7 +277,7 @@ export const WhatsAppMultiBatch = () => {
     
     // Abrir WhatsApp
     const cleanNumber = phoneNumber.replace(/\D/g, '');
-    const whatsappUrl = `https://wa.me/${cleanNumber}`;
+    const whatsappUrl = `https://whatsapp.com`;
     
     setTimeout(() => {
       window.open(whatsappUrl, '_blank');
@@ -256,37 +302,53 @@ export const WhatsAppMultiBatch = () => {
         </Button>
       </DialogTrigger>
       
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <MessageCircle className="w-5 h-5 text-green-500" />
-            Enviar Múltiplos Lotes via WhatsApp
-          </DialogTitle>
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col bg-white">
+        <DialogHeader className="bg-gradient-to-r from-green-600 to-green-700 text-white rounded-t-lg px-6 py-4 -mx-6 -mt-6 mb-4">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center justify-center w-10 h-10 bg-white rounded-full">
+              <img 
+                src="https://customer-assets.emergentagent.com/job_prodman-lumix/artifacts/aod9p9yw_images.png" 
+                alt="Lumix Logo"
+                className="w-8 h-8 object-contain"
+              />
+            </div>
+            <div>
+              <DialogTitle className="text-white flex items-center gap-2">
+                <MessageCircle className="w-5 h-5" />
+                Enviar Múltiplos Lotes via WhatsApp
+              </DialogTitle>
+              <p className="text-xs text-green-100 mt-1">Lumix - Sistema de Gestão de Produção</p>
+            </div>
+          </div>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto space-y-4">
+        <div className="flex-1 overflow-y-auto space-y-4 px-6">
           {/* Número de Telefone */}
-          <div>
-            <Label>Número de Telefone *</Label>
+          <div className="space-y-2 p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border-2 border-green-200">
+            <Label className="text-green-900 font-semibold flex items-center gap-2">
+              <span>📱</span> Número de Telefone
+            </Label>
             <Input
               value={phoneNumber}
               onChange={(e) => setPhoneNumber(e.target.value)}
               placeholder="Ex: 5511999999999"
+              className="border-green-300 focus:ring-green-500 focus:border-green-500"
             />
-            <p className="text-xs text-muted-foreground mt-1">
-              Código do país + DDD + número (sem espaços)
+            <p className="text-xs text-green-700 font-medium">
+              💡 Código do país + DDD + número (sem espaços)
             </p>
           </div>
 
           {/* Lotes Selecionados */}
           {selectedBatchesData.length > 0 && (
-            <div className="p-4 bg-muted rounded-lg">
-              <Label className="mb-2 block">Lotes Selecionados ({selectedBatchesData.length})</Label>
+            <div className="p-4 bg-gradient-to-r from-emerald-50 to-green-50 rounded-lg border-2 border-green-300">
+              <Label className="mb-3 block font-semibold text-green-900 flex items-center gap-2">
+                <span>✅</span> Lotes Selecionados ({selectedBatchesData.length})
+              </Label>
               <div className="space-y-2 max-h-40 overflow-y-auto">
                 {selectedBatchesData.map(batch => {
                   const product = products.find(p => p.id === batch.product_id);
                   
-                  // Formatar data corretamente
                   let date;
                   if (batch.date.includes('T')) {
                     date = batch.date.split('T')[0].split('-').reverse().join('/');
@@ -295,17 +357,17 @@ export const WhatsAppMultiBatch = () => {
                   }
                   
                   return (
-                    <div key={batch.id} className="flex items-center justify-between bg-background p-2 rounded text-sm">
-                      <span className="flex-1 font-mono">
-                        {date} • {product?.name} • {batch.batch_number}
+                    <div key={batch.id} className="flex items-center justify-between bg-white p-3 rounded-md border-l-4 border-l-green-600 shadow-sm hover:shadow-md transition-shadow">
+                      <span className="flex-1 font-mono text-sm text-gray-700">
+                        <span className="text-green-600 font-semibold">{date}</span> • <span className="text-emerald-700 font-semibold">{product?.name}</span> • <span className="text-gray-600">{batch.batch_number}</span>
                       </span>
                       <Button
                         size="sm"
                         variant="ghost"
                         onClick={() => removeBatch(batch.id)}
-                        className="h-6 w-6 p-0 text-red-600"
+                        className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
                       >
-                        <Trash2 className="w-3 h-3" />
+                        <Trash2 className="w-3.5 h-3.5" />
                       </Button>
                     </div>
                   );
@@ -316,87 +378,108 @@ export const WhatsAppMultiBatch = () => {
 
           {/* Preview da Imagem */}
           {selectedBatchesData.length > 0 && (
-            <div className="p-4 bg-muted rounded-lg">
-              <Label className="mb-2 block">Preview da Imagem</Label>
-              <div className="bg-white p-3 rounded border border-border">
+            <div className="p-4 bg-gradient-to-r from-gray-50 to-slate-50 rounded-lg border-2 border-gray-200">
+              <Label className="mb-3 block font-semibold text-gray-900 flex items-center gap-2">
+                <span>🖼️</span> Preview da Imagem
+              </Label>
+              <div className="bg-white p-4 rounded-lg border-2 border-green-200 shadow-md">
                 <img 
                   src={generateTableImage()} 
                   alt="Preview da tabela de lotes"
-                  className="w-full rounded shadow-sm"
+                  className="w-full rounded shadow-lg"
                 />
               </div>
-              <p className="text-xs text-muted-foreground mt-2">
-                📸 A DATA mostrada é a data que você escolheu no lote (não a data de criação)
+              <p className="text-xs text-gray-600 mt-3 p-2 bg-yellow-50 rounded border border-yellow-200">
+                📸 A data mostrada corresponde à data do lote que você selecionou
               </p>
-              <div className="flex gap-2 mt-2">
+              <div className="flex gap-2 mt-3">
                 <Button
                   onClick={handleCopyImage}
                   variant="outline"
-                  className="flex-1"
+                  className="flex-1 border-green-300 text-green-700 hover:bg-green-50 font-semibold"
                 >
                   <Copy className="w-4 h-4 mr-2" />
-                  Copiar
+                  Copiar Imagem
                 </Button>
                 <Button
                   onClick={handleDownloadImage}
                   variant="outline"
-                  className="flex-1"
+                  className="flex-1 border-green-300 text-green-700 hover:bg-green-50 font-semibold"
                 >
                   <Download className="w-4 h-4 mr-2" />
-                  Baixar
+                  Baixar PNG
                 </Button>
               </div>
             </div>
           )}
 
           {/* Lista de Lotes Disponíveis */}
-          <div>
-            <Label className="mb-2 block">Selecione os Lotes</Label>
+          <div className="space-y-2">
+            <Label className="font-semibold text-gray-900 flex items-center gap-2">
+              <span>📋</span> Selecione os Lotes
+            </Label>
             {loading ? (
-              <p className="text-center py-4 text-muted-foreground">Carregando...</p>
+              <div className="flex items-center justify-center py-8">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-600"></div>
+                <p className="text-muted-foreground ml-2">Carregando lotes...</p>
+              </div>
             ) : (
-              <div className="border rounded-lg max-h-64 overflow-y-auto">
-                {batches.map(batch => {
-                  const product = products.find(p => p.id === batch.product_id);
-                  
-                  // Formatar data corretamente
-                  let date;
-                  if (batch.date.includes('T')) {
-                    date = batch.date.split('T')[0].split('-').reverse().join('/');
-                  } else {
-                    date = batch.date.split('-').reverse().join('/');
-                  }
-                  
-                  const isSelected = selectedBatches.includes(batch.id);
-                  
-                  return (
-                    <div
-                      key={batch.id}
-                      className={`flex items-center gap-3 p-3 border-b last:border-b-0 hover:bg-muted cursor-pointer ${
-                        isSelected ? 'bg-primary/10' : ''
-                      }`}
-                      onClick={() => toggleBatch(batch.id)}
-                    >
-                      <Checkbox
-                        checked={isSelected}
-                        onCheckedChange={() => toggleBatch(batch.id)}
-                      />
-                      <div className="flex-1">
-                        <p className="font-semibold text-sm">{product?.name || 'Produto desconhecido'}</p>
-                        <p className="text-xs text-muted-foreground">
-                          Lote: {batch.batch_number} • Data: {date}
-                        </p>
+              <div className="border-2 border-green-200 rounded-lg max-h-64 overflow-y-auto shadow-sm bg-white">
+                {batches.length === 0 ? (
+                  <div className="p-6 text-center text-gray-500">
+                    <p className="text-sm">Nenhum lote disponível</p>
+                  </div>
+                ) : (
+                  batches.map(batch => {
+                    const product = products.find(p => p.id === batch.product_id);
+                    
+                    let date;
+                    if (batch.date.includes('T')) {
+                      date = batch.date.split('T')[0].split('-').reverse().join('/');
+                    } else {
+                      date = batch.date.split('-').reverse().join('/');
+                    }
+                    
+                    const isSelected = selectedBatches.includes(batch.id);
+                    
+                    return (
+                      <div
+                        key={batch.id}
+                        className={`flex items-center gap-3 p-4 border-b last:border-b-0 cursor-pointer transition-all duration-150 ${
+                          isSelected 
+                            ? 'bg-green-50 border-l-4 border-l-green-600' 
+                            : 'bg-white hover:bg-green-50'
+                        }`}
+                        onClick={() => toggleBatch(batch.id)}
+                      >
+                        <Checkbox
+                          checked={isSelected}
+                          onCheckedChange={() => toggleBatch(batch.id)}
+                          className="cursor-pointer"
+                        />
+                        <div className="flex-1">
+                          <p className={`font-semibold text-sm ${isSelected ? 'text-green-900' : 'text-gray-900'}`}>
+                            {product?.name || 'Produto desconhecido'}
+                          </p>
+                          <p className="text-xs text-gray-600 mt-1">
+                            <span className="inline-block mr-4">🔖 Lote: <span className="font-mono font-semibold">{batch.batch_number}</span></span>
+                            <span className="inline-block">📅 {date}</span>
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-semibold text-green-600">{batch.planned_liters}L</p>
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })
+                )}
               </div>
             )}
           </div>
         </div>
 
         {/* Botões */}
-        <div className="flex gap-3 pt-4 border-t">
+        <div className="flex gap-3 pt-4 border-t px-6 pb-4 bg-gradient-to-r from-green-50 to-emerald-50">
           <Button
             onClick={() => {
               setDialogOpen(false);
@@ -404,17 +487,17 @@ export const WhatsAppMultiBatch = () => {
               setSelectedBatches([]);
             }}
             variant="outline"
-            className="flex-1"
+            className="flex-1 border-green-300 text-gray-700 hover:bg-gray-100"
           >
-            Cancelar
+            ✕ Cancelar
           </Button>
           <Button
             onClick={handleSendWhatsApp}
-            className="flex-1 bg-green-600 hover:bg-green-700"
+            className="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold transition-all duration-200 shadow-md hover:shadow-lg"
             disabled={selectedBatches.length === 0 || !phoneNumber.trim()}
           >
             <MessageCircle className="w-4 h-4 mr-2" />
-            Baixar Imagem e Abrir WhatsApp ({selectedBatches.length})
+            Enviar WhatsApp ({selectedBatches.length})
           </Button>
         </div>
       </DialogContent>

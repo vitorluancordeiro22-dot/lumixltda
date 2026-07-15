@@ -24,6 +24,7 @@ import { InProduction } from './pages/InProduction';
 import FichasAnalise from './pages/FichasAnalise';
 import FichaAnalise from './pages/FichaAnalise';
 import { Pedidos } from './pages/Pedidos';
+import { Notificar } from './pages/Notificar';
 import './App.css';
 
 const PrivateRoute = ({ children }) => {
@@ -86,6 +87,7 @@ function App() {
               <Route path="ficha-analise" element={<RoleRoute allowedRoles={['laboratorio']}><FichaAnalise /></RoleRoute>} />
               <Route path="batch-management" element={<RoleRoute allowedRoles={['laboratorio']}><BatchManagement /></RoleRoute>} />
               <Route path="pedidos" element={<RoleRoute allowedRoles={['laboratorio', 'pedidos']}><Pedidos /></RoleRoute>} />
+              <Route path="notificar" element={<RoleRoute allowedRoles={['laboratorio', 'producao']}><Notificar /></RoleRoute>} />
               <Route path="team" element={<RoleRoute allowedRoles={['laboratorio']}><Team /></RoleRoute>} />
               <Route path="trash" element={<RoleRoute allowedRoles={['laboratorio']}><Trash /></RoleRoute>} />
               <Route path="settings" element={<RoleRoute allowedRoles={['laboratorio']}><Settings /></RoleRoute>} />

@@ -3658,84 +3658,168 @@ async def purchase_order_pdf(order_id: str, current_user=Depends(get_current_use
     from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image as RLImage
 
     buf = io.BytesIO()
-    doc = SimpleDocTemplate(buf, pagesize=A4, topMargin=18 * mm, bottomMargin=18 * mm, leftMargin=18 * mm, rightMargin=18 * mm)
+    doc = SimpleDocTemplate(buf, pagesize=A4, topMargin=16 * mm, bottomMargin=16 * mm, leftMargin=18 * mm, rightMargin=18 * mm)
     styles = getSampleStyleSheet()
-    primary = colors.HexColor('#2563EB')
-    title_style = ParagraphStyle('t', parent=styles['Title'], textColor=primary, fontSize=20, spaceAfter=2)
-    sub_style = ParagraphStyle('s', parent=styles['Normal'], fontSize=10, textColor=colors.HexColor('#475569'))
-    label_style = ParagraphStyle('l', parent=styles['Normal'], fontSize=10, textColor=colors.HexColor('#0f172a'))
-    cell_style = ParagraphStyle('c', parent=styles['Normal'], fontSize=10)
+
+    # Paleta Lumix — tons de verde suaves
+    green = colors.HexColor('#0B8F5A')
+    green_dark = colors.HexColor('#066A43')
+    green_soft = colors.HexColor('#ECFAF3')
+    ink = colors.HexColor('#14323D')
+    grey = colors.HexColor('#64748B')
+    line_grey = colors.HexColor('#E2E8F0')
+
+    title_style = ParagraphStyle('t', parent=styles['Title'], textColor=green_dark, fontSize=20, spaceAfter=0, alignment=2)
+    sub_style = ParagraphStyle('s', parent=styles['Normal'], fontSize=11, textColor=grey, alignment=2)
+    label_style = ParagraphStyle('l', parent=styles['Normal'], fontSize=9.5, textColor=grey)
+    value_style = ParagraphStyle('v', parent=styles['Normal'], fontSize=10.5, textColor=ink)
+    cell_style = ParagraphStyle('c', parent=styles['Normal'], fontSize=10, textColor=ink)
+    head_style = ParagraphStyle('h', parent=styles['Normal'], fontSize=10, textColor=colors.white)
+    foot_style = ParagraphStyle('f', parent=styles['Normal'], fontSize=8, textColor=grey, alignment=1)
 
     elements = []
     logo_path = _get_lumix_logo_path()
-    header_left = []
+    logo_cell = Paragraph('<b>LUMIX</b>', title_style)
     if logo_path:
         try:
-            img = RLImage(logo_path, width=42 * mm, height=22 * mm, kind='proportional')
-            header_left.append(img)
+            logo_cell = RLImage(logo_path, width=40 * mm, height=20 * mm, kind='proportional')
         except Exception:
             pass
     title_block = [Paragraph('PEDIDO DE COMPRA', title_style), Paragraph(order.get('order_number', ''), sub_style)]
-    header_tbl = Table([[header_left or Paragraph('LUMIX', title_style), title_block]], colWidths=[80 * mm, 90 * mm])
+    header_tbl = Table([[logo_cell, title_block]], colWidths=[85 * mm, 89 * mm])
     header_tbl.setStyle(TableStyle([
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('ALIGN', (0, 0), (0, 0), 'LEFT'),
         ('ALIGN', (1, 0), (1, 0), 'RIGHT'),
     ]))
     elements.append(header_tbl)
     elements.append(Spacer(1, 8))
-    elements.append(Table([['']], colWidths=[174 * mm], style=TableStyle([('LINEBELOW', (0, 0), (-1, -1), 1.2, primary)])))
-    elements.append(Spacer(1, 10))
+    elements.append(Table([['']], colWidths=[174 * mm], style=TableStyle([('LINEBELOW', (0, 0), (-1, -1), 2, green)])))
+    elements.append(Spacer(1, 12))
 
     created = order.get('created_at', '')
     try:
         created_fmt = datetime.fromisoformat(created).strftime('%d/%m/%Y %H:%M')
     except Exception:
         created_fmt = created
-    info_rows = [
-        [Paragraph('<b>Fornecedor:</b>', label_style), Paragraph(order.get('supplier_name', '-'), cell_style)],
-        [Paragraph('<b>Data:</b>', label_style), Paragraph(created_fmt, cell_style)],
-        [Paragraph('<b>Responsável:</b>', label_style), Paragraph(order.get('created_by', '-'), cell_style)],
-        [Paragraph('<b>Pedido Nº:</b>', label_style), Paragraph(order.get('order_number', '-'), cell_style)],
-    ]
-    info_tbl = Table(info_rows, colWidths=[35 * mm, 139 * mm])
-    info_tbl.setStyle(TableStyle([('VALIGN', (0, 0), (-1, -1), 'TOP'), ('BOTTOMPADDING', (0, 0), (-1, -1), 4)]))
-    elements.append(info_tbl)
-    elements.append(Spacer(1, 12))
+    status_map = {'pendente': 'Pendente', 'enviado': 'Enviado', 'recebido': 'Recebido'}
+    status_lbl = status_map.get(order.get('status', 'pendente'), 'Pendente')
 
-    data_rows = [[Paragraph('<b>#</b>', cell_style), Paragraph('<b>Produto</b>', cell_style),
-                  Paragraph('<b>Unidade</b>', cell_style), Paragraph('<b>Quantidade</b>', cell_style)]]
+    info_rows = [
+        [Paragraph('FORNECEDOR', label_style), Paragraph('DATA', label_style)],
+        [Paragraph(f"<b>{order.get('supplier_name', '-')}</b>", value_style), Paragraph(created_fmt, value_style)],
+        [Paragraph('RESPONSÁVEL', label_style), Paragraph('UNIDADE / STATUS', label_style)],
+        [Paragraph(order.get('created_by', '-'), value_style),
+         Paragraph(f"{order.get('unit', '-')} &nbsp;•&nbsp; {status_lbl}", value_style)],
+    ]
+    info_tbl = Table(info_rows, colWidths=[100 * mm, 74 * mm])
+    info_tbl.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), green_soft),
+        ('BOX', (0, 0), (-1, -1), 0.5, line_grey),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('LEFTPADDING', (0, 0), (-1, -1), 10),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 10),
+        ('TOPPADDING', (0, 0), (-1, -1), 5),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+    ]))
+    elements.append(info_tbl)
+    elements.append(Spacer(1, 16))
+
+    data_rows = [[Paragraph('<b>#</b>', head_style), Paragraph('<b>PRODUTO</b>', head_style),
+                  Paragraph('<b>UNIDADE</b>', head_style), Paragraph('<b>QUANTIDADE</b>', head_style)]]
     for i, it in enumerate(order.get('items', []), 1):
         qty = it.get('quantity', 0)
-        qty_str = str(int(qty)) if float(qty) == int(qty) else str(qty)
+        try:
+            qty_str = str(int(qty)) if float(qty) == int(qty) else str(qty)
+        except Exception:
+            qty_str = str(qty)
         data_rows.append([Paragraph(str(i), cell_style), Paragraph(it.get('name', ''), cell_style),
                           Paragraph(it.get('unit', ''), cell_style), Paragraph(qty_str, cell_style)])
     items_tbl = Table(data_rows, colWidths=[12 * mm, 102 * mm, 30 * mm, 30 * mm], repeatRows=1)
     items_tbl.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), primary),
+        ('BACKGROUND', (0, 0), (-1, 0), green),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
         ('FONTSIZE', (0, 0), (-1, -1), 10),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cbd5e1')),
-        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f1f5f9')]),
+        ('LINEBELOW', (0, 0), (-1, -1), 0.5, line_grey),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, green_soft]),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
         ('ALIGN', (0, 0), (0, -1), 'CENTER'),
-        ('ALIGN', (3, 0), (3, -1), 'CENTER'),
-        ('ALIGN', (2, 0), (2, -1), 'CENTER'),
-        ('TOPPADDING', (0, 0), (-1, -1), 6),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ('ALIGN', (2, 0), (3, -1), 'CENTER'),
+        ('TOPPADDING', (0, 0), (-1, -1), 7),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 7),
+        ('LEFTPADDING', (1, 0), (1, -1), 8),
     ]))
     elements.append(items_tbl)
-    elements.append(Spacer(1, 14))
+    elements.append(Spacer(1, 6))
+
+    total_items = len(order.get('items', []))
+    total_tbl = Table([[Paragraph(f"<b>Total de itens: {total_items}</b>", value_style)]], colWidths=[174 * mm])
+    total_tbl.setStyle(TableStyle([
+        ('ALIGN', (0, 0), (-1, -1), 'RIGHT'),
+        ('TEXTCOLOR', (0, 0), (-1, -1), green_dark),
+        ('TOPPADDING', (0, 0), (-1, -1), 2),
+    ]))
+    elements.append(total_tbl)
+    elements.append(Spacer(1, 16))
 
     if order.get('observations'):
-        elements.append(Paragraph('<b>Observações:</b>', label_style))
+        elements.append(Paragraph('<b>OBSERVAÇÕES</b>', label_style))
         elements.append(Spacer(1, 4))
-        elements.append(Paragraph(order.get('observations', '').replace('\n', '<br/>'), cell_style))
+        obs_tbl = Table([[Paragraph(order.get('observations', '').replace('\n', '<br/>'), cell_style)]], colWidths=[174 * mm])
+        obs_tbl.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#F8FAFC')),
+            ('BOX', (0, 0), (-1, -1), 0.5, line_grey),
+            ('LEFTPADDING', (0, 0), (-1, -1), 10), ('RIGHTPADDING', (0, 0), (-1, -1), 10),
+            ('TOPPADDING', (0, 0), (-1, -1), 8), ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ]))
+        elements.append(obs_tbl)
+
+    elements.append(Spacer(1, 24))
+    elements.append(Table([['']], colWidths=[174 * mm], style=TableStyle([('LINEBELOW', (0, 0), (-1, -1), 0.5, line_grey)])))
+    elements.append(Spacer(1, 4))
+    elements.append(Paragraph('Documento gerado automaticamente pelo sistema Lumix — Gestão Inteligente de Produção', foot_style))
 
     doc.build(elements)
     buf.seek(0)
     filename = f"{order.get('order_number', 'pedido')}.pdf"
     return StreamingResponse(buf, media_type='application/pdf',
-                             headers={'Content-Disposition': f'inline; filename="{filename}"'})
+                             headers={'Content-Disposition': f'attachment; filename="{filename}"'})
+
+
+# ========== NOTIFICAÇÕES ==========
+class NotificationCreate(BaseModel):
+    product_name: str
+    message: str = ''
+
+
+@api_router.get('/notifications')
+async def get_notifications(current_user=Depends(get_current_user)):
+    items = await db.notifications.find({'deleted': {'$ne': True}}, {'_id': 0}).sort('created_at', -1).to_list(500)
+    return items
+
+
+@api_router.post('/notifications')
+async def create_notification(data: NotificationCreate, current_user=Depends(get_current_user)):
+    name = data.product_name.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail='Selecione ou informe um produto')
+    doc = {
+        'id': str(uuid.uuid4()),
+        'product_name': name,
+        'message': data.message.strip(),
+        'created_by': current_user.get('name') or current_user.get('email', ''),
+        'created_at': datetime.now(timezone.utc).isoformat(),
+        'deleted': False,
+    }
+    await db.notifications.insert_one(doc)
+    doc.pop('_id', None)
+    return doc
+
+
+@api_router.delete('/notifications/{notif_id}')
+async def delete_notification(notif_id: str, current_user=Depends(get_current_user)):
+    await db.notifications.update_one({'id': notif_id}, {'$set': {'deleted': True}})
+    return {'message': 'Notificação removida'}
 
 
 app.include_router(api_router)
