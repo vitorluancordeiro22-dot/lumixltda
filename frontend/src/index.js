@@ -13,3 +13,10 @@ root.render(
     </ThemeProvider>
   </React.StrictMode>
 );
+
+// Registra o Service Worker para PWA / Web Push
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  });
+}

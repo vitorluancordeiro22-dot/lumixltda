@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, UploadFile, File, Body
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, UploadFile, File, Body, BackgroundTasks
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import StreamingResponse, FileResponse
 from dotenv import load_dotenv
@@ -16,6 +16,8 @@ from uuid import uuid4
 import uuid
 import io
 import re
+import json
+import asyncio
 from bson import ObjectId
 
 # Industrial OP imports
@@ -3786,10 +3788,72 @@ async def purchase_order_pdf(order_id: str, current_user=Depends(get_current_use
                              headers={'Content-Disposition': f'attachment; filename="{filename}"'})
 
 
-# ========== NOTIFICAÇÕES ==========
+# ========== NOTIFICAÇÕES + WEB PUSH ==========
+from pywebpush import webpush, WebPushException
+
+VAPID_PUBLIC_KEY = os.environ.get('VAPID_PUBLIC_KEY', '')
+VAPID_PRIVATE_KEY = os.environ.get('VAPID_PRIVATE_KEY', '')
+VAPID_SUB = os.environ.get('VAPID_SUB', 'mailto:admin@lumix.com')
+
+
 class NotificationCreate(BaseModel):
     product_name: str
     message: str = ''
+
+
+class PushSubscription(BaseModel):
+    endpoint: str
+    keys: dict
+    expirationTime: Optional[Any] = None
+
+
+def _send_webpush(subscription, payload):
+    webpush(
+        subscription_info=subscription,
+        data=json.dumps(payload),
+        vapid_private_key=VAPID_PRIVATE_KEY,
+        vapid_claims={'sub': VAPID_SUB},
+        ttl=86400,
+    )
+
+
+async def broadcast_push(title, body, url='/notificar'):
+    if not VAPID_PRIVATE_KEY:
+        return
+    payload = {'title': title, 'body': body, 'url': url}
+    subs = await db.push_subscriptions.find({}, {'_id': 0}).to_list(2000)
+    for s in subs:
+        try:
+            await asyncio.to_thread(_send_webpush, s['subscription'], payload)
+        except WebPushException as e:
+            code = getattr(getattr(e, 'response', None), 'status_code', None)
+            if code in (404, 410):
+                await db.push_subscriptions.delete_one({'endpoint': s['endpoint']})
+        except Exception:
+            pass
+
+
+@api_router.get('/push/vapid-public-key')
+async def get_vapid_public_key():
+    return {'publicKey': VAPID_PUBLIC_KEY}
+
+
+@api_router.post('/push/subscribe')
+async def push_subscribe(sub: PushSubscription, current_user=Depends(get_current_user)):
+    doc = {
+        'endpoint': sub.endpoint,
+        'subscription': {'endpoint': sub.endpoint, 'keys': sub.keys},
+        'email': current_user.get('email', ''),
+        'created_at': datetime.now(timezone.utc).isoformat(),
+    }
+    await db.push_subscriptions.update_one({'endpoint': sub.endpoint}, {'$set': doc}, upsert=True)
+    return {'message': 'Inscrição registrada'}
+
+
+@api_router.post('/push/unsubscribe')
+async def push_unsubscribe(sub: PushSubscription, current_user=Depends(get_current_user)):
+    await db.push_subscriptions.delete_one({'endpoint': sub.endpoint})
+    return {'message': 'Inscrição removida'}
 
 
 @api_router.get('/notifications')
@@ -3799,7 +3863,7 @@ async def get_notifications(current_user=Depends(get_current_user)):
 
 
 @api_router.post('/notifications')
-async def create_notification(data: NotificationCreate, current_user=Depends(get_current_user)):
+async def create_notification(data: NotificationCreate, background: BackgroundTasks, current_user=Depends(get_current_user)):
     name = data.product_name.strip()
     if not name:
         raise HTTPException(status_code=400, detail='Selecione ou informe um produto')
@@ -3813,6 +3877,8 @@ async def create_notification(data: NotificationCreate, current_user=Depends(get
     }
     await db.notifications.insert_one(doc)
     doc.pop('_id', None)
+    push_body = name + (f" — {doc['message']}" if doc['message'] else '')
+    background.add_task(broadcast_push, 'Lumix — Novo aviso', push_body, '/notificar')
     return doc
 
 

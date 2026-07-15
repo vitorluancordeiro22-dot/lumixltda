@@ -10,6 +10,7 @@ import {
 } from '../components/ui/alert-dialog';
 import { toast } from 'sonner';
 import { Bell, Plus, Trash2, Package } from 'lucide-react';
+import { PushToggle } from '../components/PushToggle';
 
 const fmtDateTime = (iso) => {
   try { return new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }); }
@@ -66,6 +67,8 @@ export const Notificar = () => {
         <h1 className="text-xl md:text-2xl font-bold tracking-tight text-slate-900">Notificar equipe</h1>
         <p className="text-sm font-medium text-slate-500 mt-1">Crie um aviso rápido — ele aparece no sino de notificações de todos os usuários.</p>
       </div>
+
+      <PushToggle />
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
         {/* Formulário */}
