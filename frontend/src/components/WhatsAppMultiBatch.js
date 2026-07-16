@@ -527,8 +527,7 @@ export const WhatsAppMultiBatch = () => {
                       >
                         <Checkbox
                           checked={isSelected}
-                          onCheckedChange={() => toggleBatch(batch.id)}
-                          className="cursor-pointer"
+                          className="cursor-pointer pointer-events-none"
                         />
                         <div className="flex-1">
                           <p className={`font-semibold text-sm ${isSelected ? 'text-green-900' : 'text-gray-900'}`}>

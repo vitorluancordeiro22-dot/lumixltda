@@ -100,6 +100,8 @@ Sistema de gestão de produção industrial com controle de lotes, matérias-pri
 
 - [x] **Notificações Push (PWA) + polimento mobile** (07/2026) - App agora é PWA instalável (manifest.json + ícones 192/512 + service worker `sw.js`). Web Push via VAPID (pywebpush): endpoints `/api/push/vapid-public-key`, `/api/push/subscribe`, `/api/push/unsubscribe`; a cada aviso criado na aba Notificar dispara push (BackgroundTasks) para todos os dispositivos inscritos (remove inscrições 404/410). Frontend: componente `PushToggle` (botão "Ativar notificações no celular") na página Notificar + registro do SW no index.js + meta tags PWA/apple no index.html. Chaves VAPID em backend/.env. Mobile: modais shadcn (Dialog/AlertDialog) adaptados ao celular (largura calc(100%-1.5rem), max-h 92vh, scroll, rounded-2xl), `overflow-x:hidden` global. Backend testado via curl; push no dispositivo requer teste em celular real (iPhone: "Adicionar à Tela de Início").
 
+- [x] **Fix WhatsApp "Enviar Lotes" (copiar imagem/texto no mobile)** (07/2026) - Corrigido: "Copiar Imagem" não funcionava no celular (Safari/iOS) e o texto era uma tabela monoespaçada ruim. Agora: cópia de imagem compatível com Safari (Promise no ClipboardItem) + botão **Compartilhar (Web Share API)** que abre o WhatsApp com a imagem no celular; **Copiar Texto** com formato de lista legível; envio principal usa share nativo (telefone opcional). Também corrigido bug do checkbox que alternava a seleção 2x (pointer-events delegando p/ a linha). Verificado por testing_agent (iteration_6, 100%) + smoke test.
+
 ## Backlog (P1/P2)
 - [ ] (P1) Testar E2E funcionalidade "Reabrir Lote"
 - [ ] (P1) Melhorar campo de data de validade nas matérias-primas
