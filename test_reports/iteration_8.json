@@ -1,0 +1,24 @@
+{
+  "summary": "Focused retest of Novo Pedido dialog sizing (Pedidos.js line ~387). Verified mobile has lateral margin and desktop keeps max-w-2xl.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A", "frontend": "100%"},
+  "test_credentials": "laboratoriolumix@outlook.com / Lumix2002",
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Novo Pedido dialog sizing confirmed: mobile 390x844 -> width=374, left=8, right=382 (has ~8px margin each side, NOT full-width). Desktop 1440 -> width=672, left=384 (max-w-2xl preserved). Cancel button visible at bottom=603 within vh=844 (sticky footer OK). Fix in /app/frontend/src/pages/Pedidos.js (DialogContent className 'w-[calc(100%-1rem)] max-w-lg sm:max-w-2xl max-h-[88vh]') works as intended.",
+  "measurements": {
+    "mobile_390x844": {"width": 374, "left": 8, "right": 382, "height": 403, "cancelBottom": 603, "vh": 844},
+    "desktop_1440x900": {"width": 672, "left": 384}
+  },
+  "rca of the issue": "N/A - verification only"
+}

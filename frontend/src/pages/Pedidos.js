@@ -70,7 +70,7 @@ const AddSupplierDialog = ({ open, onOpenChange, onCreated }) => {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-card border-border w-full max-w-md p-4 sm:p-6 rounded-lg">
+      <DialogContent className="bg-card border-border w-[calc(100%-1rem)] max-w-md p-4 sm:p-6 rounded-2xl">
         <DialogHeader>
           <DialogTitle className="text-foreground flex items-center gap-2">
             <Building2 className="w-5 h-5 text-primary" />
@@ -384,7 +384,7 @@ const NewOrderDialog = ({ open, onOpenChange, onCreated }) => {
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="bg-card border-border w-full max-w-2xl max-h-[90vh] overflow-y-auto p-4 sm:p-6 rounded-lg">
+        <DialogContent className="bg-card border-border w-[calc(100%-1rem)] max-w-lg sm:max-w-2xl max-h-[88vh] overflow-y-auto p-4 sm:p-6 rounded-2xl">
           <DialogHeader className="mb-6">
             <div className="flex items-center justify-between">
               <DialogTitle className="text-foreground flex items-center gap-2 text-xl sm:text-2xl">
