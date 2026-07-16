@@ -4,7 +4,7 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Checkbox } from './ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
-import { MessageCircle, Trash2, Copy, Download } from 'lucide-react';
+import { MessageCircle, Trash2, Copy, Download, Share2 } from 'lucide-react';
 import { toast } from 'sonner';
 import api from '../lib/api';
 
@@ -62,22 +62,23 @@ export const WhatsAppMultiBatch = () => {
     if (selectedBatches.length === 0) return '';
 
     const selectedBatchesData = batches.filter(b => selectedBatches.includes(b.id));
-    
-    let message = '*LOTES LIBERADOS*\n\n';
-    message += '```\n';
-    message += 'DATA       | PRODUTO                    | QTD    | LOTE\n';
-    message += '-----------|----------------------------|--------|----------\n';
-    
+
+    let message = '*LOTES LIBERADOS*\n';
+    message += `_${new Date().toLocaleDateString('pt-BR')}_\n\n`;
+
     selectedBatchesData.forEach(batch => {
       const product = products.find(p => p.id === batch.product_id);
-      const date = new Date(batch.date).toLocaleDateString('pt-BR');
-      const productName = (product?.name || 'N/A').padEnd(26).substring(0, 26);
-      const qty = `${batch.planned_liters}L`.padEnd(6);
-      
-      message += `${date} | ${productName} | ${qty} | ${batch.batch_number}\n`;
+      let date;
+      if (batch.date.includes('T')) {
+        date = batch.date.split('T')[0].split('-').reverse().join('/');
+      } else {
+        date = batch.date.split('-').reverse().join('/');
+      }
+      message += `• *${product?.name || 'N/A'}*\n`;
+      message += `   Lote: ${batch.batch_number}  |  ${batch.planned_liters}L  |  ${date}\n\n`;
     });
-    
-    message += '```';
+
+    message += '_Lumix - Gestão de Produção_';
     return message;
   };
 
@@ -219,30 +220,76 @@ export const WhatsAppMultiBatch = () => {
     return canvas.toDataURL('image/png');
   };
 
+  const getImageBlob = async () => {
+    const res = await fetch(generateTableImage());
+    return res.blob();
+  };
+
+  const handleShareImage = async () => {
+    if (selectedBatches.length === 0) {
+      toast.error('Selecione pelo menos um lote');
+      return;
+    }
+    try {
+      const blob = await getImageBlob();
+      const file = new File([blob], `lotes_${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')}.png`, { type: 'image/png' });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: 'Lotes Liberados', text: 'Lotes Liberados - Lumix' });
+      } else {
+        handleDownloadImage();
+        toast.info('Compartilhamento direto indisponível — imagem baixada.');
+      }
+    } catch (error) {
+      if (error && error.name === 'AbortError') return; // usuário cancelou o compartilhamento
+      console.error('Erro ao compartilhar:', error);
+      handleDownloadImage();
+    }
+  };
+
   const handleCopyImage = async () => {
     if (selectedBatches.length === 0) {
       toast.error('Selecione pelo menos um lote');
       return;
     }
-
     try {
-      const imageData = generateTableImage();
-      
-      // Converter base64 para blob
-      const response = await fetch(imageData);
-      const blob = await response.blob();
-      
-      // Copiar para área de transferência
-      await navigator.clipboard.write([
-        new ClipboardItem({
-          'image/png': blob
-        })
-      ]);
-      
-      toast.success('✅ Imagem copiada! Cole no WhatsApp (Ctrl+V)');
+      if (typeof ClipboardItem === 'undefined' || !navigator.clipboard || !navigator.clipboard.write) {
+        throw new Error('clipboard-unsupported');
+      }
+      // Padrão compatível com Safari/iOS: passar a Promise do blob preserva o gesto do usuário
+      const item = new ClipboardItem({ 'image/png': getImageBlob() });
+      await navigator.clipboard.write([item]);
+      toast.success('✅ Imagem copiada! Cole no WhatsApp');
     } catch (error) {
-      console.error('Erro ao copiar:', error);
-      toast.error('Erro ao copiar imagem. Use o botão de baixar.');
+      console.error('Erro ao copiar imagem:', error);
+      toast.info('Cópia não suportada aqui — abrindo compartilhar...');
+      handleShareImage();
+    }
+  };
+
+  const handleCopyText = async () => {
+    if (selectedBatches.length === 0) {
+      toast.error('Selecione pelo menos um lote');
+      return;
+    }
+    const msg = generateMessage();
+    try {
+      await navigator.clipboard.writeText(msg);
+      toast.success('✅ Texto copiado! Cole no WhatsApp');
+    } catch (error) {
+      const ta = document.createElement('textarea');
+      ta.value = msg;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      try {
+        document.execCommand('copy');
+        toast.success('✅ Texto copiado! Cole no WhatsApp');
+      } catch {
+        toast.error('Não foi possível copiar o texto.');
+      }
+      document.body.removeChild(ta);
     }
   };
 
@@ -261,28 +308,35 @@ export const WhatsAppMultiBatch = () => {
     toast.success('Imagem baixada! Agora envie pelo WhatsApp');
   };
 
-  const handleSendWhatsApp = () => {
-    if (!phoneNumber.trim()) {
-      toast.error('Digite um número de telefone');
-      return;
-    }
-
+  const handleSendWhatsApp = async () => {
     if (selectedBatches.length === 0) {
       toast.error('Selecione pelo menos um lote');
       return;
     }
 
-    // Baixar a imagem primeiro
+    // No celular: usa o compartilhamento nativo (abre WhatsApp com a imagem)
+    try {
+      const blob = await getImageBlob();
+      const file = new File([blob], `lotes_${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')}.png`, { type: 'image/png' });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: 'Lotes Liberados', text: generateMessage() });
+        setDialogOpen(false);
+        setPhoneNumber('');
+        setSelectedBatches([]);
+        return;
+      }
+    } catch (error) {
+      if (error && error.name === 'AbortError') return;
+    }
+
+    // Desktop / sem share: baixa a imagem e abre o WhatsApp
     handleDownloadImage();
-    
-    // Abrir WhatsApp
-    const cleanNumber = phoneNumber.replace(/\D/g, '');
-    const whatsappUrl = `https://whatsapp.com`;
-    
+    const target = phoneNumber.trim()
+      ? `https://wa.me/${phoneNumber.replace(/\D/g, '')}?text=${encodeURIComponent(generateMessage())}`
+      : 'https://web.whatsapp.com';
     setTimeout(() => {
-      window.open(whatsappUrl, '_blank');
-      toast.info('Envie a imagem que foi baixada!');
-      
+      window.open(target, '_blank');
+      toast.info('Anexe a imagem que foi baixada no WhatsApp.');
       setTimeout(() => {
         setDialogOpen(false);
         setPhoneNumber('');
@@ -392,19 +446,38 @@ export const WhatsAppMultiBatch = () => {
               <p className="text-xs text-gray-600 mt-3 p-2 bg-yellow-50 rounded border border-yellow-200">
                 📸 A data mostrada corresponde à data do lote que você selecionou
               </p>
-              <div className="flex gap-2 mt-3">
+              <div className="grid grid-cols-2 gap-2 mt-3">
+                <Button
+                  onClick={handleShareImage}
+                  className="col-span-2 bg-green-600 hover:bg-green-700 text-white font-semibold"
+                  data-testid="share-image-btn"
+                >
+                  <Share2 className="w-4 h-4 mr-2" />
+                  Compartilhar (WhatsApp)
+                </Button>
                 <Button
                   onClick={handleCopyImage}
                   variant="outline"
-                  className="flex-1 border-green-300 text-green-700 hover:bg-green-50 font-semibold"
+                  className="border-green-300 text-green-700 hover:bg-green-50 font-semibold"
+                  data-testid="copy-image-btn"
                 >
                   <Copy className="w-4 h-4 mr-2" />
                   Copiar Imagem
                 </Button>
                 <Button
+                  onClick={handleCopyText}
+                  variant="outline"
+                  className="border-green-300 text-green-700 hover:bg-green-50 font-semibold"
+                  data-testid="copy-text-btn"
+                >
+                  <Copy className="w-4 h-4 mr-2" />
+                  Copiar Texto
+                </Button>
+                <Button
                   onClick={handleDownloadImage}
                   variant="outline"
-                  className="flex-1 border-green-300 text-green-700 hover:bg-green-50 font-semibold"
+                  className="col-span-2 border-green-300 text-green-700 hover:bg-green-50 font-semibold"
+                  data-testid="download-image-btn"
                 >
                   <Download className="w-4 h-4 mr-2" />
                   Baixar PNG
@@ -494,7 +567,7 @@ export const WhatsAppMultiBatch = () => {
           <Button
             onClick={handleSendWhatsApp}
             className="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold transition-all duration-200 shadow-md hover:shadow-lg"
-            disabled={selectedBatches.length === 0 || !phoneNumber.trim()}
+            disabled={selectedBatches.length === 0}
           >
             <MessageCircle className="w-4 h-4 mr-2" />
             Enviar WhatsApp ({selectedBatches.length})
