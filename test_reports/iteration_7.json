@@ -1,0 +1,32 @@
+{
+  "summary": "Frontend E2E teste dos 2 bugs de Pedidos > Novo Pedido em MOBILE (390x844) e DESKTOP (1440). Login como laboratoriolumix, criacao de fornecedor QA, add/delete de item customizado, verificacao de persistencia apos reabrir modal, e regressao completa (criar pedido -> aparece no historico como PED-0010).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "NewOrderDialog (Pedidos.js:387) DialogContent",
+        "issue": "No MOBILE (390px viewport) o modal ocupa a largura TOTAL da tela (w=390, left=0, right=390) - SEM margem lateral. A className atual e 'w-full max-w-2xl max-h-[90vh]' e o 'w-full' esta sobrescrevendo o 'w-[calc(100%-1.5rem)] max-w-lg' base do DialogContent (dialog.jsx). Isto contradiz o fix descrito no request (deveria ser 'w-[calc(100%-1rem)] max-w-lg sm:max-w-2xl max-h-[88vh]'). No desktop esta OK (w=672 em vw=1440).",
+        "selector": "[role=dialog] no viewport <768px",
+        "priority": "MEDIUM"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Trocar em /app/frontend/src/pages/Pedidos.js linha 387 o className do DialogContent: remover 'w-full max-w-2xl' e usar 'w-[calc(100%-1rem)] max-w-lg sm:max-w-2xl max-h-[88vh]' (conforme descrito no fix). O 'w-full' hoje sobrepoe o calc do dialog.jsx base, fazendo o modal ocupar 100% da largura no mobile (bug relatado pelo usuario continua parcial). O sticky footer, o max-h e o overflow ja funcionam."
+  ],
+  "critical_code_review_comments": [
+    "Pedidos.js:387: w-full max-w-2xl -> classe w-full anula a margem lateral do base DialogContent (w-[calc(100%-1.5rem)] max-w-lg). Correcao trivial de className.",
+    "Arquivo Pedidos.js tem 1074 linhas - considere dividir NewOrderDialog em componente separado."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a", "frontend": "80%"},
+  "test_credentials": "laboratoriolumix@outlook.com / Lumix2002 (Laboratorio)",
+  "seed_data_creation": "Criado fornecedor 'Fornecedor QA 1755265' + pedido PED-0010 + item catalogo 'Item QA Bom'. TUDO REMOVIDO ao final via API (supplier delete cascata itens de catalogo/carrinho; PED-0010 apagado). PED-0009 do usuario NAO tocado.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Bug de sizing mobile do modal Novo Pedido persiste - w-full na linha 387 de Pedidos.js sobrescreve o w-[calc(100%-1.5rem)] base. Todo o resto (sticky footer visivel/fixo, delete de item customizado com toast, persistencia apos reabrir, regressao criando pedido) FUNCIONA.",
+  "rca of the issue": "DialogContent base em /app/frontend/src/components/ui/dialog.jsx define 'w-[calc(100%-1.5rem)] max-w-lg' garantindo margem lateral. Porem em Pedidos.js linha 387 passa 'w-full max-w-2xl' que via twMerge/cn tem precedencia (classe mais especifica passada por prop), zerando a margem no mobile. Reproducao: viewport 390x844 -> abrir Novo Pedido -> medir dialog.getBoundingClientRect() retorna width=390 left=0. Mitigacao: usar 'w-[calc(100%-1rem)] max-w-lg sm:max-w-2xl' conforme especificado no request."
+}

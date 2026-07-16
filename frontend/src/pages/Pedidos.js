@@ -310,6 +310,23 @@ const NewOrderDialog = ({ open, onOpenChange, onCreated }) => {
     toast.success('Item removido do carrinho');
   };
 
+  const handleDeleteCatalogItem = async (item) => {
+    if (!selectedSupplier?.id || item.source !== 'custom') return;
+    try {
+      await api.delete(`/suppliers/${selectedSupplier.id}/catalog/${item.id}`);
+      setCatalog((prev) => prev.filter((c) => c.id !== item.id));
+      setCart((prev) => prev.filter((c) => c.key !== `c-${item.name.toLowerCase()}`));
+      setQtyMap((m) => {
+        const next = { ...m };
+        delete next[item.id];
+        return next;
+      });
+      toast.success('Item removido do catálogo');
+    } catch {
+      toast.error('Erro ao remover item');
+    }
+  };
+
   const nextStep = () => {
     if (step === 'items') {
       if (cart.length === 0) {
@@ -520,10 +537,22 @@ const NewOrderDialog = ({ open, onOpenChange, onCreated }) => {
                         <Button
                           size="sm"
                           onClick={() => addToCart(item)}
-                          className="bg-primary hover:bg-primary/90 h-8 px-2"
+                          className="bg-primary hover:bg-primary/90 h-8 px-2 shrink-0"
                         >
                           <Plus className="w-4 h-4" />
                         </Button>
+                        {item.source === 'custom' && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleDeleteCatalogItem(item)}
+                            className="text-red-500 hover:text-red-600 hover:bg-red-50 h-8 w-8 px-0 shrink-0"
+                            title="Remover do catálogo"
+                            data-testid={`catalog-del-${item.id}`}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -628,7 +657,7 @@ const NewOrderDialog = ({ open, onOpenChange, onCreated }) => {
           )}
 
           {/* Footer com botões de navegação */}
-          <DialogFooter className="mt-6 gap-2 flex">
+          <DialogFooter className="sticky bottom-0 -mx-4 sm:-mx-6 mt-4 px-4 sm:px-6 pt-3 pb-1 bg-card border-t border-border gap-2 flex">
             {step !== 'suppliers' && (
               <Button
                 onClick={prevStep}
