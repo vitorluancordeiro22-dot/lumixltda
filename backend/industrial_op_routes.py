@@ -17,6 +17,12 @@ from industrial_op import (
     IndustrialOPCreate, IndustrialOPUpdate, OPStatusChange
 )
 
+# Tentativa de importar PdfMerger para mesclar PDFs em memória
+try:
+    from PyPDF2 import PdfMerger
+except Exception:
+    PdfMerger = None
+
 # ========== HELPER FUNCTIONS ==========
 
 async def upload_file_to_gridfs(fs, file: UploadFile, file_type: FileType, user_id: str, version: int = 1):
@@ -168,7 +174,92 @@ def setup_industrial_op_routes(api_router: APIRouter, db, fs, get_current_user, 
                 'Content-Disposition': f'attachment; filename="{file_metadata["filename"]}"'
             }
         )
-    
+
+    @api_router.post('/products/{product_id}/generate-model-pdf')
+    async def generate_product_models_pdf(
+        product_id: str,
+        current_user = Depends(get_current_user)
+    ):
+        """
+        Gera e retorna um PDF único com os modelos do produto:
+        - Ficha de Análise (DOCX -> PDF) se existir
+        - Modelo de OP (Excel -> PDF) se existir
+        Acesso: apenas o laboratório.
+        """
+        # Verificar permissão (apenas laboratório)
+        if current_user.get('email', '').lower() != LAB_EMAIL.lower():
+            raise HTTPException(status_code=403, detail='Apenas o laboratório pode gerar PDFs de modelos')
+
+        if PdfMerger is None:
+            raise HTTPException(status_code=500, detail='Dependência PyPDF2 ausente no servidor. Instale PyPDF2.')
+
+        from document_generator import generate_documents_from_templates
+
+        # Buscar produto
+        product = await db.products.find_one({'id': product_id, 'deleted': False}, {'_id': 0})
+        if not product:
+            raise HTTPException(status_code=404, detail='Produto não encontrado')
+
+        file_models = product.get('file_models', {})
+        if not file_models.get('op_model') and not file_models.get('ficha_analise'):
+            raise HTTPException(status_code=400, detail='Produto não possui templates cadastrados')
+
+        # Baixar templates do GridFS (se existirem)
+        docx_template_content = None
+        excel_template_content = None
+
+        if file_models.get('ficha_analise'):
+            try:
+                file_id = file_models['ficha_analise']['file_id']
+                grid_out = await fs.open_download_stream(ObjectId(file_id))
+                docx_template_content = await grid_out.read()
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=f'Erro ao baixar template .docx: {str(e)}')
+
+        if file_models.get('op_model'):
+            try:
+                file_id = file_models['op_model']['file_id']
+                grid_out = await fs.open_download_stream(ObjectId(file_id))
+                excel_template_content = await grid_out.read()
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=f'Erro ao baixar template Excel: {str(e)}')
+
+        # Gerar documentos usando o generator existente (vazio raw_materials)
+        op_data = {'batch_number': '', 'date': datetime.now(timezone.utc).strftime('%d/%m/%Y')}
+        product_data = {'name': product['name']}
+
+        try:
+            documents = await generate_documents_from_templates(
+                op_data,
+                product_data,
+                [],  # sem matérias-primas
+                docx_template_content,
+                excel_template_content
+            )
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f'Erro ao gerar documentos: {str(e)}')
+
+        # Se existir mais de um PDF, mesclar em um único arquivo
+        parts = []
+        if 'docx_pdf' in documents:
+            parts.append(documents['docx_pdf'])
+        if 'excel_pdf' in documents:
+            parts.append(documents['excel_pdf'])
+
+        if not parts:
+            raise HTTPException(status_code=404, detail='Nenhum documento gerado')
+
+        merger = PdfMerger()
+        for b in parts:
+            merger.append(io.BytesIO(b))
+
+        out = io.BytesIO()
+        merger.write(out)
+        merger.close()
+        out.seek(0)
+
+        return StreamingResponse(out, media_type='application/pdf', headers={'Content-Disposition': f'attachment; filename="Modelos_{product["name"]}.pdf"'})
+
     # ========== CRUD DE ORDENS DE PRODUÇÃO ==========
     
     @api_router.post('/industrial-ops', response_model=IndustrialOP)
