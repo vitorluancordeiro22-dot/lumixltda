@@ -14,16 +14,15 @@ export const MobileProvider = ({ children }) => {
     // Adiciona/remove classe no body para aplicar estilos globais
     if (forceMobileView) {
       document.body.classList.add('mobile-mode');
-      // Força o viewport a não permitir zoom
       const viewport = document.querySelector('meta[name="viewport"]');
       if (viewport) {
-        viewport.setAttribute('content', 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no');
+        viewport.setAttribute('content', 'width=device-width, initial-scale=1, viewport-fit=cover');
       }
     } else {
       document.body.classList.remove('mobile-mode');
       const viewport = document.querySelector('meta[name="viewport"]');
       if (viewport) {
-        viewport.setAttribute('content', 'width=device-width, initial-scale=1');
+        viewport.setAttribute('content', 'width=device-width, initial-scale=1, viewport-fit=cover');
       }
     }
   }, [forceMobileView]);

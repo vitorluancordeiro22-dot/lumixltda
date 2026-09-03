@@ -237,7 +237,7 @@ export const Products = () => {
       }
     } catch (error) {
       if (isMountedRef.current) {
-        toast.error('Erro ao criar lote');
+        toast.error(error.response?.data?.detail || 'Erro ao criar lote');
       }
     } finally {
       if (isMountedRef.current) {
@@ -308,7 +308,7 @@ export const Products = () => {
   const addRecipe = () => {
     setFormData({
       ...formData,
-      recipes: [...formData.recipes, { raw_material_id: '', quantity_per_liter: 0, unit: 'L' }]
+      recipes: [...formData.recipes, { raw_material_id: '', quantity_per_liter: 0, unit: 'Kg' }]
     });
   };
 
@@ -503,7 +503,7 @@ export const Products = () => {
                         />
                       </div>
                       <div className="w-32">
-                        <Label className="text-foreground text-xs">Qtd. Total</Label>
+                        <Label className="text-foreground text-xs">Peso total da receita</Label>
                         <Input type="number" step="0.001" value={recipe.quantity_per_liter} onChange={(e) => updateRecipe(index, 'quantity_per_liter', e.target.value)} className="bg-input border-border text-foreground" placeholder="Ex: 0.100" />
                       </div>
                       <Button type="button" onClick={() => removeRecipe(index)} size="icon" variant="destructive">

@@ -22,6 +22,13 @@ from industrial_op import (
     RawMaterialUsage, OPHistoryEntry, IndustrialOP,
     IndustrialOPCreate, IndustrialOPUpdate, OPStatusChange
 )
+from inventory import (
+    calculate_recipe_requirements,
+    consume_requirements,
+    reconcile_physical_stock,
+    restore_allocations,
+    sync_material_total_stock,
+)
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -91,6 +98,7 @@ class RawMaterial(BaseModel):
     received_date: str = ''
     created_at: str
     deleted: bool = False
+    stock_reconciled_at: Optional[str] = None
 
 class RawMaterialCreate(BaseModel):
     name: str
@@ -110,6 +118,8 @@ class ProductBatch(BaseModel):
     total_bottled: float = 0.0
     created_at: str
     deleted: bool = False
+    materials_used: List[Dict[str, Any]] = Field(default_factory=list)
+    inventory_deducted: bool = False
 
 class ProductBatchCreate(BaseModel):
     product_id: str
@@ -150,6 +160,10 @@ class RawMaterialBatchUpdate(BaseModel):
     quantity: Optional[float] = None
     supplier_batch_number: Optional[str] = None
     expiry_date: Optional[str] = None
+
+class StockCountUpdate(BaseModel):
+    counted_stock: float
+    notes: str = ''
 
 class MaterialUsed(BaseModel):
     raw_material_id: str
@@ -230,6 +244,26 @@ class SupplierCreate(BaseModel):
     phone: str = ''
     email: str = ''
     address: str = ''
+
+class SupplierCatalogItemCreate(BaseModel):
+    name: str
+    unit: str = ''
+
+class PurchaseOrderItem(BaseModel):
+    name: str
+    unit: str
+    quantity: float
+    raw_material_id: Optional[str] = None
+
+class PurchaseOrderCreate(BaseModel):
+    supplier_id: str = ''
+    supplier_name: str
+    items: List[PurchaseOrderItem]
+    unit: str = 'Kg'
+    observations: str = ''
+
+class PurchaseOrderStatusUpdate(BaseModel):
+    status: str
 
 # ========== AMOSTRAS MODELS ==========
 class Sample(BaseModel):
@@ -522,6 +556,18 @@ async def create_product_batch(data: ProductBatchCreate, current_user = Depends(
         # Gerar automaticamente (já considera números customizados anteriores)
         batch_number = await generate_batch_number(data.date)
     
+    product = await db.products.find_one(
+        {'id': data.product_id, 'deleted': False}, {'_id': 0}
+    )
+    if not product:
+        raise HTTPException(status_code=404, detail='Produto não encontrado')
+
+    try:
+        requirements = calculate_recipe_requirements(product, data.planned_liters)
+        materials_used = await consume_requirements(db, requirements)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
     batch_doc = {
         'id': batch_id,
         'product_id': data.product_id,
@@ -533,9 +579,15 @@ async def create_product_batch(data: ProductBatchCreate, current_user = Depends(
         'total_bottled': 0.0,
         'created_at': datetime.now(timezone.utc).isoformat(),
         'deleted': False,
-        'is_custom': bool(data.custom_batch_number)
+        'is_custom': bool(data.custom_batch_number),
+        'materials_used': materials_used,
+        'inventory_deducted': True,
     }
-    await db.product_batches.insert_one(batch_doc)
+    try:
+        await db.product_batches.insert_one(batch_doc)
+    except Exception:
+        await restore_allocations(db, materials_used)
+        raise
     
     # Verificar se precisa criar amostra (primeiro lote do produto no mês)
     batch_date = datetime.fromisoformat(data.date)
@@ -590,7 +642,12 @@ async def update_product_batch(batch_id: str, data: ProductBatchUpdate, current_
         update_fields['date'] = data.date
     if data.unit is not None:
         update_fields['unit'] = data.unit
-    if data.planned_liters is not None:
+    if data.planned_liters is not None and data.planned_liters != batch.get('planned_liters'):
+        if batch.get('inventory_deducted'):
+            raise HTTPException(
+                status_code=400,
+                detail='A quantidade deste lote já movimentou o estoque. Exclua o lote incorreto e crie outro.'
+            )
         update_fields['planned_liters'] = data.planned_liters
     
     if update_fields:
@@ -631,13 +688,21 @@ async def delete_product_batch(batch_id: str, current_user = Depends(get_current
     if not batch:
         raise HTTPException(status_code=404, detail='Batch not found')
     
+    trash_batch = dict(batch)
+    if batch.get('inventory_deducted') and not batch.get('inventory_reverted'):
+        await restore_allocations(db, batch.get('materials_used', []))
+        trash_batch['inventory_reverted'] = True
+
     await db.trash.insert_one({
         'id': str(__import__('uuid').uuid4()),
         'item_type': 'product_batch',
-        'item_data': batch,
+        'item_data': trash_batch,
         'deleted_at': datetime.now(timezone.utc).isoformat()
     })
-    await db.product_batches.update_one({'id': batch_id}, {'$set': {'deleted': True}})
+    await db.product_batches.update_one(
+        {'id': batch_id},
+        {'$set': {'deleted': True, 'inventory_reverted': trash_batch.get('inventory_reverted', False)}}
+    )
     return {'message': 'Batch moved to trash'}
 
 @api_router.post('/product-batches/{batch_id}/finalize')
@@ -710,6 +775,9 @@ async def reopen_archived_batch(batch_id: str, current_user = Depends(get_curren
         'total_bottled': archived_batch.get('total_bottled', 0),
         'created_at': archived_batch.get('created_at', datetime.now(timezone.utc).isoformat()),
         'deleted': False,
+        'materials_used': archived_batch.get('materials_used', []),
+        'inventory_deducted': archived_batch.get('inventory_deducted', False),
+        'inventory_reverted': archived_batch.get('inventory_reverted', False),
         'reopened_at': datetime.now(timezone.utc).isoformat(),
         'reopened_from_archive': True
     }
@@ -748,31 +816,73 @@ async def create_raw_material(data: RawMaterialCreate, current_user = Depends(ge
         'id': material_id,
         'name': data.name,
         'type': data.type,
-        'total_stock': data.total_stock,
+        # Entradas devem ser registradas por lote. Isso evita somar o mesmo
+        # recebimento uma vez aqui e outra ao criar o lote.
+        'total_stock': 0.0,
         'supplier_id': data.supplier_id,
         'received_date': data.received_date,
         'created_at': datetime.now(timezone.utc).isoformat(),
-        'deleted': False
+        'deleted': False,
+        # Matérias novas começam consistentes e recebem saldo somente por lote.
+        'stock_reconciled_at': datetime.now(timezone.utc).isoformat(),
     }
     await db.raw_materials.insert_one(material_doc)
     return RawMaterial(**material_doc)
 
 @api_router.put('/raw-materials/{material_id}', response_model=RawMaterial)
 async def update_raw_material(material_id: str, data: RawMaterialCreate, current_user = Depends(get_current_user)):
+    material_before = await db.raw_materials.find_one({'id': material_id}, {'_id': 0})
+    if not material_before:
+        raise HTTPException(status_code=404, detail='Material not found')
+
     result = await db.raw_materials.update_one(
         {'id': material_id},
         {'$set': {
             'name': data.name,
             'type': data.type,
-            'total_stock': data.total_stock,
             'supplier_id': data.supplier_id,
             'received_date': data.received_date
         }}
     )
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail='Material not found')
+    # O campo de estoque na edição funciona como contagem física. A função
+    # também corrige os saldos antigos que ficaram divergentes dos lotes.
+    if (
+        not material_before.get('stock_reconciled_at')
+        or abs(float(data.total_stock) - float(material_before.get('total_stock', 0))) > 1e-6
+    ):
+        try:
+            await reconcile_physical_stock(
+                db, material_before, data.total_stock, current_user,
+                'Ajuste informado na edição da matéria-prima',
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+    else:
+        await sync_material_total_stock(db, material_id)
+
     material = await db.raw_materials.find_one({'id': material_id}, {'_id': 0})
     return RawMaterial(**material)
+
+@api_router.post('/raw-materials/{material_id}/stock-count')
+async def count_raw_material_stock(
+    material_id: str,
+    data: StockCountUpdate,
+    current_user = Depends(get_current_user),
+):
+    material = await db.raw_materials.find_one(
+        {'id': material_id, 'deleted': False}, {'_id': 0}
+    )
+    if not material:
+        raise HTTPException(status_code=404, detail='Matéria-prima não encontrada')
+    try:
+        total = await reconcile_physical_stock(
+            db, material, data.counted_stock, current_user, data.notes
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return {'message': 'Estoque corrigido com sucesso', 'total_stock': total}
 
 @api_router.delete('/raw-materials/{material_id}')
 async def delete_raw_material(material_id: str, current_user = Depends(get_current_user)):
@@ -799,6 +909,18 @@ async def get_raw_material_batches(current_user = Depends(get_current_user)):
 @api_router.post('/raw-material-batches', response_model=RawMaterialBatch)
 async def create_raw_material_batch(data: RawMaterialBatchCreate, current_user = Depends(get_current_user)):
     import uuid
+    if data.quantity <= 0:
+        raise HTTPException(status_code=400, detail='A quantidade recebida deve ser maior que zero')
+    material = await db.raw_materials.find_one(
+        {'id': data.raw_material_id, 'deleted': False}, {'_id': 0}
+    )
+    if not material:
+        raise HTTPException(status_code=404, detail='Matéria-prima não encontrada')
+    if not material.get('stock_reconciled_at'):
+        raise HTTPException(
+            status_code=409,
+            detail='Faça primeiro a contagem física desta matéria-prima e salve o saldo atual.'
+        )
     batch_id = str(uuid.uuid4())
     
     # Se o usuário forneceu um número customizado, usar ele
@@ -839,11 +961,9 @@ async def create_raw_material_batch(data: RawMaterialBatchCreate, current_user =
     }
     await db.raw_material_batches.insert_one(batch_doc)
     
-    # Update stock
-    await db.raw_materials.update_one(
-        {'id': data.raw_material_id},
-        {'$inc': {'total_stock': data.quantity}}
-    )
+    # O total consolidado sempre nasce da soma dos lotes, nunca de um saldo
+    # possivelmente desatualizado.
+    await sync_material_total_stock(db, data.raw_material_id)
     
     return RawMaterialBatch(**batch_doc)
 
@@ -880,14 +1000,10 @@ async def update_raw_material_batch(batch_id: str, data: RawMaterialBatchUpdate,
     if data.expiry_date is not None:
         update_fields['expiry_date'] = data.expiry_date
     
-    # Se a quantidade mudou, ajustar o estoque
+    # Se a quantidade mudou, o total será recalculado pela soma dos lotes.
     if data.quantity is not None and data.quantity != batch.get('quantity', 0):
-        old_quantity = batch.get('quantity', 0)
-        quantity_diff = data.quantity - old_quantity
-        await db.raw_materials.update_one(
-            {'id': batch['raw_material_id']},
-            {'$inc': {'total_stock': quantity_diff}}
-        )
+        if data.quantity < 0:
+            raise HTTPException(status_code=400, detail='A quantidade não pode ser negativa')
         update_fields['quantity'] = data.quantity
     
     if update_fields:
@@ -895,6 +1011,7 @@ async def update_raw_material_batch(batch_id: str, data: RawMaterialBatchUpdate,
             {'id': batch_id},
             {'$set': update_fields}
         )
+    await sync_material_total_stock(db, batch['raw_material_id'])
     
     updated = await db.raw_material_batches.find_one({'id': batch_id}, {'_id': 0})
     return RawMaterialBatch(**updated)
@@ -912,6 +1029,7 @@ async def delete_raw_material_batch(batch_id: str, current_user = Depends(get_cu
         'deleted_at': datetime.now(timezone.utc).isoformat()
     })
     await db.raw_material_batches.update_one({'id': batch_id}, {'$set': {'deleted': True}})
+    await sync_material_total_stock(db, batch['raw_material_id'])
     return {'message': 'Batch moved to trash'}
 
 @api_router.post('/raw-material-batches/{batch_id}/finalize')
@@ -923,6 +1041,11 @@ async def finalize_raw_material_batch(batch_id: str, current_user = Depends(get_
     
     if batch.get('status') == 'finalizado':
         raise HTTPException(status_code=400, detail='Lote já está finalizado')
+    if float(batch.get('quantity', 0)) > 1e-6:
+        raise HTTPException(
+            status_code=400,
+            detail='Este lote ainda possui saldo. Faça a contagem física antes de finalizá-lo.'
+        )
     
     await db.raw_material_batches.update_one(
         {'id': batch_id},
@@ -942,15 +1065,29 @@ async def get_production_orders(current_user = Depends(get_current_user)):
 async def create_production_order(data: ProductionOrderCreate, current_user = Depends(get_current_user)):
     import uuid
     order_id = str(uuid.uuid4())
-    
-    # Deduct stock for each material
-    for material in data.materials_used:
-        result = await db.raw_materials.update_one(
-            {'id': material.raw_material_id},
-            {'$inc': {'total_stock': -material.quantity}}
+
+    product = await db.products.find_one({'id': data.product_id, 'deleted': False}, {'_id': 0})
+    if not product:
+        raise HTTPException(status_code=404, detail='Produto não encontrado')
+    product_batch = await db.product_batches.find_one(
+        {'id': data.product_batch_id, 'deleted': False}, {'_id': 0}
+    )
+    if not product_batch:
+        raise HTTPException(status_code=404, detail='Lote do produto não encontrado')
+
+    # Lotes criados pela versão corrigida já deram baixa. Para lotes antigos,
+    # calcula no servidor e dá baixa uma única vez (não confia no cálculo da tela).
+    materials_used = product_batch.get('materials_used', [])
+    if not product_batch.get('inventory_deducted'):
+        try:
+            requirements = calculate_recipe_requirements(product, data.production_size)
+            materials_used = await consume_requirements(db, requirements)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+        await db.product_batches.update_one(
+            {'id': data.product_batch_id},
+            {'$set': {'materials_used': materials_used, 'inventory_deducted': True}},
         )
-        if result.matched_count == 0:
-            raise HTTPException(status_code=404, detail=f'Material {material.raw_material_id} not found')
     
     order_doc = {
         'id': order_id,
@@ -959,7 +1096,10 @@ async def create_production_order(data: ProductionOrderCreate, current_user = De
         'date': data.date,
         'weigher': data.weigher,
         'production_size': data.production_size,
-        'materials_used': [m.model_dump() for m in data.materials_used],
+        'materials_used': [
+            {'raw_material_id': item['raw_material_id'], 'quantity': item['quantity']}
+            for item in materials_used
+        ],
         'status': 'em_producao',
         'created_at': datetime.now(timezone.utc).isoformat(),
         'deleted': False
@@ -1222,6 +1362,330 @@ async def delete_supplier(supplier_id: str, current_user = Depends(get_current_u
     await db.suppliers.update_one({'id': supplier_id}, {'$set': {'deleted': True}})
     return {'message': 'Supplier moved to trash'}
 
+# ========== PEDIDOS DE COMPRA ==========
+
+ORDER_UNITS = {'Kg', 'Litros', 'Fardos', 'Unidades'}
+ORDER_STATUSES = {'pendente', 'enviado', 'recebido'}
+
+
+def validate_purchase_order(data: PurchaseOrderCreate):
+    supplier_name = data.supplier_name.strip()
+    if not supplier_name:
+        raise HTTPException(status_code=400, detail='Informe o fornecedor')
+    if data.unit not in ORDER_UNITS:
+        raise HTTPException(status_code=400, detail='Unidade do pedido inválida')
+    if not data.items:
+        raise HTTPException(status_code=400, detail='Adicione pelo menos um item')
+
+    items = []
+    for item in data.items:
+        name = item.name.strip()
+        if not name:
+            raise HTTPException(status_code=400, detail='Há um item sem nome no pedido')
+        if item.quantity <= 0:
+            raise HTTPException(
+                status_code=400,
+                detail=f'A quantidade de {name} deve ser maior que zero',
+            )
+        items.append({
+            'name': name,
+            'unit': data.unit,
+            'quantity': round(float(item.quantity), 3),
+            'raw_material_id': item.raw_material_id,
+        })
+    return supplier_name, items
+
+
+async def generate_purchase_order_number():
+    year = datetime.now(timezone.utc).year
+    prefix = f'PED-{year}-'
+    existing = await db.purchase_orders.find(
+        {'order_number': {'$regex': f'^{prefix}'}}, {'_id': 0, 'order_number': 1}
+    ).to_list(10000)
+    numbers = []
+    for order in existing:
+        try:
+            numbers.append(int(order.get('order_number', '').split('-')[-1]))
+        except (TypeError, ValueError):
+            continue
+    return f'{prefix}{(max(numbers, default=0) + 1):04d}'
+
+
+def fmt_date_for_pdf(value: str) -> str:
+    try:
+        return datetime.fromisoformat(value.replace('Z', '+00:00')).strftime('%d/%m/%Y')
+    except (AttributeError, TypeError, ValueError):
+        return value or '-'
+
+
+@api_router.get('/suppliers/{supplier_id}/catalog')
+async def get_supplier_catalog(supplier_id: str, current_user = Depends(get_current_user)):
+    supplier = await db.suppliers.find_one(
+        {'id': supplier_id, 'deleted': False}, {'_id': 0}
+    )
+    if not supplier:
+        raise HTTPException(status_code=404, detail='Fornecedor não encontrado')
+
+    custom_items = await db.supplier_catalog.find(
+        {'supplier_id': supplier_id, 'deleted': {'$ne': True}}, {'_id': 0}
+    ).to_list(1000)
+    materials = await db.raw_materials.find(
+        {'supplier_id': supplier_id, 'deleted': False}, {'_id': 0}
+    ).to_list(1000)
+
+    by_key = {}
+    for material in materials:
+        key = f'rm:{material["id"]}'
+        by_key[key] = {
+            'id': f'catalog-{material["id"]}',
+            'name': material['name'],
+            'unit': material.get('type', 'Kg'),
+            'raw_material_id': material['id'],
+        }
+    for item in custom_items:
+        key = f'name:{item.get("name", "").strip().casefold()}'
+        if key not in by_key:
+            by_key[key] = item
+    return sorted(by_key.values(), key=lambda item: item.get('name', '').casefold())
+
+
+@api_router.post('/suppliers/{supplier_id}/catalog')
+async def add_supplier_catalog_item(
+    supplier_id: str,
+    data: SupplierCatalogItemCreate,
+    current_user = Depends(get_current_user),
+):
+    supplier = await db.suppliers.find_one(
+        {'id': supplier_id, 'deleted': False}, {'_id': 0}
+    )
+    if not supplier:
+        raise HTTPException(status_code=404, detail='Fornecedor não encontrado')
+    name = data.name.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail='Informe o nome do item')
+
+    existing = await db.supplier_catalog.find_one({
+        'supplier_id': supplier_id,
+        'name_normalized': name.casefold(),
+        'deleted': {'$ne': True},
+    }, {'_id': 0})
+    if existing:
+        return existing
+
+    item = {
+        'id': str(uuid4()),
+        'supplier_id': supplier_id,
+        'name': name,
+        'name_normalized': name.casefold(),
+        'unit': data.unit,
+        'raw_material_id': None,
+        'created_at': datetime.now(timezone.utc).isoformat(),
+        'created_by': current_user.get('id', ''),
+        'deleted': False,
+    }
+    await db.supplier_catalog.insert_one(item)
+    item.pop('_id', None)
+    return item
+
+
+@api_router.get('/purchase-orders')
+async def get_purchase_orders(current_user = Depends(get_current_user)):
+    return await db.purchase_orders.find(
+        {'deleted': {'$ne': True}}, {'_id': 0}
+    ).sort('created_at', -1).to_list(10000)
+
+
+@api_router.post('/purchase-orders')
+async def create_purchase_order(
+    data: PurchaseOrderCreate,
+    current_user = Depends(get_current_user),
+):
+    supplier_name, items = validate_purchase_order(data)
+    if data.supplier_id:
+        supplier = await db.suppliers.find_one(
+            {'id': data.supplier_id, 'deleted': False}, {'_id': 0}
+        )
+        if not supplier:
+            raise HTTPException(status_code=404, detail='Fornecedor não encontrado')
+        supplier_name = supplier['name']
+
+    now = datetime.now(timezone.utc).isoformat()
+    order = {
+        'id': str(uuid4()),
+        'order_number': await generate_purchase_order_number(),
+        'supplier_id': data.supplier_id,
+        'supplier_name': supplier_name,
+        'items': items,
+        'unit': data.unit,
+        'observations': data.observations.strip(),
+        'status': 'pendente',
+        'created_at': now,
+        'created_by': current_user.get('id', ''),
+        'created_by_name': current_user.get('name', ''),
+        'updated_at': now,
+        'deleted': False,
+    }
+    await db.purchase_orders.insert_one(order)
+    order.pop('_id', None)
+    return order
+
+
+@api_router.put('/purchase-orders/{order_id}')
+async def update_purchase_order(
+    order_id: str,
+    data: PurchaseOrderCreate,
+    current_user = Depends(get_current_user),
+):
+    order = await db.purchase_orders.find_one(
+        {'id': order_id, 'deleted': {'$ne': True}}, {'_id': 0}
+    )
+    if not order:
+        raise HTTPException(status_code=404, detail='Pedido não encontrado')
+
+    supplier_name, items = validate_purchase_order(data)
+    if data.supplier_id:
+        supplier = await db.suppliers.find_one(
+            {'id': data.supplier_id, 'deleted': False}, {'_id': 0}
+        )
+        if not supplier:
+            raise HTTPException(status_code=404, detail='Fornecedor não encontrado')
+        supplier_name = supplier['name']
+
+    now = datetime.now(timezone.utc).isoformat()
+    history_entry = {
+        'edited_at': now,
+        'edited_by': current_user.get('id', ''),
+        'edited_by_name': current_user.get('name', ''),
+        'previous_items': order.get('items', []),
+    }
+    await db.purchase_orders.update_one(
+        {'id': order_id},
+        {
+            '$set': {
+                'supplier_id': data.supplier_id,
+                'supplier_name': supplier_name,
+                'items': items,
+                'unit': data.unit,
+                'observations': data.observations.strip(),
+                'updated_at': now,
+                'updated_by': current_user.get('id', ''),
+                'updated_by_name': current_user.get('name', ''),
+            },
+            '$push': {'edit_history': history_entry},
+        },
+    )
+    return await db.purchase_orders.find_one({'id': order_id}, {'_id': 0})
+
+
+@api_router.put('/purchase-orders/{order_id}/status')
+async def update_purchase_order_status(
+    order_id: str,
+    data: PurchaseOrderStatusUpdate,
+    current_user = Depends(get_current_user),
+):
+    if data.status not in ORDER_STATUSES:
+        raise HTTPException(status_code=400, detail='Status inválido')
+    result = await db.purchase_orders.update_one(
+        {'id': order_id, 'deleted': {'$ne': True}},
+        {'$set': {
+            'status': data.status,
+            'status_updated_at': datetime.now(timezone.utc).isoformat(),
+            'status_updated_by': current_user.get('id', ''),
+        }},
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail='Pedido não encontrado')
+    return {'message': 'Status atualizado', 'status': data.status}
+
+
+@api_router.delete('/purchase-orders/{order_id}')
+async def delete_purchase_order(order_id: str, current_user = Depends(get_current_user)):
+    result = await db.purchase_orders.delete_one({'id': order_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail='Pedido não encontrado')
+    return {'message': 'Pedido excluído'}
+
+
+@api_router.get('/purchase-orders/{order_id}/pdf')
+async def get_purchase_order_pdf(order_id: str, current_user = Depends(get_current_user)):
+    order = await db.purchase_orders.find_one(
+        {'id': order_id, 'deleted': {'$ne': True}}, {'_id': 0}
+    )
+    if not order:
+        raise HTTPException(status_code=404, detail='Pedido não encontrado')
+
+    from reportlab.lib import colors
+    from reportlab.lib.enums import TA_CENTER
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import mm
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    from xml.sax.saxutils import escape
+
+    output = io.BytesIO()
+    doc = SimpleDocTemplate(
+        output,
+        pagesize=A4,
+        rightMargin=15 * mm,
+        leftMargin=15 * mm,
+        topMargin=14 * mm,
+        bottomMargin=14 * mm,
+    )
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        'OrderTitle', parent=styles['Title'], alignment=TA_CENTER,
+        fontName='Helvetica-Bold', fontSize=16, leading=20, spaceAfter=4,
+    )
+    small_style = ParagraphStyle(
+        'OrderSmall', parent=styles['BodyText'], fontSize=9, leading=12,
+    )
+    story = [
+        Paragraph('LUMIX PRODUTOS DE LIMPEZA', title_style),
+        Paragraph(f'PEDIDO DE COMPRA — {escape(str(order.get("order_number", "")))}', title_style),
+        Spacer(1, 5 * mm),
+        Paragraph(f'<b>Fornecedor:</b> {escape(str(order.get("supplier_name", "")))}', styles['BodyText']),
+        Paragraph(f'<b>Data:</b> {fmt_date_for_pdf(order.get("created_at", ""))}', styles['BodyText']),
+        Paragraph(f'<b>Status:</b> {order.get("status", "pendente").capitalize()}', styles['BodyText']),
+        Spacer(1, 5 * mm),
+    ]
+    rows = [['Item', 'Quantidade', 'Unidade']]
+    for item in order.get('items', []):
+        quantity = float(item.get('quantity', 0))
+        quantity_text = f'{quantity:.3f}'.rstrip('0').rstrip('.')
+        rows.append([
+            Paragraph(escape(str(item.get('name', ''))), small_style),
+            quantity_text,
+            str(item.get('unit', order.get('unit', ''))),
+        ])
+    table = Table(rows, colWidths=[120 * mm, 30 * mm, 30 * mm], repeatRows=1)
+    table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#0EA5E9')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTNAME', (1, 1), (-1, -1), 'Helvetica'),
+        ('ALIGN', (1, 0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CBD5E1')),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#F8FAFC')]),
+        ('TOPPADDING', (0, 0), (-1, -1), 7),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 7),
+    ]))
+    story.append(table)
+    if order.get('observations'):
+        story.extend([
+            Spacer(1, 5 * mm),
+            Paragraph('<b>Observações:</b>', styles['BodyText']),
+            Paragraph(escape(str(order['observations'])), small_style),
+        ])
+    doc.build(story)
+    output.seek(0)
+    filename = f'{order.get("order_number", "pedido")}.pdf'
+    return StreamingResponse(
+        output,
+        media_type='application/pdf',
+        headers={'Content-Disposition': f'attachment; filename="{filename}"'},
+    )
+
 # ========== EMPLOYEE HISTORY ==========
 
 @api_router.get('/team/{member_id}/history')
@@ -1380,11 +1844,38 @@ async def restore_from_trash(item_id: str, current_user = Depends(get_current_us
         'team_member': 'team'
     }
     
+    if item_type == 'product_batch' and item_data.get('inventory_reverted'):
+        requirements = [
+            {
+                'raw_material_id': usage.get('raw_material_id'),
+                'quantity': usage.get('quantity', 0),
+                'unit': usage.get('unit', ''),
+            }
+            for usage in item_data.get('materials_used', [])
+        ]
+        try:
+            new_usage = await consume_requirements(db, requirements)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+        await db.product_batches.update_one(
+            {'id': item_data['id']},
+            {'$set': {
+                'deleted': False,
+                'inventory_reverted': False,
+                'inventory_deducted': True,
+                'materials_used': new_usage,
+            }}
+        )
+        await db.trash.delete_one({'id': item_id})
+        return {'message': 'Item restored'}
+
     if item_type in collection_map:
         await db[collection_map[item_type]].update_one(
             {'id': item_data['id']},
             {'$set': {'deleted': False}}
         )
+        if item_type == 'raw_material_batch':
+            await sync_material_total_stock(db, item_data['raw_material_id'])
         await db.trash.delete_one({'id': item_id})
         return {'message': 'Item restored'}
     
@@ -1435,12 +1926,10 @@ async def auto_archive_finished_items(current_user = Depends(get_current_user)):
             await db.counting.delete_many({'product_batch_id': batch['id']})
         archived_products += 1
     
-    # Mover lotes de matérias-primas finalizados OU zerados
+    # Arquivar apenas lotes realmente zerados. Versões antigas permitiam
+    # finalizar um lote ainda com saldo; arquivá-lo faria esse saldo sumir.
     rm_batches = await db.raw_material_batches.find({
-        '$or': [
-            {'status': 'finalizado'},
-            {'quantity': {'$lte': 0}}  # Incluir lotes zerados
-        ],
+        'quantity': {'$lte': 0.000001},
         'deleted': False
     }, {'_id': 0}).to_list(10000)
     

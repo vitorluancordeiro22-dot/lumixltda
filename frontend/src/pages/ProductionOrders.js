@@ -104,7 +104,9 @@ export const ProductionOrders = () => {
     if (product && size) {
       const materials = product.recipes.map(r => ({
         raw_material_id: r.raw_material_id,
-        quantity: parseFloat((r.quantity_per_liter * parseFloat(size)).toFixed(3))
+        // quantity_per_liter é, apesar do nome legado, a quantidade TOTAL da
+        // receita para expected_liters. O consumo deve ser proporcional.
+        quantity: parseFloat(((r.quantity_per_liter / product.expected_liters) * parseFloat(size)).toFixed(3))
       }));
       setFormData({
         ...formData,
@@ -135,7 +137,7 @@ export const ProductionOrders = () => {
       }
     } catch (error) {
       if (isMountedRef.current) {
-        toast.error('Erro ao criar ordem');
+        toast.error(error.response?.data?.detail || 'Erro ao criar ordem');
       }
     } finally {
       if (isMountedRef.current) {

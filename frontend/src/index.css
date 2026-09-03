@@ -15,8 +15,14 @@
   * {
     @apply border-border;
   }
+  html, body, #root {
+    width: 100%;
+    max-width: 100%;
+    min-height: 100%;
+  }
   body {
     @apply bg-background text-foreground font-sans;
+    overflow-x: hidden;
   }
   h1, h2, h3, h4, h5, h6 {
     @apply font-heading;
@@ -94,6 +100,11 @@ body.mobile-mode .lg\:grid-cols-4 {
   grid-template-columns: 1fr !important;
 }
 
+/* Alguns controles compactos da tela de pedidos funcionam melhor em 2 colunas. */
+body.mobile-mode .mobile-two-cols {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+}
+
 /* Botões mais tocáveis */
 body.mobile-mode button {
   min-height: 44px;
@@ -150,9 +161,10 @@ body.mobile-mode table {
 
 /* Dialog/Modal mais compacto */
 body.mobile-mode [role="dialog"] {
-  max-width: 95vw !important;
-  max-height: 90vh !important;
-  margin: 0.5rem !important;
+  width: calc(100vw - 1rem) !important;
+  max-width: calc(100vw - 1rem) !important;
+  max-height: calc(100dvh - 1rem) !important;
+  margin: 0 !important;
 }
 
 body.mobile-mode [role="dialog"] .p-6 {
@@ -160,15 +172,9 @@ body.mobile-mode [role="dialog"] .p-6 {
 }
 
 /* Flex wrap para itens em linha */
-body.mobile-mode .flex.gap-2,
-body.mobile-mode .flex.gap-3,
-body.mobile-mode .flex.gap-4 {
-  flex-wrap: wrap;
-}
-
-/* Largura total para elementos flex */
+/* Permite que textos e campos encolham sem estourar a largura da tela */
 body.mobile-mode .flex-1 {
-  min-width: 100%;
+  min-width: 0;
 }
 
 /* Ajuste do container principal */
@@ -189,12 +195,6 @@ body.mobile-mode .text-xs {
   font-size: 0.75rem !important;
 }
 
-/* Cards em coluna única */
-body.mobile-mode .grid {
-  display: flex !important;
-  flex-direction: column !important;
-}
-
 /* Ajuste de margens */
 body.mobile-mode .mb-8 {
   margin-bottom: 1rem !important;
@@ -210,3 +210,19 @@ body.mobile-mode {
   -webkit-overflow-scrolling: touch;
 }
 
+/* O Safari aproxima automaticamente inputs com fonte menor que 16px.
+   Esta regra evita o zoom indesejado em iPhone sem bloquear o zoom manual. */
+@media (max-width: 767px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+
+  input,
+  select,
+  textarea,
+  button {
+    touch-action: manipulation;
+  }
+}

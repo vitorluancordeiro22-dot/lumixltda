@@ -20,6 +20,7 @@ import { IndustrialOPs } from './pages/IndustrialOPs';
 import { Laudos } from './pages/Laudos';
 import { BatchManagement } from './pages/BatchManagement';
 import { Samples } from './pages/Samples';
+import { Pedidos } from './pages/Pedidos';
 import './App.css';
 
 const PrivateRoute = ({ children }) => {
@@ -61,6 +62,7 @@ function App() {
               <Route path="dashboard" element={<RoleRoute allowedRoles={['laboratorio']}><Dashboard /></RoleRoute>} />
               <Route path="products" element={<RoleRoute allowedRoles={['laboratorio']}><Products /></RoleRoute>} />
               <Route path="raw-materials" element={<RoleRoute allowedRoles={['laboratorio']}><RawMaterials /></RoleRoute>} />
+              <Route path="pedidos" element={<RoleRoute allowedRoles={['laboratorio']}><Pedidos /></RoleRoute>} />
               <Route path="production-orders" element={<RoleRoute allowedRoles={['laboratorio']}><ProductionOrders /></RoleRoute>} />
               <Route path="counting" element={<Counting />} />
               <Route path="samples" element={<Samples />} />

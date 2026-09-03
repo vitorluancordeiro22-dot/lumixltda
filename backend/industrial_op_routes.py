@@ -16,6 +16,7 @@ from industrial_op import (
     RawMaterialUsage, OPHistoryEntry, IndustrialOP,
     IndustrialOPCreate, IndustrialOPUpdate, OPStatusChange
 )
+from inventory import calculate_recipe_requirements, consume_requirements, restore_allocations
 
 # Tentativa de importar PdfMerger para mesclar PDFs em memória
 try:
@@ -293,7 +294,7 @@ def setup_industrial_op_routes(api_router: APIRouter, db, fs, get_current_user, 
         date_str = now.isoformat()
         batch_number = await generate_batch_number_fn(date_str)
         
-        # Auto-selecionar matérias-primas (LIFO - mais recentes com estoque)
+        # Calcular proporcionalmente e dar baixa real nos lotes de MP.
         raw_materials_usage = []
         recipes = product.get('recipes', [])
         
@@ -303,41 +304,23 @@ def setup_industrial_op_routes(api_router: APIRouter, db, fs, get_current_user, 
                 detail='Produto não possui receita cadastrada'
             )
         
-        for recipe in recipes:
-            rm_id = recipe['raw_material_id']
-            quantity_per_unit = recipe['quantity_per_liter']
-            unit = recipe.get('unit', 'L')
-            
-            # Buscar matéria-prima
-            rm = await db.raw_materials.find_one(
-                {'id': rm_id, 'deleted': False},
-                {'_id': 0}
-            )
-            if not rm:
-                continue
-            
-            # Buscar lotes com estoque (LIFO)
-            batches = await get_latest_raw_material_batches_with_stock(db, rm_id)
-            
-            if not batches:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f'Matéria-prima {rm["name"]} sem estoque disponível'
-                )
-            
-            # Usar o lote mais recente (primeiro da lista LIFO)
-            latest_batch = batches[0]
-            quantity_needed = quantity_per_unit * op_data.planned_quantity
-            
-            raw_materials_usage.append(RawMaterialUsage(
-                raw_material_id=rm_id,
-                raw_material_name=rm['name'],
-                batch_id=latest_batch['id'],
-                batch_number=latest_batch['batch_number'],
-                quantity_used=quantity_needed,
-                unit=unit,
-                selected_at=now.isoformat()
-            ))
+        try:
+            requirements = calculate_recipe_requirements(product, op_data.planned_quantity)
+            inventory_usage = await consume_requirements(db, requirements)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+
+        for usage in inventory_usage:
+            for allocation in usage['allocations']:
+                raw_materials_usage.append(RawMaterialUsage(
+                    raw_material_id=usage['raw_material_id'],
+                    raw_material_name=usage['raw_material_name'],
+                    batch_id=allocation['batch_id'],
+                    batch_number=allocation['batch_number'],
+                    quantity_used=allocation['quantity'],
+                    unit=usage['unit'],
+                    selected_at=now.isoformat()
+                ))
         
         # Criar snapshot dos modelos (versionamento)
         op_model_snapshot = file_models.get('op_model')
@@ -386,8 +369,14 @@ def setup_industrial_op_routes(api_router: APIRouter, db, fs, get_current_user, 
             history=[h.dict() for h in history]
         )
         
-        # Salvar no banco
-        await db.industrial_ops.insert_one(op.dict())
+        # Salvar no banco; se falhar, devolver exatamente o que foi baixado.
+        try:
+            op_doc = op.dict()
+            op_doc['inventory_deducted'] = True
+            await db.industrial_ops.insert_one(op_doc)
+        except Exception:
+            await restore_allocations(db, inventory_usage)
+            raise
         
         return op
     

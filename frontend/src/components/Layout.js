@@ -24,13 +24,15 @@ import {
   Smartphone,
   Monitor,
   FlaskConical,
-  Factory
+  Factory,
+  ShoppingCart
 } from 'lucide-react';
 
 const allMenuItems = [
   { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', roles: ['laboratorio'] },
   { path: '/products', icon: Package, label: 'Produtos', roles: ['laboratorio'] },
   { path: '/raw-materials', icon: Boxes, label: 'Matérias-Primas', roles: ['laboratorio'] },
+  { path: '/pedidos', icon: ShoppingCart, label: 'Pedidos', roles: ['laboratorio'] },
   { path: '/counting', icon: Calculator, label: 'Contagem', roles: ['laboratorio', 'producao'] },
   { path: '/samples', icon: FlaskConical, label: 'Amostras', roles: ['laboratorio', 'producao'] },
   { path: '/batch-management', icon: ListChecks, label: 'Gerenciar Lotes', roles: ['laboratorio'] },

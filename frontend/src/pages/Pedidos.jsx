@@ -1,6 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import api from '../lib/api';
-import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { Input } from '../components/ui/input';
@@ -17,7 +16,7 @@ import {
 } from '../components/ui/alert-dialog';
 import { toast } from 'sonner';
 import {
-  Plus, ShoppingCart, Search, Trash2, Truck, FileText, Share2,
+  Plus, ShoppingCart, Search, Trash2, Truck, Share2,
   CheckCircle2, Send, Clock, PackageCheck, X, ChevronLeft,
   Download, Loader2, ArrowRight, Building2, Edit2,
 } from 'lucide-react';
@@ -70,7 +69,7 @@ const AddSupplierDialog = ({ open, onOpenChange, onCreated }) => {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-card border-border w-full max-w-md p-4 sm:p-6 rounded-lg">
+      <DialogContent className="bg-card border-border w-[calc(100vw-1rem)] max-w-md max-h-[calc(100dvh-1rem)] overflow-x-hidden overflow-y-auto p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:p-6 rounded-xl">
         <DialogHeader>
           <DialogTitle className="text-foreground flex items-center gap-2">
             <Building2 className="w-5 h-5 text-primary" />
@@ -86,7 +85,7 @@ const AddSupplierDialog = ({ open, onOpenChange, onCreated }) => {
               value={name}
               onChange={(e) => setName(e.target.value)}
               disabled={submitting}
-              className="bg-input border-border text-foreground h-10"
+              className="bg-input border-border text-foreground h-11 text-base sm:text-sm"
             />
           </div>
 
@@ -97,7 +96,7 @@ const AddSupplierDialog = ({ open, onOpenChange, onCreated }) => {
               value={contact}
               onChange={(e) => setContact(e.target.value)}
               disabled={submitting}
-              className="bg-input border-border text-foreground h-10"
+              className="bg-input border-border text-foreground h-11 text-base sm:text-sm"
             />
           </div>
 
@@ -109,7 +108,7 @@ const AddSupplierDialog = ({ open, onOpenChange, onCreated }) => {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               disabled={submitting}
-              className="bg-input border-border text-foreground h-10"
+              className="bg-input border-border text-foreground h-11 text-base sm:text-sm"
             />
           </div>
 
@@ -118,7 +117,7 @@ const AddSupplierDialog = ({ open, onOpenChange, onCreated }) => {
               type="button"
               onClick={() => onOpenChange(false)}
               variant="outline"
-              className="border-border text-foreground flex-1 h-10"
+              className="border-border text-foreground flex-1 h-11"
               disabled={submitting}
             >
               Cancelar
@@ -126,7 +125,7 @@ const AddSupplierDialog = ({ open, onOpenChange, onCreated }) => {
             <Button
               type="submit"
               disabled={submitting}
-              className="w-full sm:flex-1 bg-primary hover:bg-primary/90 h-10"
+              className="w-full sm:flex-1 bg-primary hover:bg-primary/90 h-11"
             >
               {submitting ? (
                 <>
@@ -158,25 +157,26 @@ const CartPreview = ({ cart, orderUnit, onRemove, onUpdateQty, showDeleteButtons
       {cart.map((c) => (
         <div
           key={c.key}
-          className="flex items-center gap-2 p-2 rounded-lg bg-card border border-border/50 hover:bg-muted/50 transition-all group"
+          className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 p-2 rounded-lg bg-card border border-border/50 hover:bg-muted/50 transition-all group"
         >
           <span className="flex-1 text-sm text-foreground truncate font-medium">{c.name}</span>
-          <div className="flex items-center gap-2">
+          <div className="grid grid-cols-[4.5rem_3.25rem_2.75rem] items-center gap-1.5">
             <Input
               type="number"
               min="0"
               step="any"
               value={c.quantity || ''}
               onChange={(e) => onUpdateQty(c.key, e.target.value)}
-              className="w-16 h-8 bg-input border-border text-foreground text-sm"
+              inputMode="decimal"
+              className="w-full h-11 bg-input border-border text-foreground text-base sm:text-sm"
             />
-            <span className="text-xs text-muted-foreground w-12 text-right">{orderUnit}</span>
+            <span className="text-sm text-muted-foreground text-right truncate">{orderUnit}</span>
             {showDeleteButtons && (
               <Button
                 size="icon"
                 variant="ghost"
                 onClick={() => onRemove(c.key)}
-                className="text-red-600 hover:text-red-500 hover:bg-red-50 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                className="text-red-600 hover:text-red-500 hover:bg-red-50 h-11 w-11 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
                 title="Remover item"
               >
                 <Trash2 className="w-4 h-4" />
@@ -187,7 +187,7 @@ const CartPreview = ({ cart, orderUnit, onRemove, onUpdateQty, showDeleteButtons
                 size="icon"
                 variant="ghost"
                 onClick={() => onRemove(c.key)}
-                className="text-red-600 hover:text-red-500 hover:bg-red-50 h-8 w-8"
+                className="text-red-600 hover:text-red-500 hover:bg-red-50 h-11 w-11"
                 title="Remover item"
               >
                 <X className="w-4 h-4" />
@@ -201,7 +201,7 @@ const CartPreview = ({ cart, orderUnit, onRemove, onUpdateQty, showDeleteButtons
 };
 
 // ====================== Novo Pedido (modal) ======================
-const NewOrderDialog = ({ open, onOpenChange, onCreated }) => {
+const NewOrderDialog = ({ open, onOpenChange, onCreated, orderToEdit = null }) => {
   const [step, setStep] = useState('suppliers'); // suppliers, items, summary
   const [suppliers, setSuppliers] = useState([]);
   const [supplierSearch, setSupplierSearch] = useState('');
@@ -216,14 +216,14 @@ const NewOrderDialog = ({ open, onOpenChange, onCreated }) => {
   const [orderUnit, setOrderUnit] = useState('Kg');
   const [submitting, setSubmitting] = useState(false);
 
-  const loadSuppliers = async () => {
+  const loadSuppliers = useCallback(async () => {
     try {
       const r = await api.get('/suppliers');
       setSuppliers(r.data);
     } catch {
       toast.error('Erro ao carregar fornecedores');
     }
-  };
+  }, []);
 
   const reset = useCallback(() => {
     setStep('suppliers');
@@ -237,29 +237,53 @@ const NewOrderDialog = ({ open, onOpenChange, onCreated }) => {
     setOrderUnit('Kg');
   }, []);
 
-  useEffect(() => {
-    if (open) {
-      reset();
-      loadSuppliers();
-    }
-  }, [open, reset]);
-
-  const selectSupplier = async (supplier) => {
-    setSelectedSupplier(supplier);
-    setStep('items');
-    if (!supplier.id) {
+  const loadCatalog = useCallback(async (supplierId) => {
+    if (!supplierId) {
       setCatalog([]);
       return;
     }
     setLoadingCatalog(true);
     try {
-      const r = await api.get(`/suppliers/${supplier.id}/catalog`);
+      const r = await api.get(`/suppliers/${supplierId}/catalog`);
       setCatalog(r.data);
     } catch {
       toast.error('Erro ao carregar itens do fornecedor');
     } finally {
       setLoadingCatalog(false);
     }
+  }, []);
+
+  useEffect(() => {
+    if (open) {
+      reset();
+      loadSuppliers();
+      if (orderToEdit) {
+        const supplier = {
+          id: orderToEdit.supplier_id || '',
+          name: orderToEdit.supplier_name || 'Fornecedor',
+        };
+        setSelectedSupplier(supplier);
+        setOrderUnit(orderToEdit.unit || orderToEdit.items?.[0]?.unit || 'Kg');
+        setObservations(orderToEdit.observations || '');
+        setCart((orderToEdit.items || []).map((item) => ({
+          key: item.raw_material_id
+            ? `rm-${item.raw_material_id}`
+            : `c-${item.name.toLowerCase()}`,
+          name: item.name,
+          unit: item.unit || orderToEdit.unit || 'Kg',
+          quantity: Number(item.quantity) || 0,
+          raw_material_id: item.raw_material_id || null,
+        })));
+        setStep('items');
+        loadCatalog(supplier.id);
+      }
+    }
+  }, [open, orderToEdit, reset, loadSuppliers, loadCatalog]);
+
+  const selectSupplier = async (supplier) => {
+    setSelectedSupplier(supplier);
+    setStep('items');
+    await loadCatalog(supplier.id);
   };
 
   const addToCart = (item) => {
@@ -338,16 +362,25 @@ const NewOrderDialog = ({ open, onOpenChange, onCreated }) => {
       toast.error('Adicione itens com quantidade ao pedido');
       return;
     }
+    if (!selectedSupplier?.name) {
+      toast.error('Selecione um fornecedor');
+      return;
+    }
     setSubmitting(true);
     try {
-      await api.post('/purchase-orders', {
+      const payload = {
         supplier_id: selectedSupplier.id || '',
         supplier_name: selectedSupplier.name,
         items,
         unit: orderUnit,
         observations,
-      });
-      toast.success('Pedido criado com sucesso!');
+      };
+      if (orderToEdit) {
+        await api.put(`/purchase-orders/${orderToEdit.id}`, payload);
+      } else {
+        await api.post('/purchase-orders', payload);
+      }
+      toast.success(orderToEdit ? 'Pedido atualizado com sucesso!' : 'Pedido criado com sucesso!');
       onOpenChange(false);
       onCreated();
     } catch (e) {
@@ -367,20 +400,22 @@ const NewOrderDialog = ({ open, onOpenChange, onCreated }) => {
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="bg-card border-border w-full max-w-2xl max-h-[90vh] overflow-y-auto p-4 sm:p-6 rounded-lg">
+        <DialogContent className="bg-card border-border w-[calc(100vw-1rem)] max-w-2xl max-h-[calc(100dvh-1rem)] overflow-x-hidden overflow-y-auto overscroll-contain p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:p-6 rounded-xl">
           <DialogHeader className="mb-6">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2 pr-8">
               <DialogTitle className="text-foreground flex items-center gap-2 text-xl sm:text-2xl">
                 <ShoppingCart className="w-5 h-5 text-primary" />
-                Novo Pedido
+                {orderToEdit ? `Editar ${orderToEdit.order_number}` : 'Novo Pedido'}
               </DialogTitle>
-              <div className="text-xs text-muted-foreground">
-                Etapa
-                {' '}
-                {step === 'suppliers' ? '1' : step === 'items' ? '2' : '3'}
-                {' '}
-                de 3
-              </div>
+              {!orderToEdit && (
+                <div className="text-xs text-muted-foreground">
+                  Etapa
+                  {' '}
+                  {step === 'suppliers' ? '1' : step === 'items' ? '2' : '3'}
+                  {' '}
+                  de 3
+                </div>
+              )}
             </div>
           </DialogHeader>
 
@@ -395,7 +430,7 @@ const NewOrderDialog = ({ open, onOpenChange, onCreated }) => {
                     placeholder="Pesquisar fornecedor..."
                     value={supplierSearch}
                     onChange={(e) => setSupplierSearch(e.target.value)}
-                    className="pl-9 bg-input border-border text-foreground h-10"
+                    className="pl-9 bg-input border-border text-foreground h-11 text-base sm:text-sm"
                   />
                 </div>
 
@@ -469,13 +504,13 @@ const NewOrderDialog = ({ open, onOpenChange, onCreated }) => {
                   {' '}
                   <span className="text-muted-foreground font-normal">(todos os itens)</span>
                 </Label>
-                <div className="grid grid-cols-4 gap-2">
+                <div className="mobile-two-cols grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {ORDER_UNITS.map((u) => (
                     <button
                       key={u}
                       type="button"
                       onClick={() => setOrderUnit(u)}
-                      className={`py-2 rounded-lg text-xs sm:text-sm font-medium border transition-all ${
+                      className={`min-h-11 px-2 py-2 rounded-lg text-sm font-medium border transition-all ${
                         orderUnit === u
                           ? 'bg-primary text-primary-foreground border-primary'
                           : 'border-border text-foreground hover:bg-primary/5'
@@ -503,7 +538,7 @@ const NewOrderDialog = ({ open, onOpenChange, onCreated }) => {
                     {catalog.map((item) => (
                       <div
                         key={item.id}
-                        className="flex items-center gap-2 p-2 rounded-lg border border-border bg-card hover:bg-muted/50 transition-all"
+                        className="grid grid-cols-[minmax(0,1fr)_4.75rem_2.75rem] items-center gap-1.5 p-2 rounded-lg border border-border bg-card hover:bg-muted/50 transition-all"
                       >
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-foreground truncate">{item.name}</p>
@@ -512,15 +547,16 @@ const NewOrderDialog = ({ open, onOpenChange, onCreated }) => {
                           type="number"
                           min="0"
                           step="any"
+                          inputMode="decimal"
                           value={qtyMap[item.id] || ''}
                           onChange={(e) => setQtyMap((m) => ({ ...m, [item.id]: e.target.value }))}
                           placeholder="Qtd"
-                          className="w-16 h-8 bg-input border-border text-foreground text-sm"
+                          className="w-full h-11 bg-input border-border text-foreground text-base sm:text-sm"
                         />
                         <Button
                           size="sm"
                           onClick={() => addToCart(item)}
-                          className="bg-primary hover:bg-primary/90 h-8 px-2"
+                          className="bg-primary hover:bg-primary/90 h-11 w-11 p-0"
                         >
                           <Plus className="w-4 h-4" />
                         </Button>
@@ -533,21 +569,26 @@ const NewOrderDialog = ({ open, onOpenChange, onCreated }) => {
               {/* Adicionar item novo */}
               <div className="space-y-2 border-t border-border/60 pt-2">
                 <Label className="text-foreground text-sm">Adicionar item customizado</Label>
-                <div className="flex gap-2">
+                <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
                   <Input
                     placeholder="Nome do item..."
                     value={newName}
                     onChange={(e) => setNewName(e.target.value)}
-                    className="flex-1 bg-input border-border text-foreground h-9 text-sm"
-                    onKeyPress={(e) => e.key === 'Enter' && addNewItem()}
+                    className="w-full min-w-0 bg-input border-border text-foreground h-11 text-base sm:text-sm"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        addNewItem();
+                      }
+                    }}
                   />
                   <Button
                     onClick={addNewItem}
                     variant="outline"
-                    className="border-border text-foreground h-9 px-3"
+                    className="border-border text-foreground h-11 px-3"
                   >
                     <Plus className="w-4 h-4 mr-1" />
-                    Add
+                    <span className="hidden min-[360px]:inline">Adicionar</span>
                   </Button>
                 </div>
               </div>
@@ -620,7 +661,7 @@ const NewOrderDialog = ({ open, onOpenChange, onCreated }) => {
                   value={observations}
                   onChange={(e) => setObservations(e.target.value)}
                   placeholder="Especifique detalhes da entrega, condições de pagamento, etc..."
-                  className="bg-input border-border text-foreground resize-none text-sm"
+                  className="bg-input border-border text-foreground resize-none text-base sm:text-sm"
                   rows={2}
                 />
               </div>
@@ -633,7 +674,7 @@ const NewOrderDialog = ({ open, onOpenChange, onCreated }) => {
               <Button
                 onClick={prevStep}
                 variant="outline"
-                className="border-border text-foreground h-10"
+                className="border-border text-foreground h-11"
               >
                 <ChevronLeft className="w-4 h-4 mr-2" />
                 Voltar
@@ -643,7 +684,7 @@ const NewOrderDialog = ({ open, onOpenChange, onCreated }) => {
               <Button
                 onClick={() => onOpenChange(false)}
                 variant="outline"
-                className="border-border text-foreground flex-1 h-10"
+                className="border-border text-foreground flex-1 h-11"
               >
                 Cancelar
               </Button>
@@ -651,7 +692,7 @@ const NewOrderDialog = ({ open, onOpenChange, onCreated }) => {
             {step !== 'summary' && step !== 'suppliers' && (
               <Button
                 onClick={nextStep}
-                className="flex-1 bg-primary hover:bg-primary/90 h-10"
+                className="flex-1 bg-primary hover:bg-primary/90 h-11"
               >
                 Próximo
                 <ArrowRight className="w-4 h-4 ml-2" />
@@ -662,14 +703,14 @@ const NewOrderDialog = ({ open, onOpenChange, onCreated }) => {
                 <Button
                   onClick={() => onOpenChange(false)}
                   variant="outline"
-                  className="border-border text-foreground h-10"
+                  className="border-border text-foreground h-11"
                 >
                   Cancelar
                 </Button>
                 <Button
                   onClick={finalize}
                   disabled={submitting}
-                  className="flex-1 bg-primary hover:bg-primary/90 h-10"
+                  className="flex-1 bg-primary hover:bg-primary/90 h-11"
                 >
                   {submitting ? (
                     <>
@@ -679,7 +720,7 @@ const NewOrderDialog = ({ open, onOpenChange, onCreated }) => {
                   ) : (
                     <>
                       <CheckCircle2 className="w-4 h-4 mr-2" />
-                      Finalizar Pedido
+                      {orderToEdit ? 'Salvar Alterações' : 'Finalizar Pedido'}
                     </>
                   )}
                 </Button>
@@ -700,7 +741,7 @@ const NewOrderDialog = ({ open, onOpenChange, onCreated }) => {
 
 // ====================== Card de Pedido (Mobile Optimized) ======================
 const OrderCard = ({
-  order, onStatus, onDelete, onPdf, onShare,
+  order, onStatus, onDelete, onPdf, onShare, onEdit,
 }) => {
   const meta = STATUS_META[order.status] || STATUS_META.pendente;
   const StatusIcon = meta.icon;
@@ -716,7 +757,7 @@ const OrderCard = ({
   };
 
   return (
-    <Card className="p-3 sm:p-4 border shadow-sm hover:shadow-md transition-all">
+    <Card className="min-w-0 p-3 sm:p-4 border shadow-sm hover:shadow-md transition-all">
       <div className="flex items-start justify-between gap-2 mb-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
@@ -738,7 +779,7 @@ const OrderCard = ({
           size="icon"
           variant="ghost"
           onClick={() => onDelete(order)}
-          className="text-red-600 hover:text-red-500 shrink-0 h-8 w-8"
+          className="text-red-600 hover:text-red-500 shrink-0 h-11 w-11 -mr-1 -mt-1"
         >
           <Trash2 className="w-4 h-4" />
         </Button>
@@ -775,12 +816,21 @@ const OrderCard = ({
       )}
 
       {/* Action Buttons */}
-      <div className="space-y-2 sm:space-y-0 sm:flex sm:flex-wrap gap-2">
+      <div className="mobile-two-cols grid grid-cols-2 sm:flex sm:flex-wrap gap-2">
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => onEdit(order)}
+          className="border-primary/40 text-primary w-full sm:w-auto h-11 sm:h-9 text-sm"
+        >
+          <Edit2 className="w-3.5 h-3.5 mr-1" />
+          Editar
+        </Button>
         <Button
           size="sm"
           variant="outline"
           onClick={() => onPdf(order)}
-          className="border-border text-foreground flex-1 sm:flex-none h-9 text-xs sm:text-sm"
+          className="border-border text-foreground w-full sm:w-auto h-11 sm:h-9 text-sm"
         >
           <Download className="w-3.5 h-3.5 mr-1" />
           PDF
@@ -789,7 +839,7 @@ const OrderCard = ({
           size="sm"
           onClick={handleSharePdf}
           disabled={sharingPdf}
-          className="bg-green-600 hover:bg-green-700 flex-1 sm:flex-none h-9 text-xs sm:text-sm"
+          className="bg-green-600 hover:bg-green-700 w-full sm:w-auto h-11 sm:h-9 text-sm"
         >
           {sharingPdf ? (
             <>
@@ -809,7 +859,7 @@ const OrderCard = ({
             size="sm"
             variant="outline"
             onClick={() => onStatus(order, 'enviado')}
-            className="border-border text-foreground flex-1 sm:flex-none h-9 text-xs sm:text-sm"
+            className="border-border text-foreground w-full sm:w-auto h-11 sm:h-9 text-sm"
           >
             <Send className="w-3.5 h-3.5 mr-1" />
             Enviado
@@ -820,7 +870,7 @@ const OrderCard = ({
             size="sm"
             variant="outline"
             onClick={() => onStatus(order, 'recebido')}
-            className="border-emerald-500/40 text-emerald-600 hover:bg-emerald-50 flex-1 sm:flex-none h-9 text-xs sm:text-sm"
+            className="border-emerald-500/40 text-emerald-600 hover:bg-emerald-50 w-full sm:w-auto h-11 sm:h-9 text-sm"
           >
             <PackageCheck className="w-3.5 h-3.5 mr-1" />
             Recebido
@@ -831,7 +881,7 @@ const OrderCard = ({
             size="sm"
             variant="ghost"
             onClick={() => onStatus(order, 'pendente')}
-            className="text-muted-foreground flex-1 sm:flex-none h-9 text-xs sm:text-sm"
+            className="text-muted-foreground w-full sm:w-auto h-11 sm:h-9 text-sm"
           >
             Reabrir
           </Button>
@@ -843,10 +893,10 @@ const OrderCard = ({
 
 // ====================== Página Pedidos ======================
 export const Pedidos = () => {
-  const { user } = useAuth();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
 
   const fetchOrders = useCallback(async () => {
@@ -943,6 +993,10 @@ export const Pedidos = () => {
           onDelete={setDeleteTarget}
           onPdf={handlePdf}
           onShare={handleShare}
+          onEdit={(order) => {
+            setEditTarget(order);
+            setDialogOpen(true);
+          }}
         />
       ))}
       {list.length === 0 && (
@@ -954,17 +1008,20 @@ export const Pedidos = () => {
   );
 
   return (
-    <div className="space-y-4 sm:space-y-6 p-3 sm:p-0">
+    <div className="w-full min-w-0 max-w-full space-y-4 sm:space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
-          <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-foreground mb-1 sm:mb-2">
+          <h1 className="text-2xl sm:text-4xl md:text-5xl font-bold text-foreground mb-1 sm:mb-2">
             Pedidos
           </h1>
           <p className="text-sm sm:text-base text-muted-foreground">Gerencie seus pedidos de compra</p>
         </div>
         <Button
-          onClick={() => setDialogOpen(true)}
-          className="bg-primary hover:bg-primary/90 w-full sm:w-auto h-10 text-sm"
+          onClick={() => {
+            setEditTarget(null);
+            setDialogOpen(true);
+          }}
+          className="bg-primary hover:bg-primary/90 w-full sm:w-auto h-11 text-base sm:text-sm"
         >
           <Plus className="w-4 h-4 mr-2" />
           Novo Pedido
@@ -972,7 +1029,7 @@ export const Pedidos = () => {
       </div>
 
       <Tabs defaultValue="historico" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 mb-4">
+        <TabsList className="mobile-two-cols grid w-full grid-cols-2 mb-4">
           <TabsTrigger value="historico" className="text-xs sm:text-sm">
             Histórico
           </TabsTrigger>
@@ -1014,10 +1071,19 @@ export const Pedidos = () => {
         </TabsContent>
       </Tabs>
 
-      <NewOrderDialog open={dialogOpen} onOpenChange={setDialogOpen} onCreated={fetchOrders} />
+      <NewOrderDialog
+        key={editTarget?.id || 'new-order'}
+        open={dialogOpen}
+        orderToEdit={editTarget}
+        onOpenChange={(open) => {
+          setDialogOpen(open);
+          if (!open) setEditTarget(null);
+        }}
+        onCreated={fetchOrders}
+      />
 
       <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
-        <AlertDialogContent>
+        <AlertDialogContent className="w-[calc(100vw-1rem)] max-w-lg max-h-[calc(100dvh-1rem)] overflow-y-auto p-4 sm:p-6 rounded-xl">
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir pedido?</AlertDialogTitle>
             <AlertDialogDescription>
@@ -1029,10 +1095,10 @@ export const Pedidos = () => {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="gap-2 sm:gap-0">
-            <AlertDialogCancel className="h-9">Cancelar</AlertDialogCancel>
+            <AlertDialogCancel className="h-11">Cancelar</AlertDialogCancel>
             <AlertDialogAction
               onClick={confirmDelete}
-              className="bg-red-600 hover:bg-red-700 h-9"
+              className="bg-red-600 hover:bg-red-700 h-11"
             >
               Excluir
             </AlertDialogAction>

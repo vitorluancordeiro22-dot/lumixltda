@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Combobox } from '../components/ui/combobox';
 import { Checkbox } from '../components/ui/checkbox';
 import { toast } from 'sonner';
-import { Plus, Edit, Trash2, Boxes, Package, Search, Printer } from 'lucide-react';
+import { Plus, Edit, Trash2, Boxes, Package, Search, Printer, AlertTriangle, CheckCircle2 } from 'lucide-react';
 
 export const RawMaterials = () => {
   const [materials, setMaterials] = useState([]);
@@ -36,7 +36,7 @@ export const RawMaterials = () => {
   const [suppliers, setSuppliers] = useState([]);
   const [formData, setFormData] = useState({
     name: '',
-    type: 'Litros',
+    type: 'Kg',
     total_stock: '0',
     supplier_id: '',
     received_date: new Date().toISOString().split('T')[0]
@@ -166,7 +166,7 @@ export const RawMaterials = () => {
       }
     } catch (error) {
       if (isMountedRef.current) {
-        toast.error('Erro ao salvar matéria-prima');
+        toast.error(error.response?.data?.detail || 'Erro ao salvar matéria-prima');
       }
     } finally {
       if (isMountedRef.current) {
@@ -208,7 +208,7 @@ export const RawMaterials = () => {
       }
     } catch (error) {
       if (isMountedRef.current) {
-        toast.error('Erro ao criar lote');
+        toast.error(error.response?.data?.detail || 'Erro ao criar lote');
       }
     } finally {
       if (isMountedRef.current) {
@@ -248,7 +248,7 @@ export const RawMaterials = () => {
     setSelectedMaterial(null);
     setFormData({ 
       name: '', 
-      type: 'Litros', 
+      type: 'Kg',
       total_stock: '0',
       supplier_id: '',
       received_date: new Date().toISOString().split('T')[0]
@@ -670,8 +670,23 @@ export const RawMaterials = () => {
                     />
                   </div>
                   <div>
-                    <Label className="text-foreground">Estoque Total</Label>
-                    <Input type="number" step="0.01" value={formData.total_stock} onChange={(e) => setFormData({...formData, total_stock: e.target.value})} className="bg-input border-border text-foreground" />
+                    <Label className="text-foreground">
+                      {selectedMaterial ? 'Contagem física atual' : 'Estoque inicial'}
+                    </Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.001"
+                      value={formData.total_stock}
+                      onChange={(e) => setFormData({...formData, total_stock: e.target.value})}
+                      disabled={!selectedMaterial}
+                      className="bg-input border-border text-foreground"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {selectedMaterial
+                        ? 'Digite aqui o saldo que você contou fisicamente. O sistema corrigirá os lotes e registrará o ajuste.'
+                        : 'Começa zerado. Registre cada entrada em “Novo Lote de MP”.'}
+                    </p>
                   </div>
                 </div>
                 <div>
@@ -696,6 +711,19 @@ export const RawMaterials = () => {
         </div>
       </div>
 
+      {materials.some(material => !material.stock_reconciled_at) && (
+        <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-4 flex gap-3">
+          <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+          <div>
+            <p className="font-semibold text-foreground">Contagem física necessária</p>
+            <p className="text-sm text-muted-foreground">
+              Os saldos antigos vieram de cálculos diferentes. Clique no lápis de cada item marcado,
+              informe o saldo que existe fisicamente e salve. Depois disso, as entradas e baixas ficam automáticas.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Campo de Pesquisa */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" />
@@ -718,6 +746,15 @@ export const RawMaterials = () => {
                 <div>
                   <h3 className="text-xl font-bold text-foreground mb-1">{material.name}</h3>
                   <p className="text-sm text-muted-foreground">{material.type}</p>
+                  {material.stock_reconciled_at ? (
+                    <p className="text-xs text-emerald-600 flex items-center gap-1 mt-1">
+                      <CheckCircle2 className="w-3.5 h-3.5" /> Saldo conferido
+                    </p>
+                  ) : (
+                    <p className="text-xs text-amber-600 flex items-center gap-1 mt-1">
+                      <AlertTriangle className="w-3.5 h-3.5" /> Conferir saldo
+                    </p>
+                  )}
                 </div>
                 <div className="flex gap-2">
                   <Button size="icon" variant="ghost" onClick={() => handleEdit(material)} className="text-muted-foreground hover:text-foreground">
