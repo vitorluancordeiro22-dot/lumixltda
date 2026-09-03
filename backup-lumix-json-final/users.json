@@ -1,0 +1,140 @@
+{
+	"_id": {
+		"$oid": "6931c6ed95fef518db4a2423"
+	},
+	"id": "a2284e80-1749-415e-a9c6-a51b118d0688",
+	"email": "test_173748@lumix.com",
+	"password": "$2b$12$9sIm0R.69UJh3JZJAE86B.0Z0KAumafnrPaHJbqesUUzfh1IHNMC.",
+	"name": "Test User",
+	"created_at": "2025-12-04T17:37:49.035501+00:00"
+}
+{
+	"_id": {
+		"$oid": "6931c70f95fef518db4a242b"
+	},
+	"id": "1d880df9-8db6-4771-a9ae-d7e6de5f2460",
+	"email": "test_45847@lumix.com",
+	"password": "$2b$12$rP9SUJYYfHJYLXV88mSJre7bu6r7teJ1wT5e/bn2zdhuqjYJxfXya",
+	"name": "Test User",
+	"created_at": "2025-12-04T17:38:23.302447+00:00"
+}
+{
+	"_id": {
+		"$oid": "6931c75095fef518db4a242d"
+	},
+	"id": "168c4f3d-d8e5-4cd7-8fe8-677e0b1bb887",
+	"email": "test_45912@lumix.com",
+	"password": "$2b$12$E16magKVPrqidRKR0klyWuG7oWZLSASkPsGK.1Dy8cNH4q0bqA/e.",
+	"name": "Test User",
+	"created_at": "2025-12-04T17:39:28.005901+00:00"
+}
+{
+	"_id": {
+		"$oid": "6931c78695fef518db4a242e"
+	},
+	"id": "0146ed34-54ea-4c13-93b8-1809db74e7fc",
+	"email": "test_45967@lumix.com",
+	"password": "$2b$12$WeaaxY/PMWSAfPLNwh9f0eQvO/a6P.TXhZ6cWxOpfssGpDOkrrOe.",
+	"name": "Test User",
+	"created_at": "2025-12-04T17:40:22.894121+00:00"
+}
+{
+	"_id": {
+		"$oid": "6931c7af95fef518db4a242f"
+	},
+	"id": "8d8cab0d-4787-4569-985e-286f19c0f084",
+	"email": "laboratoriolumix@outlook.com",
+	"password": "$2b$12$/RT2TZsQ7KgT64zlJKQ/tuHWcZzKrpvPBfbJ36DHJhhlwQUwTi30K",
+	"name": "Lumix laboratorio",
+	"created_at": "2025-12-04T17:41:03.360543+00:00"
+}
+{
+	"_id": {
+		"$oid": "6931dc4dfe751c8949c756ff"
+	},
+	"id": "d911ee26-d699-4c7f-93c9-0b338f73475b",
+	"email": "teste@lumix.com",
+	"password": "$2b$12$Keda92aoIgaPyXQzT4qOmeUOxiZUjAhSSNGuwx9zVtIKOnSHi5eMa",
+	"name": "Usuario Teste",
+	"created_at": "2025-12-04T19:09:01.333771+00:00"
+}
+{
+	"_id": {
+		"$oid": "6932b56cb2764416a3e393d9"
+	},
+	"id": "8d396f01-96fc-4c36-bd0b-7094cc9f2fd9",
+	"email": "teste-deploy@lumix.com",
+	"password": "$2b$12$txJVQPhjAcMahceZSpeVDOOIwQZPs2DrwjbSxsR.3PyoU3tpHyYJy",
+	"name": "Deploy Test",
+	"created_at": "2025-12-05T10:35:24.423697+00:00"
+}
+{
+	"_id": {
+		"$oid": "6932c5818f6b8ac08f18f1b3"
+	},
+	"id": "7dd9d912-9ba9-42b5-9b6f-33af915c919d",
+	"email": "teste@teste.com",
+	"password": "$2b$12$pkaRuQBkTvXIQF0IM8L/W.Jzt.pyTLvM66vlecaR14QmxY4.vLUIu",
+	"name": "Teste",
+	"created_at": "2025-12-05T11:44:01.486969+00:00"
+}
+{
+	"_id": {
+		"$oid": "6932c6f88f6b8ac08f18f1b4"
+	},
+	"id": "929674d4-56a5-4f64-be68-bce9e45dda04",
+	"email": "test_115016@lumix.com",
+	"password": "$2b$12$IpVoIkRgowNzOe9UCi.S.OAn2JXgsBijN9QA5ES3i.YAWcTLAhiqq",
+	"name": "Test User",
+	"created_at": "2025-12-05T11:50:16.746249+00:00"
+}
+{
+	"_id": {
+		"$oid": "69385620e48c5904e33f95cd"
+	},
+	"id": "b45543f4-60c8-4376-a2d7-e8161d258fa0",
+	"email": "test_170224@lumix.com",
+	"password": "$2b$12$.8SzWSzoi8LH64kA2FdljugEjitOAVAZx3KFF9mE3dYzXcL521xYu",
+	"name": "Test User",
+	"created_at": "2025-12-09T17:02:24.770360+00:00"
+}
+{
+	"_id": {
+		"$oid": "6968d7563e7a3ececc0ba559"
+	},
+	"id": "1a1cbc15-956b-4b93-a9e2-d433d56e28f5",
+	"email": "xxlisho@gmail.com",
+	"password": "$2b$12$l14h2A95nqlqcWZq2M/5DuYz3VTplvpFqywMehJcEp4dFUIXCDFN2",
+	"name": "lucas",
+	"created_at": "2026-01-15T12:02:30.384847+00:00"
+}
+{
+	"_id": {
+		"$oid": "6a43f2ffb89d6f6fece1e343"
+	},
+	"id": "4e7ae2f6-cee0-482c-bced-0184fc2d8357",
+	"email": "leonicelaboratorio@lumix.com",
+	"password": "$2b$12$sSdo.4zbazRvlNHWfUHCKO9taOM/aUmvd8B5nlh7mNgROv74HhXGi",
+	"name": "Leonice Laboratório",
+	"created_at": "2026-06-30T16:46:55.683129+00:00"
+}
+{
+	"_id": {
+		"$oid": "6a43f3c9cf4e385a39ab5f93"
+	},
+	"id": "2c75787a-3411-49bb-81be-ae371b828756",
+	"email": "TESTuser_e4ef49bf5e@example.com",
+	"password": "$2b$12$arcP5VJtmHrotuguclIf..MibFijqy5WMHKK5.ZOgeN0hlVAnjCIm",
+	"name": "TEST User",
+	"created_at": "2026-06-30T16:50:17.189995+00:00"
+}
+{
+	"_id": {
+		"$oid": "6a4402c8f5bc354a3a66ef7b"
+	},
+	"id": "61fc1a3d-ef60-43aa-ad45-98a223f54265",
+	"email": "TESTuser_327ef91ce6@example.com",
+	"password": "$2b$12$aNrj2fX4hJYzhEXgestxNesHSZgeDGdYDhpDD/oM8KcQAxWLSGL4O",
+	"name": "TEST User",
+	"created_at": "2026-06-30T17:54:16.430822+00:00"
+}

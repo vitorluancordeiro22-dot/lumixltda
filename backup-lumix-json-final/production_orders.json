@@ -1,0 +1,72 @@
+{
+	"_id": {
+		"$oid": "6931c6ed95fef518db4a2429"
+	},
+	"id": "c2affad6-8697-4c41-9c82-ff8df1cad92d",
+	"product_id": "11bfdb40-2ee2-43d0-ba4b-07d9c8d5e9be",
+	"product_batch_id": "cd1146a9-b72e-4cd3-8faa-01a5a186e907",
+	"date": "2025-12-04",
+	"weigher": "João Silva",
+	"production_size": {
+		"$numberDouble": "50.0"
+	},
+	"materials_used": [
+		{
+			"raw_material_id": "6265a12c-260f-49b9-9e8d-13e872432775",
+			"quantity": {
+				"$numberDouble": "40.0"
+			}
+		}
+	],
+	"status": "em_producao",
+	"created_at": "2025-12-04T17:37:49.855507+00:00",
+	"deleted": true
+}
+{
+	"_id": {
+		"$oid": "6932c6f98f6b8ac08f18f1bb"
+	},
+	"id": "70408024-a7d5-462c-9474-481d9c46feb9",
+	"product_id": "d8411853-193d-42dd-883e-e2db1db152a9",
+	"product_batch_id": "8185cd58-67eb-4c06-834e-0ba2fa7eb539",
+	"date": "2025-12-05",
+	"weigher": "João Silva",
+	"production_size": {
+		"$numberDouble": "50.0"
+	},
+	"materials_used": [
+		{
+			"raw_material_id": "0ff82eb2-8f25-418c-a7cb-d448b1eeec45",
+			"quantity": {
+				"$numberDouble": "40.0"
+			}
+		}
+	],
+	"status": "em_producao",
+	"created_at": "2025-12-05T11:50:17.443985+00:00",
+	"deleted": true
+}
+{
+	"_id": {
+		"$oid": "69385621e48c5904e33f95d4"
+	},
+	"id": "41c42244-101f-4084-b1d8-dae6da168933",
+	"product_id": "e39f2243-38c1-42d5-a437-955a0f442ab7",
+	"product_batch_id": "1f8c65e0-fac0-435e-b94d-615960733076",
+	"date": "2025-12-09",
+	"weigher": "João Silva",
+	"production_size": {
+		"$numberDouble": "50.0"
+	},
+	"materials_used": [
+		{
+			"raw_material_id": "30993858-111e-4831-a801-defde12b0581",
+			"quantity": {
+				"$numberDouble": "40.0"
+			}
+		}
+	],
+	"status": "em_producao",
+	"created_at": "2025-12-09T17:02:25.553876+00:00",
+	"deleted": true
+}

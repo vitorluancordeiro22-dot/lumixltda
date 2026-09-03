@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import api from '../lib/api';
 import { Button } from '../components/ui/button';
-import { Package, Droplets, RotateCcw, Calculator, TrendingUp, BarChart3, Activity, CalendarDays } from 'lucide-react';
+import { Package, Droplets, RotateCcw, Calculator, TrendingUp, BarChart3, Activity, CalendarDays, Users, ClipboardList } from 'lucide-react';
 import { Skeleton } from '../components/ui/skeleton';
 import { toast } from 'sonner';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
@@ -31,6 +31,21 @@ export const Dashboard = () => {
   const [dailyData, setDailyData] = useState([]);
   const [monthlyData, setMonthlyData] = useState([]);
   const [chartsLoading, setChartsLoading] = useState(true);
+  const [reportPeriod, setReportPeriod] = useState('week');
+  const [report, setReport] = useState(null);
+  const [reportLoading, setReportLoading] = useState(true);
+
+  const fetchReport = async (period) => {
+    setReportLoading(true);
+    try {
+      const r = await api.get(`/reports/production?period=${period}`);
+      setReport(r.data);
+    } catch (error) {
+      console.error('Error fetching report:', error);
+    } finally {
+      setReportLoading(false);
+    }
+  };
 
   const fetchSummary = async () => {
     try {
@@ -65,6 +80,10 @@ export const Dashboard = () => {
       fetchChartData();
     });
   }, []);
+
+  useEffect(() => {
+    fetchReport(reportPeriod);
+  }, [reportPeriod]);
 
   const handleResetLiters = async () => {
     if (!window.confirm('Tem certeza que deseja resetar o contador de litros envasados do mês? Esta ação não pode ser desfeita.')) {
@@ -302,6 +321,94 @@ export const Dashboard = () => {
           )}
         </div>
       )}
+
+      {/* Relatório de Envase por período */}
+      <div className="lumix-card p-6" data-testid="production-report">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+          <div className="flex items-center gap-2.5">
+            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+              <ClipboardList className="w-5 h-5 text-primary" strokeWidth={2} />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-slate-900 tracking-tight">Relatório de Envase</h2>
+              <p className="text-xs font-medium text-slate-400">O que foi feito, quanto e quem envasou</p>
+            </div>
+          </div>
+          <div className="inline-flex rounded-xl bg-slate-100 p-1 self-start">
+            {[
+              { k: 'day', label: 'Diário' },
+              { k: 'week', label: 'Semanal' },
+              { k: 'month', label: 'Mensal' },
+            ].map((p) => (
+              <button
+                key={p.k}
+                onClick={() => setReportPeriod(p.k)}
+                data-testid={`report-period-${p.k}`}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  reportPeriod === p.k ? 'bg-white text-primary shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Totais do período */}
+        {report && !reportLoading && (
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
+            <div className="rounded-xl bg-secondary/5 ring-1 ring-secondary/15 p-3.5">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total Litros</p>
+              <p className="text-2xl font-bold text-slate-900">{report.total_liters?.toFixed(1)}<span className="text-sm text-slate-400 ml-1">L</span></p>
+            </div>
+            <div className="rounded-xl bg-primary/5 ring-1 ring-primary/15 p-3.5">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total Kg</p>
+              <p className="text-2xl font-bold text-slate-900">{report.total_kg?.toFixed(1)}<span className="text-sm text-slate-400 ml-1">Kg</span></p>
+            </div>
+            <div className="rounded-xl bg-emerald-500/5 ring-1 ring-emerald-500/15 p-3.5 col-span-2 sm:col-span-1">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Lotes Envasados</p>
+              <p className="text-2xl font-bold text-slate-900">{report.batches_count}</p>
+            </div>
+          </div>
+        )}
+
+        {reportLoading ? (
+          <Skeleton className="h-32 bg-slate-100 rounded-xl" />
+        ) : !report || report.items.length === 0 ? (
+          <div className="py-10 text-center text-slate-400 text-sm">Nenhum envase registrado neste período.</div>
+        ) : (
+          <div className="space-y-2.5">
+            {report.items.map((it) => (
+              <div key={it.batch_id} className="rounded-xl border border-slate-100 p-3.5 hover:bg-slate-50/60 transition-all" data-testid={`report-item-${it.batch_id}`}>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-slate-900 truncate">{it.product_name || 'Produto'}</p>
+                    <p className="text-[11px] font-mono text-slate-400">Lote {it.batch_number}</p>
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="inline-flex items-center gap-1 text-xs font-semibold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-full">
+                      <Users className="w-3.5 h-3.5 text-primary" />
+                      {it.operators_label}
+                    </span>
+                    <span className="text-sm font-bold text-slate-900">
+                      {it.total.toFixed(1)}<span className="text-xs text-slate-400 ml-0.5">{it.unit}</span>
+                    </span>
+                  </div>
+                </div>
+                {it.sizes.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mt-2.5">
+                    {it.sizes.map((s) => (
+                      <span key={s.label} className="text-[11px] font-semibold text-secondary bg-secondary/10 px-2 py-0.5 rounded-md">
+                        {s.count} × {s.label}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 };

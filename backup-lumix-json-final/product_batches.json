@@ -1,0 +1,823 @@
+{
+	"_id": {
+		"$oid": "6931c6ed95fef518db4a2426"
+	},
+	"id": "cd1146a9-b72e-4cd3-8faa-01a5a186e907",
+	"product_id": "11bfdb40-2ee2-43d0-ba4b-07d9c8d5e9be",
+	"batch_number": "2512004",
+	"date": "2025-12-04",
+	"unit": "Litros",
+	"planned_liters": {
+		"$numberDouble": "100.0"
+	},
+	"status": "finalizado",
+	"total_bottled": {
+		"$numberDouble": "122.0"
+	},
+	"created_at": "2025-12-04T17:37:49.603023+00:00",
+	"deleted": true
+}
+{
+	"_id": {
+		"$oid": "6931e826d8f9b2ecd4ed750e"
+	},
+	"id": "95d7a7cf-2c43-4532-b46f-e8073b012249",
+	"product_id": "80d05b84-4d30-4571-ae38-bd9ccfe9c248",
+	"batch_number": "2512002",
+	"date": "2025-12-04",
+	"unit": "Litros",
+	"planned_liters": {
+		"$numberDouble": "100.0"
+	},
+	"status": "em_aberto",
+	"total_bottled": {
+		"$numberDouble": "0.0"
+	},
+	"created_at": "2025-12-04T19:59:34.619513+00:00",
+	"deleted": true
+}
+{
+	"_id": {
+		"$oid": "693994ae3e49d86d292db721"
+	},
+	"id": "c56bdad6-9c5e-4de5-9090-56ffe19c7953",
+	"product_id": "0b9ded25-0fd2-478a-9305-42a50e645689",
+	"batch_number": "9999999",
+	"date": "2025-12-09",
+	"unit": "L",
+	"planned_liters": {
+		"$numberDouble": "10.0"
+	},
+	"status": "em_aberto",
+	"total_bottled": {
+		"$numberDouble": "0.0"
+	},
+	"created_at": "2025-12-10T15:41:34.932267+00:00",
+	"deleted": true,
+	"is_custom": true
+}
+{
+	"_id": {
+		"$oid": "693994af3e49d86d292db722"
+	},
+	"id": "2e5694d8-7477-4234-b9dd-8d2b9c4a1131",
+	"product_id": "0b9ded25-0fd2-478a-9305-42a50e645689",
+	"batch_number": "10000000",
+	"date": "2025-12-09",
+	"unit": "L",
+	"planned_liters": {
+		"$numberDouble": "10.0"
+	},
+	"status": "em_aberto",
+	"total_bottled": {
+		"$numberDouble": "0.0"
+	},
+	"created_at": "2025-12-10T15:41:35.027698+00:00",
+	"deleted": true,
+	"is_custom": false
+}
+{
+	"_id": {
+		"$oid": "6939950c3e49d86d292db723"
+	},
+	"id": "eae7a96a-2320-4e75-a270-1ca6afeca2d4",
+	"product_id": "bd72d1f4-153a-45d4-a272-9b713af48323",
+	"batch_number": "2512038",
+	"date": "2025-12-10",
+	"unit": "Litros",
+	"planned_liters": {
+		"$numberDouble": "200.0"
+	},
+	"status": "em_aberto",
+	"total_bottled": {
+		"$numberDouble": "0.0"
+	},
+	"created_at": "2025-12-10T15:43:08.096771+00:00",
+	"deleted": false,
+	"is_custom": true
+}
+{
+	"_id": {
+		"$oid": "6939953b3e49d86d292db724"
+	},
+	"id": "57c13d0a-a3cf-4efc-9413-5dccb78772c8",
+	"product_id": "",
+	"batch_number": "2512025",
+	"date": "2025-12-10",
+	"unit": "Litros",
+	"planned_liters": {
+		"$numberDouble": "22.0"
+	},
+	"status": "finalizado",
+	"total_bottled": {
+		"$numberDouble": "40.0"
+	},
+	"created_at": "2025-12-10T15:43:55.065333+00:00",
+	"deleted": false,
+	"is_custom": true
+}
+{
+	"_id": {
+		"$oid": "693995dc3e49d86d292db727"
+	},
+	"id": "31410187-4a6c-4814-a262-7fd4a0177cbf",
+	"product_id": "0b9ded25-0fd2-478a-9305-42a50e645689",
+	"batch_number": "25152002",
+	"date": "2025-12-10",
+	"unit": "Litros",
+	"planned_liters": {
+		"$numberDouble": "222.0"
+	},
+	"status": "em_aberto",
+	"total_bottled": {
+		"$numberDouble": "0.0"
+	},
+	"created_at": "2025-12-10T15:46:36.098441+00:00",
+	"deleted": true,
+	"is_custom": true
+}
+{
+	"_id": {
+		"$oid": "693995fdfd97c15032887d7b"
+	},
+	"id": "ac010a2e-ebd3-452e-94e3-6750d52e4ffb",
+	"product_id": "0b9ded25-0fd2-478a-9305-42a50e645689",
+	"batch_number": "2512033",
+	"date": "2025-12-10",
+	"unit": "Litros",
+	"planned_liters": {
+		"$numberDouble": "522.0"
+	},
+	"status": "em_aberto",
+	"total_bottled": {
+		"$numberDouble": "0.0"
+	},
+	"created_at": "2025-12-10T15:47:09.723036+00:00",
+	"deleted": false,
+	"is_custom": true
+}
+{
+	"_id": {
+		"$oid": "6939961c0039c35b656c1bea"
+	},
+	"id": "36fada12-ae10-440f-b6e7-cd7a1fc64558",
+	"product_id": "e39f2243-38c1-42d5-a437-955a0f442ab7",
+	"batch_number": "2512003",
+	"date": "2025-12-10",
+	"unit": "Litros",
+	"planned_liters": {
+		"$numberDouble": "22222.0"
+	},
+	"status": "em_aberto",
+	"total_bottled": {
+		"$numberDouble": "0.0"
+	},
+	"created_at": "2025-12-10T15:47:40.124928+00:00",
+	"deleted": false,
+	"is_custom": true
+}
+{
+	"_id": {
+		"$oid": "693996340f4d0be7d7f0d13c"
+	},
+	"id": "d0c2c183-8779-4fd2-9931-4b843ac0ac20",
+	"product_id": "0b9ded25-0fd2-478a-9305-42a50e645689",
+	"batch_number": "2512046",
+	"date": "2025-12-10",
+	"unit": "Litros",
+	"planned_liters": {
+		"$numberDouble": "33.0"
+	},
+	"status": "em_aberto",
+	"total_bottled": {
+		"$numberDouble": "0.0"
+	},
+	"created_at": "2025-12-10T15:48:04.634096+00:00",
+	"deleted": false,
+	"is_custom": true
+}
+{
+	"_id": {
+		"$oid": "6939963e0f4d0be7d7f0d13d"
+	},
+	"id": "d72f3abb-59f7-4400-a499-b1a42455300a",
+	"product_id": "0b9ded25-0fd2-478a-9305-42a50e645689",
+	"batch_number": "2512100",
+	"date": "2025-12-10",
+	"unit": "L",
+	"planned_liters": {
+		"$numberDouble": "5.0"
+	},
+	"status": "em_aberto",
+	"total_bottled": {
+		"$numberDouble": "0.0"
+	},
+	"created_at": "2025-12-10T15:48:14.021209+00:00",
+	"deleted": false,
+	"is_custom": true
+}
+{
+	"_id": {
+		"$oid": "6939963e0f4d0be7d7f0d13e"
+	},
+	"id": "cb05411a-8026-4772-a0e9-6915a6962530",
+	"product_id": "0b9ded25-0fd2-478a-9305-42a50e645689",
+	"batch_number": "2512101",
+	"date": "2025-12-10",
+	"unit": "L",
+	"planned_liters": {
+		"$numberDouble": "5.0"
+	},
+	"status": "em_aberto",
+	"total_bottled": {
+		"$numberDouble": "0.0"
+	},
+	"created_at": "2025-12-10T15:48:14.135573+00:00",
+	"deleted": true,
+	"is_custom": false
+}
+{
+	"_id": {
+		"$oid": "693996420f4d0be7d7f0d13f"
+	},
+	"id": "f9679d22-83ff-43b4-9994-88b49f17e7b1",
+	"product_id": "",
+	"batch_number": "2512055",
+	"date": "2025-12-10",
+	"unit": "Litros",
+	"planned_liters": {
+		"$numberDouble": "33.0"
+	},
+	"status": "em_aberto",
+	"total_bottled": {
+		"$numberDouble": "0.0"
+	},
+	"created_at": "2025-12-10T15:48:18.946532+00:00",
+	"deleted": false,
+	"is_custom": true
+}
+{
+	"_id": {
+		"$oid": "6939967f0f4d0be7d7f0d140"
+	},
+	"id": "d05b954e-e8e9-440d-a13a-244cc619980d",
+	"product_id": "e39f2243-38c1-42d5-a437-955a0f442ab7",
+	"batch_number": "2512002",
+	"date": "2025-12-10",
+	"unit": "Litros",
+	"planned_liters": {
+		"$numberDouble": "33.0"
+	},
+	"status": "em_aberto",
+	"total_bottled": {
+		"$numberDouble": "0.0"
+	},
+	"created_at": "2025-12-10T15:49:19.423150+00:00",
+	"deleted": false,
+	"is_custom": true
+}
+{
+	"_id": {
+		"$oid": "6939971a9bfde9d8541637eb"
+	},
+	"id": "33128ae6-61db-402a-98d3-1c4bf784dad9",
+	"product_id": "0b9ded25-0fd2-478a-9305-42a50e645689",
+	"batch_number": "2512200",
+	"date": "2025-12-10",
+	"unit": "L",
+	"planned_liters": {
+		"$numberDouble": "1.0"
+	},
+	"status": "em_aberto",
+	"total_bottled": {
+		"$numberDouble": "0.0"
+	},
+	"created_at": "2025-12-10T15:51:54.382746+00:00",
+	"deleted": false,
+	"is_custom": true
+}
+{
+	"_id": {
+		"$oid": "6939971b9bfde9d8541637ec"
+	},
+	"id": "d072935d-c8d9-4673-988f-981a12f40552",
+	"product_id": "0b9ded25-0fd2-478a-9305-42a50e645689",
+	"batch_number": "2512050",
+	"date": "2025-12-10",
+	"unit": "L",
+	"planned_liters": {
+		"$numberDouble": "1.0"
+	},
+	"status": "em_aberto",
+	"total_bottled": {
+		"$numberDouble": "0.0"
+	},
+	"created_at": "2025-12-10T15:51:55.463217+00:00",
+	"deleted": false,
+	"is_custom": true
+}
+{
+	"_id": {
+		"$oid": "6939971c9bfde9d8541637ed"
+	},
+	"id": "67dfe47a-4f56-4451-a77d-e30836c156d8",
+	"product_id": "0b9ded25-0fd2-478a-9305-42a50e645689",
+	"batch_number": "2512051",
+	"date": "2025-12-10",
+	"unit": "L",
+	"planned_liters": {
+		"$numberDouble": "1.0"
+	},
+	"status": "em_aberto",
+	"total_bottled": {
+		"$numberDouble": "0.0"
+	},
+	"created_at": "2025-12-10T15:51:56.549192+00:00",
+	"deleted": false,
+	"is_custom": false
+}
+{
+	"_id": {
+		"$oid": "693997619bfde9d8541637ee"
+	},
+	"id": "cb073cb9-7e0f-49f4-bfbf-203284fe199a",
+	"product_id": "0b9ded25-0fd2-478a-9305-42a50e645689",
+	"batch_number": "2512045",
+	"date": "2025-12-10",
+	"unit": "Litros",
+	"planned_liters": {
+		"$numberDouble": "25.0"
+	},
+	"status": "em_aberto",
+	"total_bottled": {
+		"$numberDouble": "0.0"
+	},
+	"created_at": "2025-12-10T15:53:05.538938+00:00",
+	"deleted": false,
+	"is_custom": true
+}
+{
+	"_id": {
+		"$oid": "693997739bfde9d8541637ef"
+	},
+	"id": "c38b2d69-a935-4c7c-b801-324e600f5ac1",
+	"product_id": "0b9ded25-0fd2-478a-9305-42a50e645689",
+	"batch_number": "2512088",
+	"date": "2025-12-10",
+	"unit": "Litros",
+	"planned_liters": {
+		"$numberDouble": "33.0"
+	},
+	"status": "em_aberto",
+	"total_bottled": {
+		"$numberDouble": "0.0"
+	},
+	"created_at": "2025-12-10T15:53:23.090681+00:00",
+	"deleted": false,
+	"is_custom": true
+}
+{
+	"_id": {
+		"$oid": "693aac72c268438f18b019e8"
+	},
+	"id": "5cc6b72b-b06d-44b5-893c-097c219d8cca",
+	"product_id": "bd72d1f4-153a-45d4-a272-9b713af48323",
+	"batch_number": "2512089",
+	"date": "2025-12-11",
+	"unit": "Kg",
+	"planned_liters": {
+		"$numberDouble": "20.0"
+	},
+	"status": "em_aberto",
+	"total_bottled": {
+		"$numberDouble": "0.0"
+	},
+	"created_at": "2025-12-11T11:35:14.724992+00:00",
+	"deleted": false,
+	"is_custom": false
+}
+{
+	"_id": {
+		"$oid": "693b0e9525fa51a901f02b53"
+	},
+	"id": "5819b632-aec2-443f-a29a-f91f744513fc",
+	"product_id": "0b9ded25-0fd2-478a-9305-42a50e645689",
+	"batch_number": "2512090",
+	"date": "2025-12-25",
+	"unit": "Litros",
+	"planned_liters": {
+		"$numberDouble": "20.0"
+	},
+	"status": "em_aberto",
+	"total_bottled": {
+		"$numberDouble": "0.0"
+	},
+	"created_at": "2025-12-11T18:33:57.181391+00:00",
+	"deleted": false,
+	"is_custom": false
+}
+{
+	"_id": {
+		"$oid": "6968ca7012919ca8022d3eab"
+	},
+	"id": "5982fd34-9992-4019-88f7-1230b8a4c9c2",
+	"product_id": "0b3fa5d7-5d89-4785-861c-8924bf9f859b",
+	"batch_number": "2512092",
+	"date": "2026-01-15",
+	"unit": "Litros",
+	"planned_liters": {
+		"$numberDouble": "3333.0"
+	},
+	"status": "em_aberto",
+	"total_bottled": {
+		"$numberDouble": "0.0"
+	},
+	"created_at": "2026-01-15T11:07:28.572757+00:00",
+	"deleted": false,
+	"is_custom": false
+}
+{
+	"_id": {
+		"$oid": "699df8a004519d74fcc4be1d"
+	},
+	"id": "1f8c65e0-fac0-435e-b94d-615960733076",
+	"product_id": "e39f2243-38c1-42d5-a437-955a0f442ab7",
+	"batch_number": "2512012",
+	"date": "2025-12-09",
+	"unit": "Litros",
+	"planned_liters": {
+		"$numberDouble": "100.0"
+	},
+	"status": "em_aberto",
+	"total_bottled": {
+		"$numberDouble": "170.0"
+	},
+	"created_at": "2025-12-09T17:02:25.348680+00:00",
+	"deleted": false,
+	"reopened_at": "2026-02-24T19:14:40.682464+00:00",
+	"reopened_from_archive": true
+}
+{
+	"_id": {
+		"$oid": "69b2aeb0e1c38d8b3951b381"
+	},
+	"id": "e11c1e99-5efc-4913-9a79-9fc9a7f99c64",
+	"product_id": "bd72d1f4-153a-45d4-a272-9b713af48323",
+	"batch_number": "2512097",
+	"date": "2026-03-12",
+	"unit": "Litros",
+	"planned_liters": {
+		"$numberDouble": "150.0"
+	},
+	"status": "em_aberto",
+	"total_bottled": {
+		"$numberDouble": "0.0"
+	},
+	"created_at": "2026-03-12T12:16:48.344141+00:00",
+	"deleted": false,
+	"is_custom": false,
+	"released_by": "laboratoriolumix@outlook.com",
+	"released_for_bottling_at": "2026-03-12T12:18:23.773260+00:00"
+}
+{
+	"_id": {
+		"$oid": "69b2af3be1c38d8b3951b383"
+	},
+	"id": "b2259a79-e8a3-4ac1-9570-174661edab2f",
+	"product_id": "0b9ded25-0fd2-478a-9305-42a50e645689",
+	"batch_number": "2512098",
+	"date": "2026-03-12",
+	"unit": "Litros",
+	"planned_liters": {
+		"$numberDouble": "655.0"
+	},
+	"status": "em_aberto",
+	"total_bottled": {
+		"$numberDouble": "0.0"
+	},
+	"created_at": "2026-03-12T12:19:07.861480+00:00",
+	"deleted": false,
+	"is_custom": false,
+	"released_by": "laboratoriolumix@outlook.com",
+	"released_for_bottling_at": "2026-03-12T12:19:13.172665+00:00"
+}
+{
+	"_id": {
+		"$oid": "69cc044aa70f79a6ac8ba8b1"
+	},
+	"id": "1d210069-23ab-4f4a-a23a-ee130371a37a",
+	"product_id": "3e10f0f3-8e5c-4b3e-a12e-73ebc4b7a3b5",
+	"batch_number": "2512099",
+	"date": "2026-03-16",
+	"unit": "Kg",
+	"planned_liters": {
+		"$numberDouble": "500.0"
+	},
+	"status": "em_producao",
+	"total_bottled": {
+		"$numberDouble": "0.0"
+	},
+	"created_at": "2026-03-31T17:28:42.870442+00:00",
+	"deleted": false,
+	"is_custom": false,
+	"raw_materials_used": []
+}
+{
+	"_id": {
+		"$oid": "69cc0452a70f79a6ac8ba8b3"
+	},
+	"id": "26ecc375-2931-4a93-b1f6-5f23bdd81394",
+	"product_id": "bd72d1f4-153a-45d4-a272-9b713af48323",
+	"batch_number": "2512100",
+	"date": "2026-03-16",
+	"unit": "Kg",
+	"planned_liters": {
+		"$numberDouble": "500.0"
+	},
+	"status": "em_producao",
+	"total_bottled": {
+		"$numberDouble": "0.0"
+	},
+	"created_at": "2026-03-31T17:28:50.925347+00:00",
+	"deleted": false,
+	"is_custom": false,
+	"raw_materials_used": [
+		{
+			"raw_material_id": "0ff82eb2-8f25-418c-a7cb-d448b1eeec45",
+			"raw_material_name": "Água Filtrada",
+			"quantity_needed": {
+				"$numberDouble": "50.0"
+			},
+			"unit": "Kg",
+			"batches_consumed": [
+				{
+					"batch_id": "e688e58b-08fe-4e27-ae1f-c62f847c228b",
+					"batch_number": "2512006",
+					"quantity_used": {
+						"$numberDouble": "50.0"
+					},
+					"remaining_after": {
+						"$numberDouble": "0.0"
+					}
+				}
+			]
+		}
+	]
+}
+{
+	"_id": {
+		"$oid": "69cc047540800bc768c6e819"
+	},
+	"id": "e8857492-b9b7-4892-981d-ab5053f3ef66",
+	"product_id": "bd72d1f4-153a-45d4-a272-9b713af48323",
+	"batch_number": "2512101",
+	"date": "2026-03-16",
+	"unit": "Kg",
+	"planned_liters": {
+		"$numberDouble": "500.0"
+	},
+	"status": "em_producao",
+	"total_bottled": {
+		"$numberDouble": "0.0"
+	},
+	"created_at": "2026-03-31T17:29:25.635057+00:00",
+	"deleted": true,
+	"is_custom": false,
+	"raw_materials_used": [
+		{
+			"raw_material_id": "0ff82eb2-8f25-418c-a7cb-d448b1eeec45",
+			"raw_material_name": "Água Filtrada",
+			"quantity_needed": {
+				"$numberDouble": "50.0"
+			},
+			"unit": "Kg",
+			"batches_consumed": []
+		}
+	]
+}
+{
+	"_id": {
+		"$oid": "69dd1cbb76f5824afb430d78"
+	},
+	"id": "9ae57a23-bf61-4005-9d22-80cd0ed4f14a",
+	"product_id": "bd72d1f4-153a-45d4-a272-9b713af48323",
+	"batch_number": "2512101",
+	"date": "2026-03-16",
+	"unit": "Kg",
+	"planned_liters": {
+		"$numberDouble": "200.0"
+	},
+	"status": "em_producao",
+	"total_bottled": {
+		"$numberDouble": "0.0"
+	},
+	"created_at": "2026-04-13T16:41:31.537653+00:00",
+	"deleted": true,
+	"is_custom": false,
+	"raw_materials_used": [
+		{
+			"raw_material_id": "0ff82eb2-8f25-418c-a7cb-d448b1eeec45",
+			"raw_material_name": "Água Filtrada",
+			"quantity_needed": {
+				"$numberDouble": "20.0"
+			},
+			"unit": "Kg",
+			"batches_consumed": [
+				{
+					"batch_id": "e688e58b-08fe-4e27-ae1f-c62f847c228b",
+					"batch_number": "2512006",
+					"quantity_used": {
+						"$numberDouble": "20.0"
+					},
+					"remaining_after": {
+						"$numberDouble": "30.0"
+					}
+				}
+			]
+		}
+	]
+}
+{
+	"_id": {
+		"$oid": "69e11fc2208d7700a238c32c"
+	},
+	"id": "e7d9ced4-1143-4b2c-b26a-2ab3ffd1c37b",
+	"product_id": "bd72d1f4-153a-45d4-a272-9b713af48323",
+	"batch_number": "2512101",
+	"date": "2026-04-13",
+	"unit": "Kg",
+	"planned_liters": {
+		"$numberDouble": "100.0"
+	},
+	"status": "em_producao",
+	"total_bottled": {
+		"$numberDouble": "0.0"
+	},
+	"created_at": "2026-04-16T17:43:30.262607+00:00",
+	"deleted": false,
+	"is_custom": false,
+	"raw_materials_used": [
+		{
+			"raw_material_id": "0ff82eb2-8f25-418c-a7cb-d448b1eeec45",
+			"raw_material_name": "Água Filtrada",
+			"quantity_needed": {
+				"$numberDouble": "10.0"
+			},
+			"unit": "Kg",
+			"batches_consumed": [
+				{
+					"batch_id": "e688e58b-08fe-4e27-ae1f-c62f847c228b",
+					"batch_number": "2512006",
+					"supplier_batch_number": "",
+					"expiry_date": "",
+					"quantity_used": {
+						"$numberDouble": "10.0"
+					},
+					"remaining_after": {
+						"$numberDouble": "40.0"
+					}
+				}
+			]
+		}
+	]
+}
+{
+	"_id": {
+		"$oid": "6a1055005bcb7357d6a85ca1"
+	},
+	"id": "12ce937f-107b-4d1c-8197-1664e541deae",
+	"product_id": "0b9ded25-0fd2-478a-9305-42a50e645689",
+	"batch_number": "2512102",
+	"date": "2026-05-22",
+	"unit": "Litros",
+	"planned_liters": {
+		"$numberDouble": "2101.0"
+	},
+	"status": "em_producao",
+	"total_bottled": {
+		"$numberDouble": "0.0"
+	},
+	"created_at": "2026-05-22T13:07:12.982315+00:00",
+	"deleted": false,
+	"is_custom": false,
+	"raw_materials_used": [
+		{
+			"raw_material_id": "e553dbc8-87aa-4ad9-aae3-0327aee1813e",
+			"raw_material_name": "Água Mineral",
+			"quantity_needed": {
+				"$numberDouble": "16.808"
+			},
+			"unit": "L",
+			"batches_consumed": [
+				{
+					"batch_id": "a880e802-594b-4751-9fc5-1eab7b5d90b6",
+					"batch_number": "2512008",
+					"supplier_batch_number": "",
+					"expiry_date": "",
+					"quantity_used": {
+						"$numberDouble": "16.808"
+					},
+					"remaining_after": {
+						"$numberDouble": "983.192"
+					}
+				}
+			]
+		},
+		{
+			"raw_material_id": "8ee8abdf-b7ef-48bd-8840-1c958ceb136c",
+			"raw_material_name": "TIRA MANCHAS",
+			"quantity_needed": {
+				"$numberDouble": "13761.55"
+			},
+			"unit": "L",
+			"batches_consumed": [
+				{
+					"batch_id": "66afa13f-4baf-42cb-bbf0-fdce15ef06be",
+					"batch_number": "2512095",
+					"supplier_batch_number": "1581651065",
+					"expiry_date": "2026-05-22",
+					"quantity_used": {
+						"$numberDouble": "90.0"
+					},
+					"remaining_after": {
+						"$numberDouble": "0.0"
+					}
+				}
+			]
+		},
+		{
+			"raw_material_id": "24cc7546-22f1-4879-b17a-7ae3841a16e3",
+			"raw_material_name": "Açúcar Cristal",
+			"quantity_needed": {
+				"$numberDouble": "11660.55"
+			},
+			"unit": "L",
+			"batches_consumed": []
+		}
+	]
+}
+{
+	"_id": {
+		"$oid": "6a157dd0862a79dea6e98168"
+	},
+	"id": "9e46606d-1d4d-43dd-9ab6-35a7f67d2538",
+	"product_id": "e39f2243-38c1-42d5-a437-955a0f442ab7",
+	"batch_number": "2512103",
+	"date": "2026-02-22",
+	"unit": "Litros",
+	"planned_liters": {
+		"$numberDouble": "200.0"
+	},
+	"status": "em_producao",
+	"total_bottled": {
+		"$numberDouble": "0.0"
+	},
+	"created_at": "2026-05-26T11:02:40.921617+00:00",
+	"deleted": true,
+	"is_custom": false,
+	"raw_materials_used": [
+		{
+			"raw_material_id": "30993858-111e-4831-a801-defde12b0581",
+			"raw_material_name": "Água Filtrada",
+			"quantity_needed": {
+				"$numberDouble": "0.32"
+			},
+			"unit": "L",
+			"batches_consumed": [
+				{
+					"batch_id": "7a37cc0c-8469-4404-afe4-d79a3eccd742",
+					"batch_number": "2512013",
+					"supplier_batch_number": "",
+					"expiry_date": "",
+					"quantity_used": {
+						"$numberDouble": "0.32"
+					},
+					"remaining_after": {
+						"$numberDouble": "49.68"
+					}
+				}
+			]
+		}
+	]
+}
+{
+	"_id": {
+		"$oid": "6a47e98b99da1e2d82793c0c"
+	},
+	"id": "a00b4353-698f-4eb8-af74-4802daf13466",
+	"product_id": "9704734c-0b9c-478c-9d43-840031cd0f48",
+	"batch_number": "2512103",
+	"date": "2026-07-03",
+	"unit": "Litros",
+	"planned_liters": {
+		"$numberDouble": "150.0"
+	},
+	"status": "em_producao",
+	"total_bottled": {
+		"$numberDouble": "0.0"
+	},
+	"created_at": "2026-07-03T16:55:39.179229+00:00",
+	"deleted": false,
+	"is_custom": false,
+	"raw_materials_used": []
+}

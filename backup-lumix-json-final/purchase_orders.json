@@ -1,0 +1,316 @@
+{
+	"_id": {
+		"$oid": "6a4402c9f5bc354a3a66ef80"
+	},
+	"id": "ead1d6ea-dfa9-4c66-bad1-39c27cad66a4",
+	"seq": {
+		"$numberInt": "1"
+	},
+	"order_number": "PED-0001",
+	"supplier_id": "c2c24d18-08af-4daa-8213-92d2a0652816",
+	"supplier_name": "TEST Supplier",
+	"unit": "Kg",
+	"items": [
+		{
+			"name": "TEST_OrderItem_fc66b",
+			"unit": "Kg",
+			"quantity": {
+				"$numberDouble": "5.0"
+			},
+			"raw_material_id": null
+		}
+	],
+	"observations": "Pedido de teste automatizado",
+	"status": "pendente",
+	"created_by": "Lumix laboratorio",
+	"created_by_email": "laboratoriolumix@outlook.com",
+	"created_at": "2026-06-30T17:54:17.793544+00:00",
+	"delivered_at": null,
+	"deleted": true
+}
+{
+	"_id": {
+		"$oid": "6a4402caf5bc354a3a66ef82"
+	},
+	"id": "50482ea8-b505-4da8-9074-e4ca3f4e19d3",
+	"seq": {
+		"$numberInt": "2"
+	},
+	"order_number": "PED-0002",
+	"supplier_id": "c2c24d18-08af-4daa-8213-92d2a0652816",
+	"supplier_name": "TEST Supplier",
+	"unit": "Kg",
+	"items": [
+		{
+			"name": "TEST_AutoSave_45565e",
+			"unit": "Kg",
+			"quantity": {
+				"$numberDouble": "2.0"
+			},
+			"raw_material_id": null
+		}
+	],
+	"observations": "",
+	"status": "pendente",
+	"created_by": "Lumix laboratorio",
+	"created_by_email": "laboratoriolumix@outlook.com",
+	"created_at": "2026-06-30T17:54:18.030053+00:00",
+	"delivered_at": null,
+	"deleted": true
+}
+{
+	"_id": {
+		"$oid": "6a4402caf5bc354a3a66ef84"
+	},
+	"id": "29bc56bb-e534-422c-8a12-b51c687970cd",
+	"seq": {
+		"$numberInt": "3"
+	},
+	"order_number": "PED-0003",
+	"supplier_id": "c2c24d18-08af-4daa-8213-92d2a0652816",
+	"supplier_name": "TEST",
+	"unit": "Kg",
+	"items": [
+		{
+			"name": "X",
+			"unit": "Kg",
+			"quantity": {
+				"$numberDouble": "1.0"
+			},
+			"raw_material_id": null
+		}
+	],
+	"observations": "",
+	"status": "pendente",
+	"created_by": "Lumix laboratorio",
+	"created_by_email": "laboratoriolumix@outlook.com",
+	"created_at": "2026-06-30T17:54:18.430437+00:00",
+	"delivered_at": null,
+	"deleted": true
+}
+{
+	"_id": {
+		"$oid": "6a4402caf5bc354a3a66ef85"
+	},
+	"id": "de9b2bfd-bf9b-4196-8c7f-43db8aafae9d",
+	"seq": {
+		"$numberInt": "4"
+	},
+	"order_number": "PED-0004",
+	"supplier_id": "c2c24d18-08af-4daa-8213-92d2a0652816",
+	"supplier_name": "TEST",
+	"unit": "Kg",
+	"items": [
+		{
+			"name": "X",
+			"unit": "Kg",
+			"quantity": {
+				"$numberDouble": "1.0"
+			},
+			"raw_material_id": null
+		}
+	],
+	"observations": "",
+	"status": "pendente",
+	"created_by": "Lumix laboratorio",
+	"created_by_email": "laboratoriolumix@outlook.com",
+	"created_at": "2026-06-30T17:54:18.872514+00:00",
+	"delivered_at": null,
+	"deleted": true
+}
+{
+	"_id": {
+		"$oid": "6a4402cbf5bc354a3a66ef86"
+	},
+	"id": "66035677-6299-44a0-a9d2-d7cd2f1cb075",
+	"seq": {
+		"$numberInt": "5"
+	},
+	"order_number": "PED-0005",
+	"supplier_id": "c2c24d18-08af-4daa-8213-92d2a0652816",
+	"supplier_name": "TEST",
+	"unit": "Kg",
+	"items": [
+		{
+			"name": "X",
+			"unit": "Kg",
+			"quantity": {
+				"$numberDouble": "1.0"
+			},
+			"raw_material_id": null
+		}
+	],
+	"observations": "",
+	"status": "pendente",
+	"created_by": "Lumix laboratorio",
+	"created_by_email": "laboratoriolumix@outlook.com",
+	"created_at": "2026-06-30T17:54:19.088475+00:00",
+	"delivered_at": null,
+	"deleted": true
+}
+{
+	"_id": {
+		"$oid": "6a4402cbf5bc354a3a66ef89"
+	},
+	"id": "d3882025-efa7-4f98-a01e-9592d7e37214",
+	"seq": {
+		"$numberInt": "6"
+	},
+	"order_number": "PED-0006",
+	"supplier_id": "c2c24d18-08af-4daa-8213-92d2a0652816",
+	"supplier_name": "TEST",
+	"unit": "Kg",
+	"items": [
+		{
+			"name": "Pão de queijo",
+			"unit": "Kg",
+			"quantity": {
+				"$numberDouble": "3.0"
+			},
+			"raw_material_id": null
+		},
+		{
+			"name": "Leite",
+			"unit": "Kg",
+			"quantity": {
+				"$numberDouble": "5.0"
+			},
+			"raw_material_id": null
+		}
+	],
+	"observations": "Pedido com 2 itens para validar PDF",
+	"status": "pendente",
+	"created_by": "Lumix laboratorio",
+	"created_by_email": "laboratoriolumix@outlook.com",
+	"created_at": "2026-06-30T17:54:19.392183+00:00",
+	"delivered_at": null,
+	"deleted": true
+}
+{
+	"_id": {
+		"$oid": "6a4402cbf5bc354a3a66ef8a"
+	},
+	"id": "cc1398b2-ab05-4498-af1f-87f8402237e1",
+	"seq": {
+		"$numberInt": "7"
+	},
+	"order_number": "PED-0007",
+	"supplier_id": "c2c24d18-08af-4daa-8213-92d2a0652816",
+	"supplier_name": "TEST",
+	"unit": "Kg",
+	"items": [
+		{
+			"name": "X",
+			"unit": "Kg",
+			"quantity": {
+				"$numberDouble": "1.0"
+			},
+			"raw_material_id": null
+		}
+	],
+	"observations": "",
+	"status": "pendente",
+	"created_by": "Lumix laboratorio",
+	"created_by_email": "laboratoriolumix@outlook.com",
+	"created_at": "2026-06-30T17:54:19.629103+00:00",
+	"delivered_at": null,
+	"deleted": true
+}
+{
+	"_id": {
+		"$oid": "6a44034cf5bc354a3a66ef8c"
+	},
+	"id": "6a61229f-51e0-45a5-8c39-614986eee371",
+	"seq": {
+		"$numberInt": "8"
+	},
+	"order_number": "PED-0008",
+	"supplier_id": "",
+	"supplier_name": "TEST_PDF_Sup",
+	"unit": "Litros",
+	"items": [
+		{
+			"name": "TEST_LeitePDF",
+			"unit": "Litros",
+			"quantity": {
+				"$numberDouble": "2.0"
+			},
+			"raw_material_id": null
+		},
+		{
+			"name": "TEST_CafePDF",
+			"unit": "Litros",
+			"quantity": {
+				"$numberDouble": "3.0"
+			},
+			"raw_material_id": null
+		}
+	],
+	"observations": "",
+	"status": "pendente",
+	"created_by": "Leonice Laboratório",
+	"created_by_email": "leonicelaboratorio@lumix.com",
+	"created_at": "2026-06-30T17:56:28.492944+00:00",
+	"delivered_at": null,
+	"deleted": true
+}
+{
+	"_id": {
+		"$oid": "6a47b219aeea3c6e1a55f6ea"
+	},
+	"id": "b882fe45-e0d5-43e0-a517-7badba073102",
+	"seq": {
+		"$numberInt": "9"
+	},
+	"order_number": "PED-0009",
+	"supplier_id": "92a08044-10d4-4d49-98c8-fdbd8a200e58",
+	"supplier_name": "f asef asef",
+	"unit": "Kg",
+	"items": [
+		{
+			"name": "asd",
+			"unit": "Kg",
+			"quantity": {
+				"$numberDouble": "1.0"
+			},
+			"raw_material_id": null
+		}
+	],
+	"observations": "afaf",
+	"status": "recebido",
+	"created_by": "Lumix laboratorio",
+	"created_by_email": "laboratoriolumix@outlook.com",
+	"created_at": "2026-07-03T12:59:05.355972+00:00",
+	"delivered_at": "2026-08-20T16:48:40.260241+00:00",
+	"deleted": false
+}
+{
+	"_id": {
+		"$oid": "6a591d731f94ca0deb65fd5d"
+	},
+	"id": "de90a355-612d-4f0a-9f3a-63eefd1dbe28",
+	"seq": {
+		"$numberInt": "10"
+	},
+	"order_number": "PED-0010",
+	"supplier_id": "ab723357-4a43-4784-9052-b2edc4d5d44a",
+	"supplier_name": "Fornecedor QA 1755265",
+	"unit": "Kg",
+	"items": [
+		{
+			"name": "Item QA Bom",
+			"unit": "Kg",
+			"quantity": {
+				"$numberDouble": "1.0"
+			},
+			"raw_material_id": null
+		}
+	],
+	"observations": "",
+	"status": "pendente",
+	"created_by": "Lumix laboratorio",
+	"created_by_email": "laboratoriolumix@outlook.com",
+	"created_at": "2026-07-16T18:05:39.469547+00:00",
+	"delivered_at": null,
+	"deleted": true
+}

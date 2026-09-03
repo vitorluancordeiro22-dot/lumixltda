@@ -25,6 +25,7 @@ import FichasAnalise from './pages/FichasAnalise';
 import FichaAnalise from './pages/FichaAnalise';
 import { Pedidos } from './pages/Pedidos';
 import { Notificar } from './pages/Notificar';
+import { Impressao } from './pages/Impressao';
 import './App.css';
 
 const PrivateRoute = ({ children }) => {
@@ -86,6 +87,7 @@ function App() {
               <Route path="fichas-analise" element={<RoleRoute allowedRoles={['laboratorio']}><FichasAnalise /></RoleRoute>} />
               <Route path="ficha-analise" element={<RoleRoute allowedRoles={['laboratorio']}><FichaAnalise /></RoleRoute>} />
               <Route path="batch-management" element={<RoleRoute allowedRoles={['laboratorio']}><BatchManagement /></RoleRoute>} />
+              <Route path="impressao" element={<RoleRoute allowedRoles={['laboratorio']}><Impressao /></RoleRoute>} />
               <Route path="pedidos" element={<RoleRoute allowedRoles={['laboratorio', 'pedidos']}><Pedidos /></RoleRoute>} />
               <Route path="notificar" element={<RoleRoute allowedRoles={['laboratorio', 'producao']}><Notificar /></RoleRoute>} />
               <Route path="team" element={<RoleRoute allowedRoles={['laboratorio']}><Team /></RoleRoute>} />

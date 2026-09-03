@@ -1,0 +1,11 @@
+{
+	"_id": {
+		"$oid": "6a57d5f08b2202a4337ffd5b"
+	},
+	"id": "01bee594-253c-46a6-bd21-18b564e02a6b",
+	"product_name": "sada",
+	"message": "tatga ta",
+	"created_by": "Lumix laboratorio",
+	"created_at": "2026-07-15T18:48:16.082361+00:00",
+	"deleted": true
+}

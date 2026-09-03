@@ -1,0 +1,33 @@
+{
+  "summary": "Tested the new 'Resultado da Análise' bridge button from Ordem de Produção -> Ficha de Análise. Bridge navigation works (opens produto's analises view directly with product name, Voltar/Nova Análise/Editar Campos/Gerar Documentação buttons and 'Nenhuma análise registrada para este produto' state). Query params (productId, productName) are cleared from URL. Regression checks OK: direct nav to /ficha-analise still shows categories list; Fechar and Gerar Documentação buttons still render on Ordem de Produção (22 lotes, 22 close, 22 doc, 22 resultado buttons). HOWEVER, the 'Voltar' button on Ficha de Análise crashes with a runtime error when entering via the bridge.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "FichaAnalise.js (renderAnalises Voltar handler)",
+        "issue": "Uncaught runtime error: 'Cannot read properties of null (reading items)' at getCategoryItems -> renderItems. When user arrives via the bridge (productId query param), selectedCategory is never set (openItem is called directly). The Voltar button sets view='items' (line 380), which then renders renderItems() -> getCategoryItems(selectedCategory=null) -> null.items crashes the page. The task spec requires 'O botão Voltar volta para a lista de categorias/itens normalmente'.",
+        "selector": "button:has-text('Voltar') inside renderAnalises after bridge navigation",
+        "priority": "HIGH"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Fix Voltar behavior in FichaAnalise.renderAnalises when arriving via the bridge (no selectedCategory). Suggested fix: if selectedCategory is null, Voltar should setView('categories') (and clear selectedItem). E.g.: onClick={() => { if (!selectedCategory) { setView('categories'); setSelectedItem(null); } else { setView('items'); } }} — or, on the bridge auto-open effect, additionally set view='analises' and leave selectedCategory=null while making renderItems tolerate null (early-return to categories)."
+  ],
+  "critical_code_review_comments": [
+    "FichaAnalise.js getCategoryItems does not guard against selectedCategory being null; wrap with (cat?.items || []).",
+    "The bridge useEffect depends on [allItems, pendingProductId, itemType] but calls openItem which mutates state (setSelectedItem/setView) — fine, but consider also seeding a synthetic view/breadcrumb so Voltar has a meaningful destination.",
+    "Bridge only triggers when itemType==='produto'; if user switches to 'Matérias-Primas' tab with a productId param still pending, pendingProductId remains set (never cleared). Low risk but worth clearing on tab switch."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A", "frontend": "80%"},
+  "test_credentials": "laboratoriolumix@outlook.com / Lumix2002 (Laboratório)",
+  "seed_data_creation": "None",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "The bridge itself works end-to-end (navigation, auto-open, URL cleanup, product name in header, empty-state message, action buttons all present). Regression on /fichas-analise (Fechar, Gerar Documentação) and direct /ficha-analise entry both OK. Only remaining defect is that Voltar crashes when entering via the bridge because selectedCategory is null. Screenshot captured at .screenshots/after_voltar.png shows the React uncaught runtime error overlay 'Cannot read properties of null (reading items)' at getCategoryItems.",
+  "rca of the issue": "Bridge path: FichasAnalise navigates to /ficha-analise?productId=...; FichaAnalise's useEffect (lines 150-160) calls openItem(product) which sets view='analises' + selectedItem, but never sets selectedCategory (there is no category context because the user did not enter via the categories flow). renderAnalises Voltar button (line 380) unconditionally calls setView('items'), which triggers renderItems -> getCategoryItems(selectedCategory) -> selectedCategory.items on null -> TypeError. Reproduction: login as laboratorio -> Ordem de Produção -> click Resultado da Análise on any lote -> click Voltar -> uncaught runtime error overlay appears."
+}

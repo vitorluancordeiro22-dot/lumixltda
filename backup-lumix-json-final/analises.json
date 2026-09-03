@@ -1,0 +1,56 @@
+{
+	"_id": {
+		"$oid": "6a328060786ce56b1bc9d3bd"
+	},
+	"id": "dff65ce9-e6bb-43f2-9f83-b25573a9b208",
+	"item_id": "bd72d1f4-153a-45d4-a272-9b713af48323",
+	"item_type": "produto",
+	"item_name": "Refrigerante Cocaccc",
+	"batch_id": "e7d9ced4-1143-4b2c-b26a-2ab3ffd1c37b",
+	"batch_number": "2512101",
+	"date": "2026-04-14",
+	"results": {
+		"Aspecto": "OK",
+		"Cor": "OK",
+		"Odor": "OK",
+		"pH": "62",
+		"Viscosidade": "6",
+		"Massa Específica": "11"
+	},
+	"specifications": {
+		"Aspecto": "Límpido",
+		"Cor": "Incolor",
+		"Odor": "Característico",
+		"pH": "ATÉ 11,40",
+		"Viscosidade": "10 a 11",
+		"Massa Específica": "1,02 a 1,05"
+	},
+	"status": "aprovado",
+	"raw_materials_used": [
+		{
+			"raw_material_id": "0ff82eb2-8f25-418c-a7cb-d448b1eeec45",
+			"raw_material_name": "Água Filtrada",
+			"quantity_needed": {
+				"$numberInt": "10"
+			},
+			"unit": "Kg",
+			"batches_consumed": [
+				{
+					"batch_id": "e688e58b-08fe-4e27-ae1f-c62f847c228b",
+					"batch_number": "2512006",
+					"supplier_batch_number": "",
+					"expiry_date": "",
+					"quantity_used": {
+						"$numberInt": "10"
+					},
+					"remaining_after": {
+						"$numberInt": "40"
+					}
+				}
+			]
+		}
+	],
+	"created_at": "2026-06-17T11:09:20.103883+00:00",
+	"created_by": "Lumix laboratorio",
+	"deleted": false
+}

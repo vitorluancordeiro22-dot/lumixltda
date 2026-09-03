@@ -1,4 +1,5 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import api from '../lib/api';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
@@ -36,6 +37,8 @@ const addDaysISO = (isoDate, days) => {
 };
 
 export default function FichaAnalise() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [pendingProductId, setPendingProductId] = useState(searchParams.get('productId'));
   const [activeTab, setActiveTab] = useState('produto');
   const [view, setView] = useState('categories'); // categories | items | analises | new_analise | edit_fields
   const [categories, setCategories] = useState([]);
@@ -79,9 +82,11 @@ export default function FichaAnalise() {
   }, [itemType]);
 
   useEffect(() => {
-    setView('categories');
-    setSelectedCategory(null);
-    setSelectedItem(null);
+    if (!pendingProductId) {
+      setView('categories');
+      setSelectedCategory(null);
+      setSelectedItem(null);
+    }
     fetchCategories();
     fetchAllItems();
   }, [activeTab, fetchCategories, fetchAllItems]);
@@ -140,6 +145,19 @@ export default function FichaAnalise() {
     } catch { toast.error('Erro ao carregar dados'); }
     setLoading(false);
   };
+
+  // Ponte vinda da aba "Ordem de Produção": abre direto as análises do produto
+  useEffect(() => {
+    if (!pendingProductId || itemType !== 'produto') return;
+    const item = allItems.find((p) => p.id === pendingProductId);
+    if (item) {
+      openItem(item);
+      setPendingProductId(null);
+      searchParams.delete('productId');
+      searchParams.delete('productName');
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [allItems, pendingProductId, itemType]);
 
   const startNewAnalise = () => {
     setSelectedBatch(null);
@@ -359,7 +377,7 @@ export default function FichaAnalise() {
   const renderAnalises = () => (
     <div className="space-y-4">
       <div className="flex items-center gap-3 flex-wrap">
-        <Button variant="ghost" onClick={() => setView('items')}>
+        <Button variant="ghost" onClick={() => { if (selectedCategory) { setView('items'); } else { setSelectedItem(null); setView('categories'); } }}>
           <ArrowLeft className="w-4 h-4 mr-1" /> Voltar
         </Button>
         <div className="flex items-center gap-2">

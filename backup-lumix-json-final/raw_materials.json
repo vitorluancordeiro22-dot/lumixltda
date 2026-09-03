@@ -1,0 +1,170 @@
+{
+	"_id": {
+		"$oid": "6931c6ed95fef518db4a2424"
+	},
+	"id": "6265a12c-260f-49b9-9e8d-13e872432775",
+	"name": "Água Filtrada",
+	"type": "Litros",
+	"total_stock": {
+		"$numberDouble": "1010.0"
+	},
+	"created_at": "2025-12-04T17:37:49.432858+00:00",
+	"deleted": true
+}
+{
+	"_id": {
+		"$oid": "6931e0fefe751c8949c75709"
+	},
+	"id": "a6ec741b-e33f-4455-aef0-4259a40fdb14",
+	"name": "ACIDO SULFONICO",
+	"type": "Litros",
+	"total_stock": {
+		"$numberDouble": "50.0"
+	},
+	"created_at": "2025-12-04T19:29:02.709369+00:00",
+	"deleted": true
+}
+{
+	"_id": {
+		"$oid": "6931e3fffe751c8949c7570b"
+	},
+	"id": "762f2790-19bb-4172-a1c1-cb3f54421a9e",
+	"name": "pedra",
+	"type": "Litros",
+	"total_stock": {
+		"$numberDouble": "50.0"
+	},
+	"created_at": "2025-12-04T19:41:51.534906+00:00",
+	"deleted": true
+}
+{
+	"_id": {
+		"$oid": "6931e826d8f9b2ecd4ed750f"
+	},
+	"id": "232929b5-44fd-495b-a1be-d12fca8c70be",
+	"name": "MP Teste",
+	"type": "Litros",
+	"total_stock": {
+		"$numberDouble": "50.0"
+	},
+	"created_at": "2025-12-04T19:59:34.725761+00:00",
+	"deleted": true
+}
+{
+	"_id": {
+		"$oid": "69324ddb476abbc650a9dfde"
+	},
+	"id": "19cdb3bb-5ee9-4cf7-b52b-bacf53a9d28e",
+	"name": "Teste ",
+	"type": "Litros",
+	"total_stock": {
+		"$numberDouble": "32.0"
+	},
+	"created_at": "2025-12-05T03:13:31.573967+00:00",
+	"deleted": true
+}
+{
+	"_id": {
+		"$oid": "6932bf0072a34dce653d8a3d"
+	},
+	"id": "e03073fe-475c-41eb-95e2-710720447a4a",
+	"name": "testa",
+	"type": "Litros",
+	"total_stock": {
+		"$numberDouble": "150.0"
+	},
+	"supplier_id": "",
+	"received_date": "2025-12-05",
+	"created_at": "2025-12-05T11:16:16.159872+00:00",
+	"deleted": false
+}
+{
+	"_id": {
+		"$oid": "6932c6f98f6b8ac08f18f1b5"
+	},
+	"id": "0ff82eb2-8f25-418c-a7cb-d448b1eeec45",
+	"name": "Água Filtrada",
+	"type": "Litros",
+	"total_stock": {
+		"$numberDouble": "50.0"
+	},
+	"supplier_id": "",
+	"received_date": "",
+	"created_at": "2025-12-05T11:50:17.089519+00:00",
+	"deleted": false
+}
+{
+	"_id": {
+		"$oid": "6932c7218f6b8ac08f18f1be"
+	},
+	"id": "fbdda7bc-f573-4a59-9944-1c309bf247f2",
+	"name": "Água Mineral",
+	"type": "Litros",
+	"total_stock": {
+		"$numberInt": "0"
+	},
+	"supplier_id": "",
+	"received_date": "",
+	"created_at": "2025-12-05T11:50:57.261082+00:00",
+	"deleted": false
+}
+{
+	"_id": {
+		"$oid": "6932c7218f6b8ac08f18f1c4"
+	},
+	"id": "24cc7546-22f1-4879-b17a-7ae3841a16e3",
+	"name": "Açúcar Cristal",
+	"type": "Kg",
+	"total_stock": {
+		"$numberInt": "0"
+	},
+	"supplier_id": "",
+	"received_date": "",
+	"created_at": "2025-12-05T11:50:57.604752+00:00",
+	"deleted": false
+}
+{
+	"_id": {
+		"$oid": "6932dc95fb409edf8d770e61"
+	},
+	"id": "e553dbc8-87aa-4ad9-aae3-0327aee1813e",
+	"name": "Água Mineral",
+	"type": "Litros",
+	"total_stock": {
+		"$numberDouble": "983.192"
+	},
+	"supplier_id": "",
+	"received_date": "",
+	"created_at": "2025-12-05T13:22:29.781363+00:00",
+	"deleted": false
+}
+{
+	"_id": {
+		"$oid": "69385621e48c5904e33f95ce"
+	},
+	"id": "30993858-111e-4831-a801-defde12b0581",
+	"name": "Água Filtrada",
+	"type": "Litros",
+	"total_stock": {
+		"$numberDouble": "50.0"
+	},
+	"supplier_id": "",
+	"received_date": "",
+	"created_at": "2025-12-09T17:02:25.108485+00:00",
+	"deleted": false
+}
+{
+	"_id": {
+		"$oid": "69a6e365e5dff81f107fb879"
+	},
+	"id": "8ee8abdf-b7ef-48bd-8840-1c958ceb136c",
+	"name": "TIRA MANCHAS",
+	"type": "Litros",
+	"total_stock": {
+		"$numberDouble": "0.0"
+	},
+	"supplier_id": "",
+	"received_date": "2026-03-03",
+	"created_at": "2026-03-03T13:34:29.252752+00:00",
+	"deleted": false
+}

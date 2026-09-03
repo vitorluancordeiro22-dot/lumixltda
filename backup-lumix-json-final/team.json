@@ -1,0 +1,99 @@
+{
+	"_id": {
+		"$oid": "6931c6ed95fef518db4a2428"
+	},
+	"id": "6c22e13f-632e-4e0f-b199-647f6274311d",
+	"name": "João Silva",
+	"role": "Operador",
+	"active": true,
+	"created_at": "2025-12-04T17:37:49.768041+00:00",
+	"deleted": true
+}
+{
+	"_id": {
+		"$oid": "6931dfeffe751c8949c75704"
+	},
+	"id": "96bee9d6-7eb5-467e-b355-854d127a57f9",
+	"name": "FELIPE ",
+	"role": "PRODUÇAO",
+	"active": true,
+	"created_at": "2025-12-04T19:24:31.719153+00:00",
+	"deleted": false
+}
+{
+	"_id": {
+		"$oid": "6931e016fe751c8949c75705"
+	},
+	"id": "6a40dcfd-0924-45a6-83e6-03200d0743fc",
+	"name": "JOÃO",
+	"role": "PRODUÇÃO",
+	"active": true,
+	"created_at": "2025-12-04T19:25:10.485097+00:00",
+	"deleted": false
+}
+{
+	"_id": {
+		"$oid": "6931e023fe751c8949c75706"
+	},
+	"id": "1862fb98-8434-4415-90f7-d160b2de8579",
+	"name": "ABRAÃO",
+	"role": "PRODUÇÃO",
+	"active": true,
+	"created_at": "2025-12-04T19:25:23.412668+00:00",
+	"deleted": false
+}
+{
+	"_id": {
+		"$oid": "6931e02dfe751c8949c75707"
+	},
+	"id": "629a2cc3-c04e-4cc5-97a5-225eda345e31",
+	"name": "LEONICE",
+	"role": "PROPIETARIO",
+	"active": true,
+	"created_at": "2025-12-04T19:25:33.164730+00:00",
+	"deleted": false
+}
+{
+	"_id": {
+		"$oid": "6931e051fe751c8949c75708"
+	},
+	"id": "0b2a5991-bac2-4d20-a0c0-4e61d983805a",
+	"name": "VITOR ",
+	"role": "AUX. LAB E  PRODUÇÃO",
+	"active": true,
+	"created_at": "2025-12-04T19:26:09.361496+00:00",
+	"deleted": false
+}
+{
+	"_id": {
+		"$oid": "6932c6f98f6b8ac08f18f1ba"
+	},
+	"id": "58d977fa-6a98-4c80-9e59-57b9a6ee6562",
+	"name": "João Silva",
+	"role": "Operador",
+	"active": true,
+	"created_at": "2025-12-05T11:50:17.405980+00:00",
+	"deleted": false
+}
+{
+	"_id": {
+		"$oid": "6932c7218f6b8ac08f18f1c1"
+	},
+	"id": "03be1bb3-30d1-40c4-ab6c-9609638a567b",
+	"name": "Maria Silva",
+	"role": "Operadora",
+	"active": true,
+	"created_at": "2025-12-05T11:50:57.367151+00:00",
+	"deleted": false
+}
+{
+	"_id": {
+		"$oid": "69385621e48c5904e33f95d3"
+	},
+	"id": "ccd6455b-1c7d-4a71-b2fd-d2b394d73bc9",
+	"name": "João Silva",
+	"role": "Operador",
+	"active": true,
+	"created_at": "2025-12-09T17:02:25.511558+00:00",
+	"deleted": false
+}

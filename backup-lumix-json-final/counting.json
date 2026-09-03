@@ -1,0 +1,56 @@
+{
+	"_id": {
+		"$oid": "699df8a004519d74fcc4be1e"
+	},
+	"id": "2792d88b-ac23-4215-9818-fe142d2c047d",
+	"product_batch_id": "1f8c65e0-fac0-435e-b94d-615960733076",
+	"one_liter": {
+		"$numberInt": "0"
+	},
+	"two_liter": {
+		"$numberInt": "0"
+	},
+	"five_liter": {
+		"$numberInt": "21"
+	},
+	"total": {
+		"$numberDouble": "105.0"
+	},
+	"operator": "João Silva",
+	"created_at": "2025-12-09T17:02:25.789386+00:00",
+	"batch_id": "1f8c65e0-fac0-435e-b94d-615960733076"
+}
+{
+	"_id": {
+		"$oid": "69b022f5354a8c4207a57dd2"
+	},
+	"id": "f285ef43-387b-43e5-a411-07db4135cf39",
+	"product_batch_id": "57c13d0a-a3cf-4efc-9413-5dccb78772c8",
+	"half_liter": {
+		"$numberInt": "0"
+	},
+	"one_liter": {
+		"$numberInt": "0"
+	},
+	"two_liter": {
+		"$numberInt": "20"
+	},
+	"five_liter": {
+		"$numberInt": "0"
+	},
+	"three_thirty_gram": {
+		"$numberInt": "0"
+	},
+	"five_hundred_gram": {
+		"$numberInt": "0"
+	},
+	"one_kg": {
+		"$numberInt": "0"
+	},
+	"total": {
+		"$numberDouble": "40.0"
+	},
+	"unit": "L",
+	"operator": "João Silva",
+	"created_at": "2026-03-10T13:56:05.147568+00:00"
+}

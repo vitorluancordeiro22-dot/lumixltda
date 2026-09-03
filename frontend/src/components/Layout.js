@@ -28,6 +28,7 @@ import {
   Beaker,
   Bell,
   Search,
+  Printer,
 } from 'lucide-react';
 
 const LAB_EMAIL = 'laboratoriolumix@outlook.com';
@@ -47,6 +48,7 @@ const menuCategories = [
       { path: '/fichas-analise', icon: ClipboardCheck, label: 'Ordem de Produção', roles: ['laboratorio'], emailOnly: LAB_EMAIL },
       { path: '/in-production', icon: Factory, label: 'Em Produção', roles: ['laboratorio', 'producao'] },
       { path: '/batch-management', icon: ListChecks, label: 'Gerenciar Lotes', roles: ['laboratorio'] },
+      { path: '/impressao', icon: Printer, label: 'Impressão', roles: ['laboratorio'] },
     ],
   },
   {

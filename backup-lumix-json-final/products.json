@@ -1,0 +1,443 @@
+{
+	"_id": {
+		"$oid": "6931c6ed95fef518db4a2425"
+	},
+	"id": "11bfdb40-2ee2-43d0-ba4b-07d9c8d5e9be",
+	"name": "Produto Teste",
+	"unit": "Litros",
+	"expected_liters": {
+		"$numberDouble": "500.0"
+	},
+	"recipes": [
+		{
+			"raw_material_id": "6265a12c-260f-49b9-9e8d-13e872432775",
+			"quantity_per_liter": {
+				"$numberDouble": "0.8"
+			}
+		}
+	],
+	"created_at": "2025-12-04T17:37:49.516921+00:00",
+	"deleted": true
+}
+{
+	"_id": {
+		"$oid": "6931c71395fef518db4a242c"
+	},
+	"id": "cfea4122-9504-428f-b8e6-9acce1f8771c",
+	"name": "Produto Teste UI",
+	"unit": "Litros",
+	"expected_liters": {
+		"$numberDouble": "100.0"
+	},
+	"recipes": [],
+	"created_at": "2025-12-04T17:38:27.908928+00:00",
+	"deleted": true
+}
+{
+	"_id": {
+		"$oid": "6931df27fe751c8949c75700"
+	},
+	"id": "0c7582e7-335a-4f97-aa39-5e94e219eb6e",
+	"name": "dd",
+	"unit": "Litros",
+	"expected_liters": {
+		"$numberDouble": "33.0"
+	},
+	"recipes": [],
+	"created_at": "2025-12-04T19:21:11.139277+00:00",
+	"deleted": true
+}
+{
+	"_id": {
+		"$oid": "6931df5cfe751c8949c75702"
+	},
+	"id": "ee2cf274-786a-41eb-908e-9b6c5c652705",
+	"name": "Produto Teste",
+	"unit": "Litros",
+	"expected_liters": {
+		"$numberDouble": "100.0"
+	},
+	"recipes": [],
+	"created_at": "2025-12-04T19:22:04.713920+00:00",
+	"deleted": true
+}
+{
+	"_id": {
+		"$oid": "6931e159fe751c8949c7570a"
+	},
+	"id": "e28d3535-e338-44f5-893a-ea3158c8d85d",
+	"name": "DESINFETANTE FLOR DE AMEIXA",
+	"unit": "Litros",
+	"expected_liters": {
+		"$numberDouble": "50.0"
+	},
+	"recipes": [],
+	"created_at": "2025-12-04T19:30:33.404002+00:00",
+	"deleted": true
+}
+{
+	"_id": {
+		"$oid": "6931e65dfe751c8949c7570c"
+	},
+	"id": "45b877ab-d462-477f-a2bf-10f25f5deb18",
+	"name": "333",
+	"unit": "Litros",
+	"expected_liters": {
+		"$numberDouble": "50.0"
+	},
+	"recipes": [],
+	"created_at": "2025-12-04T19:51:57.014192+00:00",
+	"deleted": true
+}
+{
+	"_id": {
+		"$oid": "6931e826d8f9b2ecd4ed750d"
+	},
+	"id": "80d05b84-4d30-4571-ae38-bd9ccfe9c248",
+	"name": "Teste Lote",
+	"unit": "Litros",
+	"expected_liters": {
+		"$numberDouble": "100.0"
+	},
+	"recipes": [],
+	"created_at": "2025-12-04T19:59:34.562570+00:00",
+	"deleted": true
+}
+{
+	"_id": {
+		"$oid": "6932c6f98f6b8ac08f18f1b6"
+	},
+	"id": "d8411853-193d-42dd-883e-e2db1db152a9",
+	"name": "Produto Teste",
+	"unit": "Litros",
+	"expected_liters": {
+		"$numberDouble": "500.0"
+	},
+	"recipes": [
+		{
+			"raw_material_id": "0ff82eb2-8f25-418c-a7cb-d448b1eeec45",
+			"quantity_per_liter": {
+				"$numberDouble": "0.8"
+			},
+			"unit": "L"
+		}
+	],
+	"created_at": "2025-12-05T11:50:17.166444+00:00",
+	"deleted": true
+}
+{
+	"_id": {
+		"$oid": "6932c6f98f6b8ac08f18f1b7"
+	},
+	"id": "2245e0df-6dfa-4e4f-9df1-d2afdbc9c968",
+	"name": "Produto com Receita Kg",
+	"unit": "Litros",
+	"expected_liters": {
+		"$numberDouble": "300.0"
+	},
+	"recipes": [
+		{
+			"raw_material_id": "0ff82eb2-8f25-418c-a7cb-d448b1eeec45",
+			"quantity_per_liter": {
+				"$numberDouble": "1.2"
+			},
+			"unit": "Kg"
+		}
+	],
+	"created_at": "2025-12-05T11:50:17.283764+00:00",
+	"deleted": true
+}
+{
+	"_id": {
+		"$oid": "6932c7218f6b8ac08f18f1bf"
+	},
+	"id": "f5a96237-6f14-4cf4-a450-008c7e001fcf",
+	"name": "Água Saborizada",
+	"unit": "Litros",
+	"expected_liters": {
+		"$numberDouble": "500.0"
+	},
+	"recipes": [
+		{
+			"raw_material_id": "fbdda7bc-f573-4a59-9944-1c309bf247f2",
+			"quantity_per_liter": {
+				"$numberDouble": "0.9"
+			},
+			"unit": "L"
+		}
+	],
+	"created_at": "2025-12-05T11:50:57.296195+00:00",
+	"deleted": true
+}
+{
+	"_id": {
+		"$oid": "6932c7218f6b8ac08f18f1c5"
+	},
+	"id": "28eaebce-4af3-4775-83af-da2dd55bc3d2",
+	"name": "Refrigerante Premium",
+	"unit": "Litros",
+	"expected_liters": {
+		"$numberDouble": "1000.0"
+	},
+	"recipes": [
+		{
+			"raw_material_id": "24cc7546-22f1-4879-b17a-7ae3841a16e3",
+			"quantity_per_liter": {
+				"$numberDouble": "0.15"
+			},
+			"unit": "Kg"
+		}
+	],
+	"created_at": "2025-12-05T11:50:57.638012+00:00",
+	"deleted": true,
+	"file_models": {
+		"op_model": {
+			"file_id": "6932d241c80b9a3f55f0d971",
+			"filename": "OP - QUEROSENE GEL.xls",
+			"content_type": "application/vnd.ms-excel",
+			"size": {
+				"$numberInt": "32256"
+			},
+			"file_type": "op_model",
+			"version": {
+				"$numberInt": "2"
+			},
+			"uploaded_at": "2025-12-05T12:38:25.661055+00:00",
+			"uploaded_by": "8d8cab0d-4787-4569-985e-286f19c0f084"
+		},
+		"ficha_analise": {
+			"file_id": "6932d247c80b9a3f55f0d973",
+			"filename": "FICHA - QUEROSENE GEL-DESKTOP-FL4VNO7.docx",
+			"content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+			"size": {
+				"$numberInt": "29232"
+			},
+			"file_type": "ficha_analise",
+			"version": {
+				"$numberInt": "1"
+			},
+			"uploaded_at": "2025-12-05T12:38:31.066383+00:00",
+			"uploaded_by": "8d8cab0d-4787-4569-985e-286f19c0f084"
+		}
+	}
+}
+{
+	"_id": {
+		"$oid": "6932dc95fb409edf8d770e62"
+	},
+	"id": "bd72d1f4-153a-45d4-a272-9b713af48323",
+	"name": "Refrigerante Cocaccc",
+	"unit": "Kg",
+	"expected_liters": {
+		"$numberDouble": "1000.0"
+	},
+	"recipes": [
+		{
+			"raw_material_id": "0ff82eb2-8f25-418c-a7cb-d448b1eeec45",
+			"quantity_per_liter": {
+				"$numberDouble": "100.0"
+			},
+			"unit": "Kg"
+		}
+	],
+	"created_at": "2025-12-05T13:22:29.847292+00:00",
+	"deleted": false,
+	"file_models": {
+		"op_model": {
+			"file_id": "69b7f84f30b9d144f525bedc",
+			"filename": "FICHA - ALVEJANTE SEM CLORO-DESKTOP-FL4VNO7.docx",
+			"content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+			"size": {
+				"$numberInt": "28393"
+			},
+			"file_type": "op_model",
+			"version": {
+				"$numberInt": "6"
+			},
+			"uploaded_at": "2026-03-16T12:32:15.948206+00:00",
+			"uploaded_by": "8d8cab0d-4787-4569-985e-286f19c0f084"
+		},
+		"ficha_analise": {
+			"file_id": "69b7f85330b9d144f525bede",
+			"filename": "OP - ALVEJANTE SEM CLORO-DESKTOP-FL4VNO7.xls",
+			"content_type": "application/vnd.ms-excel",
+			"size": {
+				"$numberInt": "26112"
+			},
+			"file_type": "ficha_analise",
+			"version": {
+				"$numberInt": "4"
+			},
+			"uploaded_at": "2026-03-16T12:32:19.862150+00:00",
+			"uploaded_by": "8d8cab0d-4787-4569-985e-286f19c0f084"
+		}
+	}
+}
+{
+	"_id": {
+		"$oid": "6933080340c05da3b73b03f6"
+	},
+	"id": "0b9ded25-0fd2-478a-9305-42a50e645689",
+	"name": "Produto Teste Final",
+	"unit": "L",
+	"expected_liters": {
+		"$numberDouble": "100.0"
+	},
+	"recipes": [
+		{
+			"raw_material_id": "e553dbc8-87aa-4ad9-aae3-0327aee1813e",
+			"quantity_per_liter": {
+				"$numberDouble": "0.8"
+			},
+			"unit": "L"
+		},
+		{
+			"raw_material_id": "8ee8abdf-b7ef-48bd-8840-1c958ceb136c",
+			"quantity_per_liter": {
+				"$numberDouble": "655.0"
+			},
+			"unit": "L"
+		},
+		{
+			"raw_material_id": "24cc7546-22f1-4879-b17a-7ae3841a16e3",
+			"quantity_per_liter": {
+				"$numberDouble": "555.0"
+			},
+			"unit": "L"
+		}
+	],
+	"created_at": "2025-12-05T16:27:47.687731+00:00",
+	"deleted": false,
+	"file_models": {
+		"op_model": {
+			"file_id": "69b7f9ca30b9d144f525bee6",
+			"filename": "OP - -DESKTOP-FL4VNO7.xls",
+			"content_type": "application/vnd.ms-excel",
+			"size": {
+				"$numberInt": "31744"
+			},
+			"file_type": "op_model",
+			"version": {
+				"$numberInt": "4"
+			},
+			"uploaded_at": "2026-03-16T12:38:34.542338+00:00",
+			"uploaded_by": "8d8cab0d-4787-4569-985e-286f19c0f084"
+		},
+		"ficha_analise": {
+			"file_id": "69b7f9c630b9d144f525bee4",
+			"filename": "FICHA+RECEITA -DESKTOP-FL4VNO7.docx",
+			"content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+			"size": {
+				"$numberInt": "28959"
+			},
+			"file_type": "ficha_analise",
+			"version": {
+				"$numberInt": "4"
+			},
+			"uploaded_at": "2026-03-16T12:38:30.152174+00:00",
+			"uploaded_by": "8d8cab0d-4787-4569-985e-286f19c0f084"
+		}
+	}
+}
+{
+	"_id": {
+		"$oid": "69385621e48c5904e33f95cf"
+	},
+	"id": "e39f2243-38c1-42d5-a437-955a0f442ab7",
+	"name": "Produto Teste",
+	"unit": "Litros",
+	"expected_liters": {
+		"$numberDouble": "500.0"
+	},
+	"recipes": [
+		{
+			"raw_material_id": "30993858-111e-4831-a801-defde12b0581",
+			"quantity_per_liter": {
+				"$numberDouble": "0.8"
+			},
+			"unit": "L"
+		}
+	],
+	"created_at": "2025-12-09T17:02:25.188580+00:00",
+	"deleted": false
+}
+{
+	"_id": {
+		"$oid": "69385621e48c5904e33f95d0"
+	},
+	"id": "01e28fb7-e6b1-4dba-9f23-4f10ab3b506d",
+	"name": "Produto com Receita Kg",
+	"unit": "Litros",
+	"expected_liters": {
+		"$numberDouble": "300.0"
+	},
+	"recipes": [
+		{
+			"raw_material_id": "30993858-111e-4831-a801-defde12b0581",
+			"quantity_per_liter": {
+				"$numberDouble": "1.2"
+			},
+			"unit": "Kg"
+		}
+	],
+	"created_at": "2025-12-09T17:02:25.311240+00:00",
+	"deleted": false,
+	"file_models": {
+		"op_model": {
+			"file_id": "693856cae48c5904e33f95db",
+			"filename": "FICHA - QUEROSENE GEL-DESKTOP-FL4VNO7.docx",
+			"content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+			"size": {
+				"$numberInt": "29232"
+			},
+			"file_type": "op_model",
+			"version": {
+				"$numberInt": "1"
+			},
+			"uploaded_at": "2025-12-09T17:05:14.118101+00:00",
+			"uploaded_by": "8d8cab0d-4787-4569-985e-286f19c0f084"
+		},
+		"ficha_analise": {
+			"file_id": "693856cfe48c5904e33f95dd",
+			"filename": "OP - QUEROSENE GEL-DESKTOP-FL4VNO7.xls",
+			"content_type": "application/vnd.ms-excel",
+			"size": {
+				"$numberInt": "32256"
+			},
+			"file_type": "ficha_analise",
+			"version": {
+				"$numberInt": "1"
+			},
+			"uploaded_at": "2025-12-09T17:05:19.578500+00:00",
+			"uploaded_by": "8d8cab0d-4787-4569-985e-286f19c0f084"
+		}
+	}
+}
+{
+	"_id": {
+		"$oid": "696101244d52a045496fc4ef"
+	},
+	"id": "0b3fa5d7-5d89-4785-861c-8924bf9f859b",
+	"name": "Açúcar Refinado",
+	"unit": "Kg",
+	"expected_liters": {
+		"$numberDouble": "100.0"
+	},
+	"recipes": [],
+	"created_at": "2026-01-09T13:22:44.847792+00:00",
+	"deleted": false
+}
+{
+	"_id": {
+		"$oid": "6a47e98599da1e2d82793c0b"
+	},
+	"id": "9704734c-0b9c-478c-9d43-840031cd0f48",
+	"name": "lalalalalal",
+	"unit": "Litros",
+	"expected_liters": {
+		"$numberDouble": "150.0"
+	},
+	"recipes": [],
+	"created_at": "2026-07-03T16:55:33.625225+00:00",
+	"deleted": false
+}

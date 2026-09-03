@@ -1,0 +1,487 @@
+{
+	"_id": {
+		"$oid": "6932c7218f6b8ac08f18f1c3"
+	},
+	"id": "06f59c30-7928-4ef0-b09f-79836ae509d6",
+	"product_id": "f5a96237-6f14-4cf4-a450-008c7e001fcf",
+	"batch_number": "2510001",
+	"date": "2025-10-21",
+	"unit": "Litros",
+	"planned_liters": {
+		"$numberDouble": "100.0"
+	},
+	"status": "finalizado",
+	"total_bottled": {
+		"$numberDouble": "100.0"
+	},
+	"created_at": "2025-12-05T11:50:57.332465+00:00",
+	"deleted": false,
+	"archived_year": {
+		"$numberInt": "2025"
+	},
+	"archived_month": {
+		"$numberInt": "10"
+	},
+	"archived_at": "2025-12-05T11:50:57.441584+00:00"
+}
+{
+	"_id": {
+		"$oid": "696698345a75ae9ee50c73e3"
+	},
+	"id": "8185cd58-67eb-4c06-834e-0ba2fa7eb539",
+	"product_id": "d8411853-193d-42dd-883e-e2db1db152a9",
+	"batch_number": "2512005",
+	"date": "2025-12-05",
+	"unit": "Litros",
+	"planned_liters": {
+		"$numberDouble": "100.0"
+	},
+	"status": "finalizado",
+	"total_bottled": {
+		"$numberDouble": "170.0"
+	},
+	"created_at": "2025-12-05T11:50:17.323929+00:00",
+	"deleted": false,
+	"archived_year": {
+		"$numberInt": "2025"
+	},
+	"archived_month": {
+		"$numberInt": "12"
+	},
+	"archived_at": "2026-01-13T19:08:36.863842+00:00",
+	"operators": [],
+	"countings_history": []
+}
+{
+	"_id": {
+		"$oid": "696698525a75ae9ee50c73e6"
+	},
+	"id": "72edacb6-37ac-4941-9ff2-3879a3f42c3d",
+	"product_id": "",
+	"batch_number": "2512007",
+	"date": "2025-12-05",
+	"unit": "Litros",
+	"planned_liters": {
+		"$numberDouble": "300.0"
+	},
+	"status": "finalizado",
+	"total_bottled": {
+		"$numberDouble": "222222.0"
+	},
+	"created_at": "2025-12-05T12:50:58.108720+00:00",
+	"deleted": false,
+	"archived_year": {
+		"$numberInt": "2025"
+	},
+	"archived_month": {
+		"$numberInt": "12"
+	},
+	"archived_at": "2026-01-13T19:09:06.132174+00:00",
+	"operators": [
+		"João Silva"
+	],
+	"countings_history": [
+		{
+			"id": "c75aabbf-adf6-4ab3-be69-bf5687d9efe2",
+			"product_batch_id": "72edacb6-37ac-4941-9ff2-3879a3f42c3d",
+			"half_liter": {
+				"$numberInt": "0"
+			},
+			"one_liter": {
+				"$numberInt": "222222"
+			},
+			"two_liter": {
+				"$numberInt": "0"
+			},
+			"five_liter": {
+				"$numberInt": "0"
+			},
+			"three_thirty_gram": {
+				"$numberInt": "0"
+			},
+			"five_hundred_gram": {
+				"$numberInt": "0"
+			},
+			"one_kg": {
+				"$numberInt": "0"
+			},
+			"total": {
+				"$numberDouble": "222222.0"
+			},
+			"operator": "João Silva",
+			"created_at": "2026-01-13T19:09:00.706891+00:00"
+		}
+	]
+}
+{
+	"_id": {
+		"$oid": "696794c07f010c2e832197c9"
+	},
+	"id": "38005c1c-03f3-45b9-a214-7a52ad91b15b",
+	"product_id": "0b9ded25-0fd2-478a-9305-42a50e645689",
+	"batch_number": "2512009",
+	"date": "2025-12-09",
+	"unit": "Kg",
+	"planned_liters": {
+		"$numberDouble": "20.0"
+	},
+	"status": "finalizado",
+	"total_bottled": {
+		"$numberDouble": "53020.0"
+	},
+	"created_at": "2025-12-09T16:24:12.437342+00:00",
+	"deleted": false,
+	"archived_year": {
+		"$numberInt": "2025"
+	},
+	"archived_month": {
+		"$numberInt": "12"
+	},
+	"archived_at": "2026-01-14T13:06:08.421941+00:00",
+	"operators": [
+		"Maria Silva"
+	],
+	"countings_history": [
+		{
+			"id": "6d09d011-e966-4a8d-8d86-a3843dc87a77",
+			"product_batch_id": "38005c1c-03f3-45b9-a214-7a52ad91b15b",
+			"half_liter": {
+				"$numberInt": "0"
+			},
+			"one_liter": {
+				"$numberInt": "0"
+			},
+			"two_liter": {
+				"$numberInt": "26510"
+			},
+			"five_liter": {
+				"$numberInt": "0"
+			},
+			"three_thirty_gram": {
+				"$numberInt": "0"
+			},
+			"five_hundred_gram": {
+				"$numberInt": "0"
+			},
+			"one_kg": {
+				"$numberInt": "0"
+			},
+			"total": {
+				"$numberDouble": "53020.0"
+			},
+			"operator": "Maria Silva",
+			"created_at": "2026-01-14T13:06:02.667403+00:00"
+		}
+	]
+}
+{
+	"_id": {
+		"$oid": "69b022a1354a8c4207a57dcd"
+	},
+	"id": "e66f8533-7c4d-4bc3-a990-d9a503d4128c",
+	"product_id": "0b9ded25-0fd2-478a-9305-42a50e645689",
+	"batch_number": "2512010",
+	"date": "2025-12-09",
+	"unit": "Litros",
+	"planned_liters": {
+		"$numberDouble": "333.0"
+	},
+	"status": "finalizado",
+	"total_bottled": {
+		"$numberDouble": "4040.0"
+	},
+	"created_at": "2025-12-09T16:27:05.018442+00:00",
+	"deleted": false,
+	"archived_year": {
+		"$numberInt": "2025"
+	},
+	"archived_month": {
+		"$numberInt": "12"
+	},
+	"archived_at": "2026-03-10T13:54:41.599603+00:00",
+	"operators": [
+		"João Silva"
+	],
+	"countings_history": [
+		{
+			"id": "4166f9f9-7a99-454e-9726-2e22d92075e3",
+			"product_batch_id": "e66f8533-7c4d-4bc3-a990-d9a503d4128c",
+			"half_liter": {
+				"$numberInt": "0"
+			},
+			"one_liter": {
+				"$numberInt": "0"
+			},
+			"two_liter": {
+				"$numberInt": "0"
+			},
+			"five_liter": {
+				"$numberInt": "0"
+			},
+			"three_thirty_gram": {
+				"$numberInt": "0"
+			},
+			"five_hundred_gram": {
+				"$numberInt": "0"
+			},
+			"one_kg": {
+				"$numberInt": "0"
+			},
+			"total": {
+				"$numberDouble": "0.0"
+			},
+			"unit": "L",
+			"operator": "",
+			"created_at": "2026-02-12T17:14:03.798043+00:00"
+		},
+		{
+			"id": "6e5830a0-e0bc-4a4e-bc36-e5b069074dd3",
+			"product_batch_id": "e66f8533-7c4d-4bc3-a990-d9a503d4128c",
+			"half_liter": {
+				"$numberInt": "0"
+			},
+			"one_liter": {
+				"$numberInt": "0"
+			},
+			"two_liter": {
+				"$numberInt": "2020"
+			},
+			"five_liter": {
+				"$numberInt": "0"
+			},
+			"three_thirty_gram": {
+				"$numberInt": "0"
+			},
+			"five_hundred_gram": {
+				"$numberInt": "0"
+			},
+			"one_kg": {
+				"$numberInt": "0"
+			},
+			"total": {
+				"$numberDouble": "4040.0"
+			},
+			"unit": "L",
+			"operator": "João Silva",
+			"created_at": "2026-03-10T13:54:35.774542+00:00"
+		}
+	]
+}
+{
+	"_id": {
+		"$oid": "69b022a1354a8c4207a57dce"
+	},
+	"id": "f9d021f0-f341-43a5-a87a-842a2ba8e237",
+	"product_id": "bd72d1f4-153a-45d4-a272-9b713af48323",
+	"batch_number": "2512011",
+	"date": "2025-12-09",
+	"unit": "Litros",
+	"planned_liters": {
+		"$numberDouble": "333.0"
+	},
+	"status": "finalizado",
+	"total_bottled": {
+		"$numberDouble": "10202.0"
+	},
+	"created_at": "2025-12-09T16:29:30.870335+00:00",
+	"deleted": false,
+	"archived_year": {
+		"$numberInt": "2025"
+	},
+	"archived_month": {
+		"$numberInt": "12"
+	},
+	"archived_at": "2026-03-10T13:54:41.599603+00:00",
+	"operators": [
+		"VITOR ",
+		"Maria Silva"
+	],
+	"countings_history": [
+		{
+			"id": "a0f8fd62-3733-44c2-a7e3-0eb80cb2cf06",
+			"product_batch_id": "f9d021f0-f341-43a5-a87a-842a2ba8e237",
+			"half_liter": {
+				"$numberInt": "0"
+			},
+			"one_liter": {
+				"$numberInt": "0"
+			},
+			"two_liter": {
+				"$numberInt": "0"
+			},
+			"five_liter": {
+				"$numberInt": "0"
+			},
+			"three_thirty_gram": {
+				"$numberInt": "0"
+			},
+			"five_hundred_gram": {
+				"$numberInt": "202"
+			},
+			"one_kg": {
+				"$numberInt": "0"
+			},
+			"total": {
+				"$numberDouble": "101.0"
+			},
+			"unit": "Kg",
+			"operator": "VITOR ",
+			"created_at": "2026-03-10T13:54:15.172133+00:00"
+		},
+		{
+			"id": "2a01f676-9084-47e1-b94f-4efad3a9354f",
+			"product_batch_id": "f9d021f0-f341-43a5-a87a-842a2ba8e237",
+			"half_liter": {
+				"$numberInt": "0"
+			},
+			"one_liter": {
+				"$numberInt": "0"
+			},
+			"two_liter": {
+				"$numberInt": "0"
+			},
+			"five_liter": {
+				"$numberInt": "0"
+			},
+			"three_thirty_gram": {
+				"$numberInt": "0"
+			},
+			"five_hundred_gram": {
+				"$numberInt": "20202"
+			},
+			"one_kg": {
+				"$numberInt": "0"
+			},
+			"total": {
+				"$numberDouble": "10101.0"
+			},
+			"unit": "Kg",
+			"operator": "Maria Silva",
+			"created_at": "2026-03-10T13:54:19.212411+00:00"
+		}
+	]
+}
+{
+	"_id": {
+		"$oid": "69b022a1354a8c4207a57dcf"
+	},
+	"id": "39aeb74f-39ab-4ebd-90b5-cb32fb5d95a6",
+	"product_id": "0b9ded25-0fd2-478a-9305-42a50e645689",
+	"batch_number": "2512044",
+	"date": "2025-12-10",
+	"unit": "Litros",
+	"planned_liters": {
+		"$numberDouble": "11.0"
+	},
+	"status": "finalizado",
+	"total_bottled": {
+		"$numberDouble": "764.0"
+	},
+	"created_at": "2025-12-10T12:46:20.030453+00:00",
+	"deleted": false,
+	"archived_year": {
+		"$numberInt": "2025"
+	},
+	"archived_month": {
+		"$numberInt": "12"
+	},
+	"archived_at": "2026-03-10T13:54:41.599603+00:00",
+	"operators": [
+		"FELIPE "
+	],
+	"countings_history": [
+		{
+			"id": "0efca4a9-4177-4db4-8c07-d10cb56e5cc3",
+			"product_batch_id": "39aeb74f-39ab-4ebd-90b5-cb32fb5d95a6",
+			"half_liter": {
+				"$numberInt": "0"
+			},
+			"one_liter": {
+				"$numberInt": "0"
+			},
+			"two_liter": {
+				"$numberInt": "252"
+			},
+			"five_liter": {
+				"$numberInt": "52"
+			},
+			"three_thirty_gram": {
+				"$numberInt": "0"
+			},
+			"five_hundred_gram": {
+				"$numberInt": "0"
+			},
+			"one_kg": {
+				"$numberInt": "0"
+			},
+			"total": {
+				"$numberDouble": "764.0"
+			},
+			"operator": "FELIPE ",
+			"created_at": "2026-01-15T11:46:53.200994+00:00"
+		}
+	]
+}
+{
+	"_id": {
+		"$oid": "69b022cb354a8c4207a57dd1"
+	},
+	"id": "55287876-69f7-454a-b3c7-6c1f09122d67",
+	"product_id": "e39f2243-38c1-42d5-a437-955a0f442ab7",
+	"batch_number": "2512091",
+	"date": "2026-01-15",
+	"unit": "Litros",
+	"planned_liters": {
+		"$numberDouble": "222.0"
+	},
+	"status": "finalizado",
+	"total_bottled": {
+		"$numberDouble": "5.05045E+06"
+	},
+	"created_at": "2026-01-15T11:02:37.302801+00:00",
+	"deleted": false,
+	"is_custom": false,
+	"archived_year": {
+		"$numberInt": "2026"
+	},
+	"archived_month": {
+		"$numberInt": "1"
+	},
+	"archived_at": "2026-03-10T13:55:23.424185+00:00",
+	"operators": [
+		"João Silva"
+	],
+	"countings_history": [
+		{
+			"id": "3bbd5507-7c9c-4094-8fac-62482ea0e152",
+			"product_batch_id": "55287876-69f7-454a-b3c7-6c1f09122d67",
+			"half_liter": {
+				"$numberInt": "0"
+			},
+			"one_liter": {
+				"$numberInt": "0"
+			},
+			"two_liter": {
+				"$numberInt": "2525225"
+			},
+			"five_liter": {
+				"$numberInt": "0"
+			},
+			"three_thirty_gram": {
+				"$numberInt": "0"
+			},
+			"five_hundred_gram": {
+				"$numberInt": "0"
+			},
+			"one_kg": {
+				"$numberInt": "0"
+			},
+			"total": {
+				"$numberDouble": "5.05045E+06"
+			},
+			"unit": "L",
+			"operator": "João Silva",
+			"created_at": "2026-03-10T13:55:10.941077+00:00"
+		}
+	]
+}

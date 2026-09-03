@@ -1,0 +1,24 @@
+{
+	"_id": {
+		"$oid": "6a32965a0159247764e2bfb7"
+	},
+	"product_id": "e39f2243-38c1-42d5-a437-955a0f442ab7",
+	"filename": "op_template.xls",
+	"size": {
+		"$numberInt": "26112"
+	},
+	"uploaded_at": "2026-06-17T12:43:06.548647+00:00",
+	"uploaded_by": "laboratoriolumix@outlook.com"
+}
+{
+	"_id": {
+		"$oid": "6a32969e0159247764e2bfd6"
+	},
+	"product_id": "bd72d1f4-153a-45d4-a272-9b713af48323",
+	"filename": "op_template.xls",
+	"size": {
+		"$numberInt": "26112"
+	},
+	"uploaded_at": "2026-06-17T12:44:14.769465+00:00",
+	"uploaded_by": "laboratoriolumix@outlook.com"
+}

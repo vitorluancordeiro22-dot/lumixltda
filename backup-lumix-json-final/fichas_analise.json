@@ -1,0 +1,818 @@
+{
+	"_id": {
+		"$oid": "69e11fc2208d7700a238c32e"
+	},
+	"id": "a2bf5389-9435-481b-b543-0f535f029279",
+	"product_id": "bd72d1f4-153a-45d4-a272-9b713af48323",
+	"product_name": "Refrigerante Cocaccc",
+	"product_batch_id": "e7d9ced4-1143-4b2c-b26a-2ab3ffd1c37b",
+	"batch_number": "2512101",
+	"month": {
+		"$numberInt": "4"
+	},
+	"year": {
+		"$numberInt": "2026"
+	},
+	"date": "2026-04-13",
+	"planned_liters": {
+		"$numberDouble": "100.0"
+	},
+	"unit": "Kg",
+	"expected_liters": {
+		"$numberDouble": "1000.0"
+	},
+	"recipes": [
+		{
+			"raw_material_id": "0ff82eb2-8f25-418c-a7cb-d448b1eeec45",
+			"raw_material_name": "Água Filtrada",
+			"quantity_needed": {
+				"$numberDouble": "10.0"
+			},
+			"unit": "Kg",
+			"batches_consumed": [
+				{
+					"batch_id": "e688e58b-08fe-4e27-ae1f-c62f847c228b",
+					"batch_number": "2512006",
+					"supplier_batch_number": "",
+					"expiry_date": "",
+					"quantity_used": {
+						"$numberDouble": "10.0"
+					},
+					"remaining_after": {
+						"$numberDouble": "40.0"
+					}
+				}
+			]
+		}
+	],
+	"status": "aberta",
+	"created_at": "2026-04-16T17:43:30.272517+00:00",
+	"deleted": false
+}
+{
+	"_id": {
+		"$oid": "6a1055005bcb7357d6a85ca3"
+	},
+	"id": "2876a94f-d2f8-49d1-aca8-6838f85b7b8e",
+	"product_id": "0b9ded25-0fd2-478a-9305-42a50e645689",
+	"product_name": "Produto Teste Final",
+	"product_batch_id": "12ce937f-107b-4d1c-8197-1664e541deae",
+	"batch_number": "2512102",
+	"month": {
+		"$numberInt": "5"
+	},
+	"year": {
+		"$numberInt": "2026"
+	},
+	"date": "2026-05-22",
+	"op_number": {
+		"$numberInt": "1"
+	},
+	"planned_liters": {
+		"$numberDouble": "2101.0"
+	},
+	"unit": "Litros",
+	"expected_liters": {
+		"$numberDouble": "100.0"
+	},
+	"recipes": [
+		{
+			"raw_material_id": "e553dbc8-87aa-4ad9-aae3-0327aee1813e",
+			"raw_material_name": "Água Mineral",
+			"quantity_needed": {
+				"$numberDouble": "16.808"
+			},
+			"unit": "L",
+			"batches_consumed": [
+				{
+					"batch_id": "a880e802-594b-4751-9fc5-1eab7b5d90b6",
+					"batch_number": "2512008",
+					"supplier_batch_number": "",
+					"expiry_date": "",
+					"quantity_used": {
+						"$numberDouble": "16.808"
+					},
+					"remaining_after": {
+						"$numberDouble": "983.192"
+					}
+				}
+			]
+		},
+		{
+			"raw_material_id": "8ee8abdf-b7ef-48bd-8840-1c958ceb136c",
+			"raw_material_name": "TIRA MANCHAS",
+			"quantity_needed": {
+				"$numberDouble": "13761.55"
+			},
+			"unit": "L",
+			"batches_consumed": [
+				{
+					"batch_id": "66afa13f-4baf-42cb-bbf0-fdce15ef06be",
+					"batch_number": "2512095",
+					"supplier_batch_number": "1581651065",
+					"expiry_date": "2026-05-22",
+					"quantity_used": {
+						"$numberDouble": "90.0"
+					},
+					"remaining_after": {
+						"$numberDouble": "0.0"
+					}
+				}
+			]
+		},
+		{
+			"raw_material_id": "24cc7546-22f1-4879-b17a-7ae3841a16e3",
+			"raw_material_name": "Açúcar Cristal",
+			"quantity_needed": {
+				"$numberDouble": "11660.55"
+			},
+			"unit": "L",
+			"batches_consumed": []
+		}
+	],
+	"status": "aberta",
+	"created_at": "2026-05-22T13:07:12.994102+00:00",
+	"deleted": false
+}
+{
+	"_id": {
+		"$oid": "6a157dd0862a79dea6e9816a"
+	},
+	"id": "e10c4e44-5d8e-4528-a53d-d1406557f43c",
+	"product_id": "e39f2243-38c1-42d5-a437-955a0f442ab7",
+	"product_name": "Produto Teste",
+	"product_batch_id": "9e46606d-1d4d-43dd-9ab6-35a7f67d2538",
+	"batch_number": "2512103",
+	"month": {
+		"$numberInt": "2"
+	},
+	"year": {
+		"$numberInt": "2026"
+	},
+	"date": "2026-02-22",
+	"op_number": {
+		"$numberInt": "1"
+	},
+	"planned_liters": {
+		"$numberDouble": "100.0"
+	},
+	"unit": "Litros",
+	"expected_liters": {
+		"$numberDouble": "500.0"
+	},
+	"recipes": [
+		{
+			"raw_material_id": "30993858-111e-4831-a801-defde12b0581",
+			"raw_material_name": "Água Filtrada",
+			"quantity_needed": {
+				"$numberDouble": "0.16"
+			},
+			"unit": "L",
+			"batches_consumed": [
+				{
+					"batch_id": "7a37cc0c-8469-4404-afe4-d79a3eccd742",
+					"batch_number": "2512013",
+					"supplier_batch_number": "",
+					"expiry_date": "",
+					"quantity_used": {
+						"$numberDouble": "0.16"
+					},
+					"remaining_after": {
+						"$numberDouble": "49.84"
+					}
+				}
+			]
+		}
+	],
+	"status": "aberta",
+	"created_at": "2026-05-26T11:02:40.938145+00:00",
+	"deleted": false
+}
+{
+	"_id": {
+		"$oid": "6a32ca78644bc747230f691d"
+	},
+	"id": "e3e7145f-9f9f-403d-a839-ce83b08bd711",
+	"product_id": "bd72d1f4-153a-45d4-a272-9b713af48323",
+	"product_name": "Refrigerante Cocaccc",
+	"product_batch_id": "eae7a96a-2320-4e75-a270-1ca6afeca2d4",
+	"batch_number": "2512038",
+	"month": {
+		"$numberInt": "12"
+	},
+	"year": {
+		"$numberInt": "2025"
+	},
+	"date": "2025-12-10",
+	"op_number": {
+		"$numberInt": "1"
+	},
+	"planned_liters": {
+		"$numberDouble": "200.0"
+	},
+	"unit": "Litros",
+	"expected_liters": {
+		"$numberDouble": "1000.0"
+	},
+	"recipes": [],
+	"status": "aberta",
+	"created_at": "2026-06-17T16:25:28.961452+00:00",
+	"deleted": false,
+	"backfilled": true
+}
+{
+	"_id": {
+		"$oid": "6a32ca78644bc747230f691e"
+	},
+	"id": "6faecad1-52c0-4f84-abc1-85400410e082",
+	"product_id": "0b9ded25-0fd2-478a-9305-42a50e645689",
+	"product_name": "Produto Teste Final",
+	"product_batch_id": "ac010a2e-ebd3-452e-94e3-6750d52e4ffb",
+	"batch_number": "2512033",
+	"month": {
+		"$numberInt": "12"
+	},
+	"year": {
+		"$numberInt": "2025"
+	},
+	"date": "2025-12-10",
+	"op_number": {
+		"$numberInt": "2"
+	},
+	"planned_liters": {
+		"$numberDouble": "522.0"
+	},
+	"unit": "Litros",
+	"expected_liters": {
+		"$numberDouble": "100.0"
+	},
+	"recipes": [],
+	"status": "aberta",
+	"created_at": "2026-06-17T16:25:28.967251+00:00",
+	"deleted": false,
+	"backfilled": true
+}
+{
+	"_id": {
+		"$oid": "6a32ca78644bc747230f691f"
+	},
+	"id": "40fcebc6-d09a-48ed-99ef-12cd4052cdd3",
+	"product_id": "e39f2243-38c1-42d5-a437-955a0f442ab7",
+	"product_name": "Produto Teste",
+	"product_batch_id": "36fada12-ae10-440f-b6e7-cd7a1fc64558",
+	"batch_number": "2512003",
+	"month": {
+		"$numberInt": "12"
+	},
+	"year": {
+		"$numberInt": "2025"
+	},
+	"date": "2025-12-10",
+	"op_number": {
+		"$numberInt": "3"
+	},
+	"planned_liters": {
+		"$numberDouble": "22222.0"
+	},
+	"unit": "Litros",
+	"expected_liters": {
+		"$numberDouble": "500.0"
+	},
+	"recipes": [],
+	"status": "aberta",
+	"created_at": "2026-06-17T16:25:28.968153+00:00",
+	"deleted": false,
+	"backfilled": true
+}
+{
+	"_id": {
+		"$oid": "6a32ca78644bc747230f6920"
+	},
+	"id": "b8f82765-690e-41ec-977d-f4d0a4599ce4",
+	"product_id": "0b9ded25-0fd2-478a-9305-42a50e645689",
+	"product_name": "Produto Teste Final",
+	"product_batch_id": "d0c2c183-8779-4fd2-9931-4b843ac0ac20",
+	"batch_number": "2512046",
+	"month": {
+		"$numberInt": "12"
+	},
+	"year": {
+		"$numberInt": "2025"
+	},
+	"date": "2025-12-10",
+	"op_number": {
+		"$numberInt": "4"
+	},
+	"planned_liters": {
+		"$numberDouble": "33.0"
+	},
+	"unit": "Litros",
+	"expected_liters": {
+		"$numberDouble": "100.0"
+	},
+	"recipes": [],
+	"status": "aberta",
+	"created_at": "2026-06-17T16:25:28.968960+00:00",
+	"deleted": false,
+	"backfilled": true
+}
+{
+	"_id": {
+		"$oid": "6a32ca78644bc747230f6921"
+	},
+	"id": "0674cba2-c638-4ca6-94bc-715387053ffc",
+	"product_id": "0b9ded25-0fd2-478a-9305-42a50e645689",
+	"product_name": "Produto Teste Final",
+	"product_batch_id": "d72f3abb-59f7-4400-a499-b1a42455300a",
+	"batch_number": "2512100",
+	"month": {
+		"$numberInt": "12"
+	},
+	"year": {
+		"$numberInt": "2025"
+	},
+	"date": "2025-12-10",
+	"op_number": {
+		"$numberInt": "5"
+	},
+	"planned_liters": {
+		"$numberDouble": "5.0"
+	},
+	"unit": "L",
+	"expected_liters": {
+		"$numberDouble": "100.0"
+	},
+	"recipes": [],
+	"status": "aberta",
+	"created_at": "2026-06-17T16:25:28.969686+00:00",
+	"deleted": false,
+	"backfilled": true
+}
+{
+	"_id": {
+		"$oid": "6a32ca78644bc747230f6922"
+	},
+	"id": "4920d1ed-dcd3-4e4b-a607-c6174bfc0a3f",
+	"product_id": "e39f2243-38c1-42d5-a437-955a0f442ab7",
+	"product_name": "Produto Teste",
+	"product_batch_id": "d05b954e-e8e9-440d-a13a-244cc619980d",
+	"batch_number": "2512002",
+	"month": {
+		"$numberInt": "12"
+	},
+	"year": {
+		"$numberInt": "2025"
+	},
+	"date": "2025-12-10",
+	"op_number": {
+		"$numberInt": "6"
+	},
+	"planned_liters": {
+		"$numberDouble": "33.0"
+	},
+	"unit": "Litros",
+	"expected_liters": {
+		"$numberDouble": "500.0"
+	},
+	"recipes": [],
+	"status": "aberta",
+	"created_at": "2026-06-17T16:25:28.970609+00:00",
+	"deleted": false,
+	"backfilled": true
+}
+{
+	"_id": {
+		"$oid": "6a32ca78644bc747230f6923"
+	},
+	"id": "3661cc61-41ee-493c-adfc-9f3fc2db3a67",
+	"product_id": "0b9ded25-0fd2-478a-9305-42a50e645689",
+	"product_name": "Produto Teste Final",
+	"product_batch_id": "33128ae6-61db-402a-98d3-1c4bf784dad9",
+	"batch_number": "2512200",
+	"month": {
+		"$numberInt": "12"
+	},
+	"year": {
+		"$numberInt": "2025"
+	},
+	"date": "2025-12-10",
+	"op_number": {
+		"$numberInt": "7"
+	},
+	"planned_liters": {
+		"$numberDouble": "1.0"
+	},
+	"unit": "L",
+	"expected_liters": {
+		"$numberDouble": "100.0"
+	},
+	"recipes": [],
+	"status": "aberta",
+	"created_at": "2026-06-17T16:25:28.971310+00:00",
+	"deleted": false,
+	"backfilled": true
+}
+{
+	"_id": {
+		"$oid": "6a32ca78644bc747230f6924"
+	},
+	"id": "4ec5d1e2-4c5b-4e7a-9562-f38156febb44",
+	"product_id": "0b9ded25-0fd2-478a-9305-42a50e645689",
+	"product_name": "Produto Teste Final",
+	"product_batch_id": "d072935d-c8d9-4673-988f-981a12f40552",
+	"batch_number": "2512050",
+	"month": {
+		"$numberInt": "12"
+	},
+	"year": {
+		"$numberInt": "2025"
+	},
+	"date": "2025-12-10",
+	"op_number": {
+		"$numberInt": "8"
+	},
+	"planned_liters": {
+		"$numberDouble": "1.0"
+	},
+	"unit": "L",
+	"expected_liters": {
+		"$numberDouble": "100.0"
+	},
+	"recipes": [],
+	"status": "aberta",
+	"created_at": "2026-06-17T16:25:28.972015+00:00",
+	"deleted": false,
+	"backfilled": true
+}
+{
+	"_id": {
+		"$oid": "6a32ca78644bc747230f6925"
+	},
+	"id": "117c0c96-157b-4e13-ae22-2c03ba15fbe7",
+	"product_id": "0b9ded25-0fd2-478a-9305-42a50e645689",
+	"product_name": "Produto Teste Final",
+	"product_batch_id": "67dfe47a-4f56-4451-a77d-e30836c156d8",
+	"batch_number": "2512051",
+	"month": {
+		"$numberInt": "12"
+	},
+	"year": {
+		"$numberInt": "2025"
+	},
+	"date": "2025-12-10",
+	"op_number": {
+		"$numberInt": "9"
+	},
+	"planned_liters": {
+		"$numberDouble": "1.0"
+	},
+	"unit": "L",
+	"expected_liters": {
+		"$numberDouble": "100.0"
+	},
+	"recipes": [],
+	"status": "aberta",
+	"created_at": "2026-06-17T16:25:28.972713+00:00",
+	"deleted": false,
+	"backfilled": true
+}
+{
+	"_id": {
+		"$oid": "6a32ca78644bc747230f6926"
+	},
+	"id": "3709914a-e44b-4615-9cd5-ff62b54d183d",
+	"product_id": "0b9ded25-0fd2-478a-9305-42a50e645689",
+	"product_name": "Produto Teste Final",
+	"product_batch_id": "cb073cb9-7e0f-49f4-bfbf-203284fe199a",
+	"batch_number": "2512045",
+	"month": {
+		"$numberInt": "12"
+	},
+	"year": {
+		"$numberInt": "2025"
+	},
+	"date": "2025-12-10",
+	"op_number": {
+		"$numberInt": "10"
+	},
+	"planned_liters": {
+		"$numberDouble": "25.0"
+	},
+	"unit": "Litros",
+	"expected_liters": {
+		"$numberDouble": "100.0"
+	},
+	"recipes": [],
+	"status": "aberta",
+	"created_at": "2026-06-17T16:25:28.973404+00:00",
+	"deleted": false,
+	"backfilled": true
+}
+{
+	"_id": {
+		"$oid": "6a32ca78644bc747230f6927"
+	},
+	"id": "fb9c7b87-e5be-4c96-81aa-30e97e5512e0",
+	"product_id": "0b9ded25-0fd2-478a-9305-42a50e645689",
+	"product_name": "Produto Teste Final",
+	"product_batch_id": "c38b2d69-a935-4c7c-b801-324e600f5ac1",
+	"batch_number": "2512088",
+	"month": {
+		"$numberInt": "12"
+	},
+	"year": {
+		"$numberInt": "2025"
+	},
+	"date": "2025-12-10",
+	"op_number": {
+		"$numberInt": "11"
+	},
+	"planned_liters": {
+		"$numberDouble": "33.0"
+	},
+	"unit": "Litros",
+	"expected_liters": {
+		"$numberDouble": "100.0"
+	},
+	"recipes": [],
+	"status": "aberta",
+	"created_at": "2026-06-17T16:25:28.974084+00:00",
+	"deleted": false,
+	"backfilled": true
+}
+{
+	"_id": {
+		"$oid": "6a32ca78644bc747230f6928"
+	},
+	"id": "08a03f9f-6e02-495a-ae62-f4de6f67b04e",
+	"product_id": "bd72d1f4-153a-45d4-a272-9b713af48323",
+	"product_name": "Refrigerante Cocaccc",
+	"product_batch_id": "5cc6b72b-b06d-44b5-893c-097c219d8cca",
+	"batch_number": "2512089",
+	"month": {
+		"$numberInt": "12"
+	},
+	"year": {
+		"$numberInt": "2025"
+	},
+	"date": "2025-12-11",
+	"op_number": {
+		"$numberInt": "1"
+	},
+	"planned_liters": {
+		"$numberDouble": "20.0"
+	},
+	"unit": "Kg",
+	"expected_liters": {
+		"$numberDouble": "1000.0"
+	},
+	"recipes": [],
+	"status": "aberta",
+	"created_at": "2026-06-17T16:25:28.974762+00:00",
+	"deleted": false,
+	"backfilled": true
+}
+{
+	"_id": {
+		"$oid": "6a32ca78644bc747230f6929"
+	},
+	"id": "8ae3bded-7e3d-401f-900a-50544d1b6c11",
+	"product_id": "0b9ded25-0fd2-478a-9305-42a50e645689",
+	"product_name": "Produto Teste Final",
+	"product_batch_id": "5819b632-aec2-443f-a29a-f91f744513fc",
+	"batch_number": "2512090",
+	"month": {
+		"$numberInt": "12"
+	},
+	"year": {
+		"$numberInt": "2025"
+	},
+	"date": "2025-12-25",
+	"op_number": {
+		"$numberInt": "1"
+	},
+	"planned_liters": {
+		"$numberDouble": "20.0"
+	},
+	"unit": "Litros",
+	"expected_liters": {
+		"$numberDouble": "100.0"
+	},
+	"recipes": [],
+	"status": "aberta",
+	"created_at": "2026-06-17T16:25:28.975427+00:00",
+	"deleted": false,
+	"backfilled": true
+}
+{
+	"_id": {
+		"$oid": "6a32ca78644bc747230f692a"
+	},
+	"id": "9f8f31a3-9adb-4f89-a270-456e8813f778",
+	"product_id": "0b3fa5d7-5d89-4785-861c-8924bf9f859b",
+	"product_name": "Açúcar Refinado",
+	"product_batch_id": "5982fd34-9992-4019-88f7-1230b8a4c9c2",
+	"batch_number": "2512092",
+	"month": {
+		"$numberInt": "1"
+	},
+	"year": {
+		"$numberInt": "2026"
+	},
+	"date": "2026-01-15",
+	"op_number": {
+		"$numberInt": "1"
+	},
+	"planned_liters": {
+		"$numberDouble": "3333.0"
+	},
+	"unit": "Litros",
+	"expected_liters": {
+		"$numberDouble": "100.0"
+	},
+	"recipes": [],
+	"status": "aberta",
+	"created_at": "2026-06-17T16:25:28.976109+00:00",
+	"deleted": false,
+	"backfilled": true
+}
+{
+	"_id": {
+		"$oid": "6a32ca78644bc747230f692b"
+	},
+	"id": "54a8118e-1396-4617-b9c8-660a6687a9b7",
+	"product_id": "e39f2243-38c1-42d5-a437-955a0f442ab7",
+	"product_name": "Produto Teste",
+	"product_batch_id": "1f8c65e0-fac0-435e-b94d-615960733076",
+	"batch_number": "2512012",
+	"month": {
+		"$numberInt": "12"
+	},
+	"year": {
+		"$numberInt": "2025"
+	},
+	"date": "2025-12-09",
+	"op_number": {
+		"$numberInt": "1"
+	},
+	"planned_liters": {
+		"$numberDouble": "100.0"
+	},
+	"unit": "Litros",
+	"expected_liters": {
+		"$numberDouble": "500.0"
+	},
+	"recipes": [],
+	"status": "aberta",
+	"created_at": "2026-06-17T16:25:28.976793+00:00",
+	"deleted": false,
+	"backfilled": true
+}
+{
+	"_id": {
+		"$oid": "6a32ca78644bc747230f692c"
+	},
+	"id": "3029d7f5-b2fc-4085-b281-1a8326c596f7",
+	"product_id": "bd72d1f4-153a-45d4-a272-9b713af48323",
+	"product_name": "Refrigerante Cocaccc",
+	"product_batch_id": "e11c1e99-5efc-4913-9a79-9fc9a7f99c64",
+	"batch_number": "2512097",
+	"month": {
+		"$numberInt": "3"
+	},
+	"year": {
+		"$numberInt": "2026"
+	},
+	"date": "2026-03-12",
+	"op_number": {
+		"$numberInt": "1"
+	},
+	"planned_liters": {
+		"$numberDouble": "150.0"
+	},
+	"unit": "Litros",
+	"expected_liters": {
+		"$numberDouble": "1000.0"
+	},
+	"recipes": [],
+	"status": "aberta",
+	"created_at": "2026-06-17T16:25:28.977443+00:00",
+	"deleted": false,
+	"backfilled": true
+}
+{
+	"_id": {
+		"$oid": "6a32ca78644bc747230f692d"
+	},
+	"id": "506da28e-3c3d-4ec2-a78d-a6ec3ed8a0ea",
+	"product_id": "0b9ded25-0fd2-478a-9305-42a50e645689",
+	"product_name": "Produto Teste Final",
+	"product_batch_id": "b2259a79-e8a3-4ac1-9570-174661edab2f",
+	"batch_number": "2512098",
+	"month": {
+		"$numberInt": "3"
+	},
+	"year": {
+		"$numberInt": "2026"
+	},
+	"date": "2026-03-12",
+	"op_number": {
+		"$numberInt": "2"
+	},
+	"planned_liters": {
+		"$numberDouble": "655.0"
+	},
+	"unit": "Litros",
+	"expected_liters": {
+		"$numberDouble": "100.0"
+	},
+	"recipes": [],
+	"status": "aberta",
+	"created_at": "2026-06-17T16:25:28.978115+00:00",
+	"deleted": false,
+	"backfilled": true
+}
+{
+	"_id": {
+		"$oid": "6a32ca78644bc747230f692e"
+	},
+	"id": "afcc3937-de2f-4a41-ad19-04cca0536c46",
+	"product_id": "bd72d1f4-153a-45d4-a272-9b713af48323",
+	"product_name": "Refrigerante Cocaccc",
+	"product_batch_id": "26ecc375-2931-4a93-b1f6-5f23bdd81394",
+	"batch_number": "2512100",
+	"month": {
+		"$numberInt": "3"
+	},
+	"year": {
+		"$numberInt": "2026"
+	},
+	"date": "2026-03-16",
+	"op_number": {
+		"$numberInt": "1"
+	},
+	"planned_liters": {
+		"$numberDouble": "500.0"
+	},
+	"unit": "Kg",
+	"expected_liters": {
+		"$numberDouble": "1000.0"
+	},
+	"recipes": [
+		{
+			"raw_material_id": "0ff82eb2-8f25-418c-a7cb-d448b1eeec45",
+			"raw_material_name": "Água Filtrada",
+			"quantity_needed": {
+				"$numberDouble": "50.0"
+			},
+			"unit": "Kg",
+			"batches_consumed": [
+				{
+					"batch_id": "e688e58b-08fe-4e27-ae1f-c62f847c228b",
+					"batch_number": "2512006",
+					"quantity_used": {
+						"$numberDouble": "50.0"
+					},
+					"remaining_after": {
+						"$numberDouble": "0.0"
+					}
+				}
+			]
+		}
+	],
+	"status": "aberta",
+	"created_at": "2026-06-17T16:25:28.978969+00:00",
+	"deleted": false,
+	"backfilled": true
+}
+{
+	"_id": {
+		"$oid": "6a47e98b99da1e2d82793c0e"
+	},
+	"id": "4ebea85e-0d27-4f95-8d52-b68cdc67503c",
+	"product_id": "9704734c-0b9c-478c-9d43-840031cd0f48",
+	"product_name": "lalalalalal",
+	"product_batch_id": "a00b4353-698f-4eb8-af74-4802daf13466",
+	"batch_number": "2512103",
+	"month": {
+		"$numberInt": "7"
+	},
+	"year": {
+		"$numberInt": "2026"
+	},
+	"date": "2026-07-03",
+	"op_number": {
+		"$numberInt": "1"
+	},
+	"planned_liters": {
+		"$numberDouble": "150.0"
+	},
+	"unit": "Litros",
+	"expected_liters": {
+		"$numberDouble": "150.0"
+	},
+	"recipes": [],
+	"status": "aberta",
+	"created_at": "2026-07-03T16:55:39.192363+00:00",
+	"deleted": false
+}

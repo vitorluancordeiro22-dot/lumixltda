@@ -3190,6 +3190,50 @@ async def _build_documentation_payload(product_batch_id: str) -> dict:
     }
 
 
+async def _render_doc_to_path(product_batch_id: str, doc_type: str, tmpdir: str):
+    """
+    Gera o arquivo nativo (Ficha .docx / OP .xls) de um lote usando os templates
+    fixados do produto e retorna (out_path, mime_native, safe_prod, safe_lote).
+    Reutilizado tanto na geração individual quanto na impressão em lote.
+    """
+    payload = await _build_documentation_payload(product_batch_id)
+    safe_lote = (payload['lote_number'] or 'lote').replace('/', '-')
+    safe_prod = (payload['product_name'] or 'produto').replace('/', '-').replace(' ', '_')
+
+    batch_doc = await db.product_batches.find_one({'id': product_batch_id}, {'_id': 0, 'product_id': 1}) \
+        or await db.archived_product_batches.find_one({'id': product_batch_id}, {'_id': 0, 'product_id': 1})
+    product_id = batch_doc.get('product_id') if batch_doc else None
+
+    if doc_type == 'ficha':
+        out_path = os.path.join(tmpdir, f'ficha_{safe_prod}_{safe_lote}.docx')
+        fill_ficha_template(
+            product_name=payload['product_name'],
+            op_number=payload['op_number'],
+            lote_number=payload['lote_number'],
+            fab_date=payload['fab_date'],
+            output_path=out_path,
+            template_path=get_ficha_template_path(product_id),
+        )
+        mime_native = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    else:
+        out_path = os.path.join(tmpdir, f'op_{safe_prod}_{safe_lote}.xls')
+        op_template_path, op_is_custom = get_op_template_path(product_id)
+        fill_op_template(
+            product_name=payload['product_name'],
+            op_number=payload['op_number'],
+            lote_number=payload['lote_number'],
+            fab_date=payload['fab_date'],
+            quantity_liters=payload['quantity_liters'],
+            materials=payload['materials'],
+            output_path=out_path,
+            template_path=op_template_path,
+            is_custom=op_is_custom,
+        )
+        mime_native = 'application/vnd.ms-excel'
+
+    return out_path, mime_native, safe_prod, safe_lote
+
+
 @api_router.get('/documentation/{product_batch_id}/preview-data')
 async def documentation_preview_data(
     product_batch_id: str,
@@ -3220,50 +3264,13 @@ async def generate_production_documentation(
     if fmt not in ('pdf', 'native'):
         raise HTTPException(status_code=400, detail="fmt deve ser 'pdf' ou 'native'")
 
-    payload = await _build_documentation_payload(product_batch_id)
-
     tmpdir = tempfile.mkdtemp(prefix='lumix_doc_')
-    safe_lote = (payload['lote_number'] or 'lote').replace('/', '-')
-    safe_prod = (payload['product_name'] or 'produto').replace('/', '-').replace(' ', '_')
 
     try:
-        if doc_type == 'ficha':
-            out_path = os.path.join(tmpdir, f'ficha_{safe_prod}_{safe_lote}.docx')
-            # usa template personalizado do produto se existir, senão o padrão
-            batch_doc = await db.product_batches.find_one({'id': product_batch_id}, {'_id': 0, 'product_id': 1}) \
-                or await db.archived_product_batches.find_one({'id': product_batch_id}, {'_id': 0, 'product_id': 1})
-            product_id_for_tpl = batch_doc.get('product_id') if batch_doc else None
-            template_path = get_ficha_template_path(product_id_for_tpl)
-            fill_ficha_template(
-                product_name=payload['product_name'],
-                op_number=payload['op_number'],
-                lote_number=payload['lote_number'],
-                fab_date=payload['fab_date'],
-                output_path=out_path,
-                template_path=template_path,
-            )
-            mime_native = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-            filename_native = f'Ficha_{safe_prod}_{safe_lote}.docx'
-        else:
-            out_path = os.path.join(tmpdir, f'op_{safe_prod}_{safe_lote}.xls')
-            # usa template personalizado da OP se existir
-            batch_doc_op = await db.product_batches.find_one({'id': product_batch_id}, {'_id': 0, 'product_id': 1}) \
-                or await db.archived_product_batches.find_one({'id': product_batch_id}, {'_id': 0, 'product_id': 1})
-            product_id_for_op = batch_doc_op.get('product_id') if batch_doc_op else None
-            op_template_path, op_is_custom = get_op_template_path(product_id_for_op)
-            fill_op_template(
-                product_name=payload['product_name'],
-                op_number=payload['op_number'],
-                lote_number=payload['lote_number'],
-                fab_date=payload['fab_date'],
-                quantity_liters=payload['quantity_liters'],
-                materials=payload['materials'],
-                output_path=out_path,
-                template_path=op_template_path,
-                is_custom=op_is_custom,
-            )
-            mime_native = 'application/vnd.ms-excel'
-            filename_native = f'OP_{safe_prod}_{safe_lote}.xls'
+        out_path, mime_native, safe_prod, safe_lote = await _render_doc_to_path(product_batch_id, doc_type, tmpdir)
+        ext = 'docx' if doc_type == 'ficha' else 'xls'
+        label_native = 'Ficha' if doc_type == 'ficha' else 'OP'
+        filename_native = f'{label_native}_{safe_prod}_{safe_lote}.{ext}'
 
         if fmt == 'native':
             with open(out_path, 'rb') as f:
@@ -3461,6 +3468,123 @@ async def delete_product_op_template(
     return {'message': 'Template de OP removido — usando o padrão agora'}
 
 
+# ----- Central de Impressão (Impressão em lote) -----
+
+@api_router.get('/documentation/print-center')
+async def print_center_overview(current_user = Depends(get_current_user)):
+    """
+    Dados para a aba 'Impressão': lista de produtos (cada um é uma pasta com
+    seus templates fixos) + ordens em aberto disponíveis para impressão em lote.
+    """
+    products = await db.products.find({'deleted': False}, {'_id': 0}).to_list(1000)
+    products_out = []
+    for p in products:
+        pid = p.get('id')
+        has_ficha = os.path.isfile(os.path.join(CUSTOM_TEMPLATES_DIR, f'{pid}.docx'))
+        has_op = os.path.isfile(os.path.join(CUSTOM_OP_TEMPLATES_DIR, f'{pid}.xls'))
+        ficha_meta = await db.product_ficha_templates.find_one({'product_id': pid}, {'_id': 0})
+        op_meta = await db.product_op_templates.find_one({'product_id': pid}, {'_id': 0})
+        products_out.append({
+            'id': pid,
+            'name': p.get('name', ''),
+            'has_ficha_template': has_ficha,
+            'ficha_filename': (ficha_meta or {}).get('filename', '') if has_ficha else '',
+            'has_op_template': has_op,
+            'op_filename': (op_meta or {}).get('filename', '') if has_op else '',
+        })
+    products_out.sort(key=lambda x: (x['name'] or '').lower())
+
+    # Ordens "em aberto" = lotes não finalizados (em_aberto + em_producao)
+    batches = await db.product_batches.find(
+        {'status': {'$in': ['em_aberto', 'em_producao']}, 'deleted': False},
+        {'_id': 0}
+    ).to_list(1000)
+    prod_names = {p['id']: p.get('name', '') for p in products}
+    open_orders = []
+    for b in batches:
+        open_orders.append({
+            'batch_id': b.get('id'),
+            'batch_number': b.get('batch_number', ''),
+            'product_id': b.get('product_id'),
+            'product_name': prod_names.get(b.get('product_id'), ''),
+            'date': b.get('date'),
+            'status': b.get('status'),
+            'planned_liters': b.get('planned_liters'),
+        })
+    open_orders.sort(key=lambda x: str(x.get('date') or ''), reverse=True)
+
+    return {'products': products_out, 'open_orders': open_orders}
+
+
+class BatchPrintRequest(BaseModel):
+    batch_ids: List[str]
+    doc_types: Optional[List[str]] = None  # default: ['ficha', 'op']
+
+
+@api_router.post('/documentation/batch-print')
+async def batch_print_documents(
+    req: BatchPrintRequest,
+    current_user = Depends(get_current_user)
+):
+    """
+    Gera Ficha (.docx/retrato) + OP (.xls/paisagem) de vários lotes e junta tudo
+    em um único PDF com várias páginas (na ordem: para cada lote → Ficha, depois OP).
+    """
+    from pypdf import PdfWriter
+
+    if not req.batch_ids:
+        raise HTTPException(status_code=400, detail='Selecione ao menos um lote para imprimir')
+
+    doc_types = req.doc_types or ['ficha', 'op']
+    doc_types = [d for d in doc_types if d in ('ficha', 'op')]
+    if not doc_types:
+        doc_types = ['ficha', 'op']
+
+    tmpdir = tempfile.mkdtemp(prefix='lumix_batch_')
+    writer = PdfWriter()
+    added = 0
+    errors = []
+    try:
+        for batch_id in req.batch_ids:
+            for doc_type in doc_types:
+                try:
+                    out_path, _mime, _sp, _sl = await _render_doc_to_path(batch_id, doc_type, tmpdir)
+                    pdf_path = convert_to_pdf(out_path, tmpdir)
+                    if pdf_path and os.path.exists(pdf_path):
+                        writer.append(pdf_path)
+                        added += 1
+                    else:
+                        errors.append(f'{doc_type}/{batch_id}: falha na conversão PDF')
+                except HTTPException as he:
+                    errors.append(f'{doc_type}/{batch_id}: {he.detail}')
+                except Exception as e:
+                    errors.append(f'{doc_type}/{batch_id}: {str(e)}')
+
+        if added == 0:
+            raise HTTPException(status_code=500, detail='Não foi possível gerar nenhum documento. ' + ('; '.join(errors) if errors else ''))
+
+        merged_path = os.path.join(tmpdir, 'lumix_ordens.pdf')
+        with open(merged_path, 'wb') as f:
+            writer.write(f)
+        with open(merged_path, 'rb') as f:
+            content = f.read()
+
+        return StreamingResponse(
+            io.BytesIO(content),
+            media_type='application/pdf',
+            headers={
+                'Content-Disposition': 'inline; filename="Ordens_Lumix.pdf"',
+                'X-Docs-Generated': str(added),
+            }
+        )
+    finally:
+        try:
+            import shutil as _sh
+            _sh.rmtree(tmpdir, ignore_errors=True)
+        except Exception:
+            pass
+
+
 # ==========================================================================
 # ========== MÓDULO PEDIDOS (Compras a Fornecedores) =======================
 # Independente do módulo de vendas/produção. Acesso restrito.
@@ -3644,6 +3768,231 @@ async def delete_purchase_order(order_id: str, current_user=Depends(get_current_
     require_pedidos_access(current_user)
     await db.purchase_orders.update_one({'id': order_id}, {'$set': {'deleted': True}})
     return {'message': 'Pedido excluído'}
+
+
+class LoteEntry(BaseModel):
+    raw_material_id: str
+    quantity: float
+    supplier_batch_number: str = ''
+    expiry_date: str = ''
+
+
+class GenerateBatchesRequest(BaseModel):
+    date: Optional[str] = None
+    entries: List[LoteEntry]
+
+
+@api_router.get('/purchase-orders/{order_id}/lote-preview')
+async def lote_preview_from_order(order_id: str, current_user=Depends(get_current_user)):
+    """
+    Retorna as matérias-primas do pedido que estão registradas no sistema interno,
+    já com a quantidade solicitada — prontas para 'soltar lotes' em massa.
+    O usuário só informa o lote do fornecedor e a validade.
+    """
+    require_pedidos_access(current_user)
+    order = await db.purchase_orders.find_one({'id': order_id}, {'_id': 0})
+    if not order:
+        raise HTTPException(status_code=404, detail='Pedido não encontrado')
+
+    entries = []
+    for it in (order.get('items') or []):
+        rm_id = it.get('raw_material_id')
+        if not rm_id:
+            continue
+        rm = await db.raw_materials.find_one({'id': rm_id, 'deleted': False}, {'_id': 0})
+        if not rm:
+            continue
+        entries.append({
+            'raw_material_id': rm_id,
+            'name': rm.get('name', it.get('name', '')),
+            'unit': rm.get('type', it.get('unit', 'Kg')),
+            'quantity': it.get('quantity', 0),
+        })
+    return {
+        'order_number': order.get('order_number', ''),
+        'supplier_name': order.get('supplier_name', ''),
+        'already_batched': bool(order.get('batched')),
+        'entries': entries,
+    }
+
+
+@api_router.post('/purchase-orders/{order_id}/generate-batches')
+async def generate_batches_from_order(order_id: str, req: GenerateBatchesRequest, current_user=Depends(get_current_user)):
+    """
+    'Soltar lotes' de todas as matérias-primas do pedido de uma só vez.
+    Cada matéria-prima registrada gera um novo lote no estoque interno com número
+    automático sequencial; o lote do fornecedor e a validade são informados manualmente.
+    """
+    require_pedidos_access(current_user)
+    order = await db.purchase_orders.find_one({'id': order_id}, {'_id': 0})
+    if not order:
+        raise HTTPException(status_code=404, detail='Pedido não encontrado')
+    if not req.entries:
+        raise HTTPException(status_code=400, detail='Nenhuma matéria-prima para lotear')
+
+    date_str = req.date or datetime.now(timezone.utc).date().isoformat()
+    created = []
+    for e in req.entries:
+        rm = await db.raw_materials.find_one({'id': e.raw_material_id, 'deleted': False}, {'_id': 0})
+        if not rm:
+            continue
+        batch_number = await generate_batch_number(date_str)
+        batch_id = str(uuid.uuid4())
+        batch_doc = {
+            'id': batch_id,
+            'raw_material_id': e.raw_material_id,
+            'batch_number': batch_number,
+            'date': date_str,
+            'quantity': float(e.quantity or 0),
+            'supplier_batch_number': e.supplier_batch_number or '',
+            'expiry_date': e.expiry_date or '',
+            'status': 'em_aberto',
+            'created_at': datetime.now(timezone.utc).isoformat(),
+            'deleted': False,
+            'is_custom': False,
+            'source_order_id': order_id,
+        }
+        await db.raw_material_batches.insert_one(batch_doc)
+        await db.raw_materials.update_one(
+            {'id': e.raw_material_id},
+            {'$inc': {'total_stock': float(e.quantity or 0)}}
+        )
+        created.append({
+            'raw_material_name': rm.get('name', ''),
+            'batch_number': batch_number,
+            'quantity': float(e.quantity or 0),
+            'unit': rm.get('type', 'Kg'),
+        })
+
+    await db.purchase_orders.update_one(
+        {'id': order_id},
+        {'$set': {'batched': True, 'batched_at': datetime.now(timezone.utc).isoformat()}}
+    )
+    return {'created': created, 'count': len(created)}
+
+
+# ----- Relatório de Produção (Dashboard) -----
+
+@api_router.get('/reports/production')
+async def production_report(period: str = 'week', current_user=Depends(get_current_user)):
+    """
+    Relatório de envase por período (day/week/month), agrupado por produto/lote.
+    Mostra operadores juntos (ex: felipe+joao), quantidade por tamanho e total.
+    Fonte: contagens de envase (coleção counting + históricos arquivados).
+    """
+    if period not in ('day', 'week', 'month'):
+        period = 'week'
+    now = datetime.now(timezone.utc)
+    if period == 'day':
+        start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    elif period == 'month':
+        start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    else:
+        start = (now - timedelta(days=7)).replace(hour=0, minute=0, second=0, microsecond=0)
+    start_iso = start.isoformat()
+
+    SIZE_DEFS = [
+        ('half_liter', '500ml', 0.5, 'L'),
+        ('one_liter', '1L', 1.0, 'L'),
+        ('two_liter', '2L', 2.0, 'L'),
+        ('five_liter', '5L', 5.0, 'L'),
+        ('three_thirty_gram', '330g', 0.33, 'Kg'),
+        ('five_hundred_gram', '500g', 0.5, 'Kg'),
+        ('one_kg', '1Kg', 1.0, 'Kg'),
+    ]
+
+    countings = await db.counting.find({'created_at': {'$gte': start_iso}}, {'_id': 0}).to_list(50000)
+
+    archived = await db.archived_product_batches.find({}, {'_id': 0}).to_list(5000)
+    for b in archived:
+        for c in (b.get('countings_history') or []):
+            if str(c.get('created_at', '')) >= start_iso:
+                cc = dict(c)
+                cc['product_batch_id'] = cc.get('product_batch_id') or b.get('id')
+                countings.append(cc)
+
+    # Lookups
+    products = await db.products.find({}, {'_id': 0}).to_list(2000)
+    prod_by_id = {p['id']: p for p in products}
+    active_batches = await db.product_batches.find({}, {'_id': 0}).to_list(5000)
+    batch_by_id = {b['id']: b for b in active_batches}
+    for b in archived:
+        batch_by_id.setdefault(b['id'], b)
+
+    groups = {}
+    for c in countings:
+        bid = c.get('product_batch_id')
+        if not bid:
+            continue
+        batch = batch_by_id.get(bid)
+        product_name = ''
+        batch_number = bid
+        if batch:
+            batch_number = batch.get('batch_number', bid)
+            product_name = (prod_by_id.get(batch.get('product_id')) or {}).get('name', '')
+        unit = c.get('unit') or 'L'
+
+        g = groups.get(bid)
+        if not g:
+            g = {
+                'batch_id': bid,
+                'batch_number': batch_number,
+                'product_name': product_name,
+                'unit': unit,
+                'operators': set(),
+                'sizes': {},
+                'total': 0.0,
+                'last_date': '',
+            }
+            groups[bid] = g
+
+        op = (c.get('operator') or '').strip()
+        if op:
+            g['operators'].add(op)
+        for key, label, factor, u in SIZE_DEFS:
+            cnt = c.get(key, 0) or 0
+            if cnt:
+                g['sizes'][label] = g['sizes'].get(label, 0) + cnt
+        g['total'] += float(c.get('total', 0) or 0)
+        cdate = str(c.get('created_at', ''))
+        if cdate > g['last_date']:
+            g['last_date'] = cdate
+
+    size_order = {label: i for i, (_, label, _, _) in enumerate(SIZE_DEFS)}
+    items = []
+    total_liters = 0.0
+    total_kg = 0.0
+    for g in groups.values():
+        sizes_list = sorted(
+            [{'label': k, 'count': v} for k, v in g['sizes'].items()],
+            key=lambda x: size_order.get(x['label'], 99)
+        )
+        ops = sorted(g['operators'])
+        if g['unit'] == 'Kg':
+            total_kg += g['total']
+        else:
+            total_liters += g['total']
+        items.append({
+            'batch_id': g['batch_id'],
+            'batch_number': g['batch_number'],
+            'product_name': g['product_name'],
+            'unit': g['unit'],
+            'operators': ops,
+            'operators_label': '+'.join(ops) if ops else '—',
+            'sizes': sizes_list,
+            'total': round(g['total'], 3),
+            'last_date': g['last_date'],
+        })
+    items.sort(key=lambda x: x['last_date'], reverse=True)
+
+    return {
+        'period': period,
+        'start': start_iso,
+        'total_liters': round(total_liters, 3),
+        'total_kg': round(total_kg, 3),
+        'batches_count': len(items),
+        'items': items,
+    }
 
 
 @api_router.get('/purchase-orders/{order_id}/pdf')

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '../lib/api';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
@@ -7,6 +8,7 @@ import { ClipboardCopy, X, FlaskConical, Package, Calendar, Hash, ChevronDown, C
 import DocumentationButton from '../components/DocumentationButton';
 
 export default function FichasAnalise() {
+  const navigate = useNavigate();
   const [fichas, setFichas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [closingId, setClosingId] = useState(null);
@@ -123,6 +125,16 @@ export default function FichasAnalise() {
 
                   <div className="ml-auto flex-shrink-0 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                     <DocumentationButton productId={ficha.product_id} productName={ficha.product_name} />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs border-primary/40 text-primary hover:bg-primary/5"
+                      onClick={() => navigate(`/ficha-analise?productId=${ficha.product_id}&productName=${encodeURIComponent(ficha.product_name)}`)}
+                      data-testid={`resultado-analise-${ficha.id}`}
+                    >
+                      <FlaskConical className="w-3 h-3 mr-1" />
+                      Resultado da Análise
+                    </Button>
                     <Button
                       variant="destructive"
                       size="sm"

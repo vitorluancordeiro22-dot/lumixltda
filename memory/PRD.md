@@ -102,6 +102,8 @@ Sistema de gestão de produção industrial com controle de lotes, matérias-pri
 
 - [x] **Fix WhatsApp "Enviar Lotes" (copiar imagem/texto no mobile)** (07/2026) - Corrigido: "Copiar Imagem" não funcionava no celular (Safari/iOS) e o texto era uma tabela monoespaçada ruim. Agora: cópia de imagem compatível com Safari (Promise no ClipboardItem) + botão **Compartilhar (Web Share API)** que abre o WhatsApp com a imagem no celular; **Copiar Texto** com formato de lista legível; envio principal usa share nativo (telefone opcional). Também corrigido bug do checkbox que alternava a seleção 2x (pointer-events delegando p/ a linha). Verificado por testing_agent (iteration_6, 100%) + smoke test.
 
+- [x] **Ponte "Resultado da Análise" (Ordem de Produção → Ficha de Análise)** (08/2026) - Cada lote na aba Ordem de Produção agora tem, ao lado de "Gerar Documentação", o botão "Resultado da Análise" (data-testid resultado-analise-{id}) que navega para /ficha-analise?productId=... e abre direto as análises daquele produto (FichaAnalise lê a query e chama openItem). Corrigido também: (a) bloco duplicado/corrompido no fim de FichaAnalise.js que quebrava a compilação; (b) botão "Voltar" quebrava (selectedCategory null) ao chegar pela ponte — agora volta para categorias. Verificado testing_agent iteration_10 (100%).
+
 ## Backlog (P1/P2)
 - [ ] (P1) Testar E2E funcionalidade "Reabrir Lote"
 - [ ] (P1) Melhorar campo de data de validade nas matérias-primas

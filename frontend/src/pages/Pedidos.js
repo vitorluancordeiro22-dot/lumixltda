@@ -19,7 +19,7 @@ import { toast } from 'sonner';
 import {
   Plus, ShoppingCart, Search, Trash2, Truck, FileText, Share2,
   CheckCircle2, Send, Clock, PackageCheck, X, ChevronLeft,
-  Download, Loader2, ArrowRight, Building2, Edit2,
+  Download, Loader2, ArrowRight, Building2, Edit2, Layers,
 } from 'lucide-react';
 
 const ORDER_UNITS = ['Kg', 'Litros', 'Fardos', 'Unidades'];
@@ -727,9 +727,142 @@ const NewOrderDialog = ({ open, onOpenChange, onCreated }) => {
   );
 };
 
+// ====================== Modal Lotear Matérias-Primas ======================
+const LoteMateriaisDialog = ({ open, onOpenChange, order, onDone }) => {
+  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [entries, setEntries] = useState([]);
+  const [alreadyBatched, setAlreadyBatched] = useState(false);
+  const today = new Date().toISOString().split('T')[0];
+  const [date, setDate] = useState(today);
+
+  useEffect(() => {
+    if (!open || !order) return;
+    setLoading(true);
+    setDate(today);
+    api.get(`/purchase-orders/${order.id}/lote-preview`)
+      .then((r) => {
+        setAlreadyBatched(!!r.data.already_batched);
+        setEntries((r.data.entries || []).map((e) => ({
+          ...e,
+          supplier_batch_number: '',
+          expiry_date: '',
+        })));
+      })
+      .catch(() => toast.error('Erro ao carregar matérias-primas do pedido'))
+      .finally(() => setLoading(false));
+  }, [open, order]);
+
+  const updateEntry = (idx, field, value) => {
+    setEntries((prev) => prev.map((e, i) => (i === idx ? { ...e, [field]: value } : e)));
+  };
+
+  const handleSubmit = async () => {
+    if (entries.length === 0) { toast.error('Nenhuma matéria-prima registrada neste pedido'); return; }
+    setSubmitting(true);
+    try {
+      const payload = {
+        date,
+        entries: entries.map((e) => ({
+          raw_material_id: e.raw_material_id,
+          quantity: Number(e.quantity) || 0,
+          supplier_batch_number: (e.supplier_batch_number || '').trim(),
+          expiry_date: e.expiry_date || '',
+        })),
+      };
+      const r = await api.post(`/purchase-orders/${order.id}/generate-batches`, payload);
+      toast.success(`${r.data.count} lote(s) soltos no estoque interno!`);
+      onDone?.();
+      onOpenChange(false);
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Erro ao soltar lotes');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="bg-card border-border w-[calc(100%-1rem)] max-w-2xl rounded-2xl max-h-[90vh] overflow-hidden flex flex-col p-4 sm:p-6">
+        <DialogHeader>
+          <DialogTitle className="text-foreground flex items-center gap-2">
+            <Layers className="w-5 h-5 text-primary" />
+            Lotear Matérias-Primas
+          </DialogTitle>
+        </DialogHeader>
+
+        <p className="text-xs text-muted-foreground">
+          Solta lotes novos de todas as matérias-primas registradas do pedido
+          {' '}<span className="font-semibold text-foreground">{order?.order_number}</span>.
+          O número do lote interno é automático — você só informa o <span className="font-semibold text-foreground">lote do fornecedor</span> e a <span className="font-semibold text-foreground">validade</span>.
+        </p>
+
+        {alreadyBatched && (
+          <div className="rounded-xl bg-amber-500/10 ring-1 ring-amber-500/20 text-amber-700 text-xs font-medium px-3 py-2">
+            Atenção: este pedido já foi loteado antes. Soltar novamente criará lotes adicionais.
+          </div>
+        )}
+
+        <div className="flex items-center gap-2">
+          <Label className="text-xs text-muted-foreground shrink-0">Data de recebimento</Label>
+          <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="h-9 w-auto bg-input border-border" data-testid="lote-date" />
+        </div>
+
+        {loading ? (
+          <div className="flex items-center justify-center py-10">
+            <Loader2 className="w-5 h-5 animate-spin text-primary mr-2" />
+            <span className="text-muted-foreground text-sm">Carregando...</span>
+          </div>
+        ) : entries.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-10">
+            Nenhuma matéria-prima registrada no sistema interno foi encontrada neste pedido.
+          </p>
+        ) : (
+          <div className="flex-1 overflow-y-auto space-y-2 pr-1 min-h-0">
+            {entries.map((e, idx) => (
+              <div key={e.raw_material_id} className="rounded-xl border border-border bg-muted/30 p-3" data-testid={`lote-row-${idx}`}>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm font-semibold text-foreground truncate">{e.name}</p>
+                  <Badge className="bg-primary/10 text-primary text-[10px] shrink-0">Lote automático</Badge>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  <div>
+                    <Label className="text-[10px] text-muted-foreground uppercase tracking-wide">Qtd ({e.unit})</Label>
+                    <Input type="number" step="any" value={e.quantity} onChange={(ev) => updateEntry(idx, 'quantity', ev.target.value)} className="h-9 bg-input border-border" data-testid={`lote-qty-${idx}`} />
+                  </div>
+                  <div>
+                    <Label className="text-[10px] text-muted-foreground uppercase tracking-wide">Lote do Fornecedor</Label>
+                    <Input value={e.supplier_batch_number} onChange={(ev) => updateEntry(idx, 'supplier_batch_number', ev.target.value)} placeholder="ex: RN-2024" className="h-9 bg-input border-border" data-testid={`lote-supplier-${idx}`} />
+                  </div>
+                  <div className="col-span-2 sm:col-span-1">
+                    <Label className="text-[10px] text-muted-foreground uppercase tracking-wide">Validade</Label>
+                    <Input type="date" value={e.expiry_date} onChange={(ev) => updateEntry(idx, 'expiry_date', ev.target.value)} className="h-9 bg-input border-border" data-testid={`lote-expiry-${idx}`} />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <DialogFooter className="gap-2 sm:gap-0">
+          <Button variant="outline" className="h-10" onClick={() => onOpenChange(false)}>Cancelar</Button>
+          <Button
+            className="bg-primary hover:bg-primary/90 h-10"
+            disabled={submitting || loading || entries.length === 0}
+            onClick={handleSubmit}
+            data-testid="confirm-lotear"
+          >
+            {submitting ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Soltando...</> : <><Layers className="w-4 h-4 mr-2" /> Soltar {entries.length} Lote(s)</>}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
 // ====================== Card de Pedido (Mobile Optimized) ======================
 const OrderCard = ({
-  order, onStatus, onDelete, onPdf, onShare,
+  order, onStatus, onDelete, onPdf, onShare, onLote,
 }) => {
   const meta = STATUS_META[order.status] || STATUS_META.pendente;
   const StatusIcon = meta.icon;
@@ -865,6 +998,15 @@ const OrderCard = ({
             Reabrir
           </Button>
         )}
+        <Button
+          size="sm"
+          onClick={() => onLote(order)}
+          className="bg-primary hover:bg-primary/90 text-primary-foreground flex-1 sm:flex-none h-9 text-xs sm:text-sm"
+          data-testid={`lotear-btn-${order.id}`}
+        >
+          <Layers className="w-3.5 h-3.5 mr-1" />
+          Lotear MP
+        </Button>
       </div>
     </Card>
   );
@@ -877,6 +1019,7 @@ export const Pedidos = () => {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [loteOrder, setLoteOrder] = useState(null);
 
   const fetchOrders = useCallback(async () => {
     try {
@@ -972,6 +1115,7 @@ export const Pedidos = () => {
           onDelete={setDeleteTarget}
           onPdf={handlePdf}
           onShare={handleShare}
+          onLote={setLoteOrder}
         />
       ))}
       {list.length === 0 && (
@@ -1044,6 +1188,13 @@ export const Pedidos = () => {
       </Tabs>
 
       <NewOrderDialog open={dialogOpen} onOpenChange={setDialogOpen} onCreated={fetchOrders} />
+
+      <LoteMateriaisDialog
+        open={!!loteOrder}
+        onOpenChange={(o) => !o && setLoteOrder(null)}
+        order={loteOrder}
+        onDone={fetchOrders}
+      />
 
       <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
         <AlertDialogContent>

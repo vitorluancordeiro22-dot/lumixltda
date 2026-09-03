@@ -1,0 +1,202 @@
+{
+	"_id": {
+		"$oid": "69385546e48c5904e33f95bf"
+	},
+	"id": "82b876af-ee1a-4f0c-9b57-fcd09a10dcdc",
+	"op_number": "OP-2025-0001",
+	"product_id": "bd72d1f4-153a-45d4-a272-9b713af48323",
+	"product_name": "Refrigerante Cola",
+	"product_code": "",
+	"op_model_snapshot": {
+		"file_id": "6938515d7526be60151693f5",
+		"filename": "FICHA - QUEROSENE GEL-DESKTOP-FL4VNO7.docx",
+		"content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+		"size": {
+			"$numberInt": "29232"
+		},
+		"file_type": "op_model",
+		"version": {
+			"$numberInt": "5"
+		},
+		"uploaded_at": "2025-12-09T16:42:05.003510+00:00",
+		"uploaded_by": "8d8cab0d-4787-4569-985e-286f19c0f084"
+	},
+	"ficha_analise_snapshot": {
+		"file_id": "693851607526be60151693f7",
+		"filename": "OP - QUEROSENE GEL-DESKTOP-FL4VNO7.xls",
+		"content_type": "application/vnd.ms-excel",
+		"size": {
+			"$numberInt": "32256"
+		},
+		"file_type": "ficha_analise",
+		"version": {
+			"$numberInt": "3"
+		},
+		"uploaded_at": "2025-12-09T16:42:08.354709+00:00",
+		"uploaded_by": "8d8cab0d-4787-4569-985e-286f19c0f084"
+	},
+	"impressao_model_snapshot": null,
+	"batch_number": "2512012",
+	"planned_quantity": {
+		"$numberDouble": "100.0"
+	},
+	"produced_quantity": {
+		"$numberDouble": "0.0"
+	},
+	"unit": "L",
+	"raw_materials": [
+		{
+			"raw_material_id": "e553dbc8-87aa-4ad9-aae3-0327aee1813e",
+			"raw_material_name": "Água Mineral",
+			"batch_id": "a880e802-594b-4751-9fc5-1eab7b5d90b6",
+			"batch_number": "2512008",
+			"quantity_used": {
+				"$numberDouble": "90.0"
+			},
+			"unit": "L",
+			"selected_at": "2025-12-09T16:58:46.845875+00:00"
+		}
+	],
+	"status": "em_producao",
+	"created_at": "2025-12-09T16:58:46.845875+00:00",
+	"created_by": "7dd9d912-9ba9-42b5-9b6f-33af915c919d",
+	"created_by_name": "Teste",
+	"started_at": "2026-01-15T10:59:52.041326+00:00",
+	"started_by": "8d8cab0d-4787-4569-985e-286f19c0f084",
+	"started_by_name": "Lumix laboratorio",
+	"finalized_at": null,
+	"finalized_by": null,
+	"finalized_by_name": null,
+	"is_editable": true,
+	"is_printable": false,
+	"printed_at": null,
+	"printed_by": null,
+	"observations": "Teste de geração de documentos",
+	"production_notes": null,
+	"history": [
+		{
+			"timestamp": "2025-12-09T16:58:46.845875+00:00",
+			"user_id": "7dd9d912-9ba9-42b5-9b6f-33af915c919d",
+			"user_name": "Teste",
+			"action": "created",
+			"previous_value": null,
+			"new_value": "aguardando_envase",
+			"notes": "OP criada"
+		},
+		{
+			"timestamp": "2026-01-15T10:59:52.041326+00:00",
+			"user_id": "8d8cab0d-4787-4569-985e-286f19c0f084",
+			"user_name": "Lumix laboratorio",
+			"action": "status_change",
+			"previous_value": "aguardando_envase",
+			"new_value": "em_producao",
+			"notes": "Status alterado para em_producao"
+		}
+	],
+	"responsible_name": "João Silva",
+	"shift": "Manhã",
+	"equipment": "Misturador A1",
+	"temperature": null,
+	"custom_fields": {}
+}
+{
+	"_id": {
+		"$oid": "693855a3e48c5904e33f95c4"
+	},
+	"id": "17d4be20-5067-4231-9c31-6861e5153a07",
+	"op_number": "OP-2025-0002",
+	"product_id": "0b9ded25-0fd2-478a-9305-42a50e645689",
+	"product_name": "Produto Teste Final",
+	"product_code": "",
+	"op_model_snapshot": {
+		"file_id": "6938556de48c5904e33f95c2",
+		"filename": "template_op.xlsx",
+		"content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+		"size": {
+			"$numberInt": "4994"
+		},
+		"file_type": "op_model",
+		"version": {
+			"$numberInt": "2"
+		},
+		"uploaded_at": "2025-12-09T16:59:25.143482+00:00",
+		"uploaded_by": "7dd9d912-9ba9-42b5-9b6f-33af915c919d"
+	},
+	"ficha_analise_snapshot": {
+		"file_id": "6938556de48c5904e33f95c0",
+		"filename": "template_ficha.docx",
+		"content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+		"size": {
+			"$numberInt": "36722"
+		},
+		"file_type": "ficha_analise",
+		"version": {
+			"$numberInt": "2"
+		},
+		"uploaded_at": "2025-12-09T16:59:25.053232+00:00",
+		"uploaded_by": "7dd9d912-9ba9-42b5-9b6f-33af915c919d"
+	},
+	"impressao_model_snapshot": null,
+	"batch_number": "2512012",
+	"planned_quantity": {
+		"$numberDouble": "50.0"
+	},
+	"produced_quantity": {
+		"$numberDouble": "0.0"
+	},
+	"unit": "L",
+	"raw_materials": [
+		{
+			"raw_material_id": "e553dbc8-87aa-4ad9-aae3-0327aee1813e",
+			"raw_material_name": "Água Mineral",
+			"batch_id": "a880e802-594b-4751-9fc5-1eab7b5d90b6",
+			"batch_number": "2512008",
+			"quantity_used": {
+				"$numberDouble": "40.0"
+			},
+			"unit": "L",
+			"selected_at": "2025-12-09T17:00:19.068664+00:00"
+		}
+	],
+	"status": "em_producao",
+	"created_at": "2025-12-09T17:00:19.068664+00:00",
+	"created_by": "7dd9d912-9ba9-42b5-9b6f-33af915c919d",
+	"created_by_name": "Teste",
+	"started_at": "2025-12-11T19:05:47.235387+00:00",
+	"started_by": "8d8cab0d-4787-4569-985e-286f19c0f084",
+	"started_by_name": "Lumix laboratorio",
+	"finalized_at": null,
+	"finalized_by": null,
+	"finalized_by_name": null,
+	"is_editable": true,
+	"is_printable": false,
+	"printed_at": null,
+	"printed_by": null,
+	"observations": "OP de teste",
+	"production_notes": null,
+	"history": [
+		{
+			"timestamp": "2025-12-09T17:00:19.068664+00:00",
+			"user_id": "7dd9d912-9ba9-42b5-9b6f-33af915c919d",
+			"user_name": "Teste",
+			"action": "created",
+			"previous_value": null,
+			"new_value": "aguardando_envase",
+			"notes": "OP criada"
+		},
+		{
+			"timestamp": "2025-12-11T19:05:47.235387+00:00",
+			"user_id": "8d8cab0d-4787-4569-985e-286f19c0f084",
+			"user_name": "Lumix laboratorio",
+			"action": "status_change",
+			"previous_value": "aguardando_envase",
+			"new_value": "em_producao",
+			"notes": "Status alterado para em_producao"
+		}
+	],
+	"responsible_name": "Maria Santos",
+	"shift": "Tarde",
+	"equipment": null,
+	"temperature": null,
+	"custom_fields": {}
+}

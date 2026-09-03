@@ -1,0 +1,53 @@
+{
+	"_id": {
+		"$oid": "69ebb3eaf6e908fb1cc1bdc4"
+	},
+	"item_id": "bd72d1f4-153a-45d4-a272-9b713af48323",
+	"fields": [
+		{
+			"name": "Aspecto",
+			"order": {
+				"$numberInt": "0"
+			},
+			"spec": "Límpido",
+			"quick_answer": true
+		},
+		{
+			"name": "Cor",
+			"order": {
+				"$numberInt": "1"
+			},
+			"spec": "Incolor",
+			"quick_answer": true
+		},
+		{
+			"name": "Odor",
+			"order": {
+				"$numberInt": "2"
+			},
+			"spec": "Característico",
+			"quick_answer": true
+		},
+		{
+			"name": "pH",
+			"order": {
+				"$numberInt": "3"
+			},
+			"spec": "ATÉ 11,40"
+		},
+		{
+			"name": "Viscosidade",
+			"order": {
+				"$numberInt": "4"
+			},
+			"spec": "10 a 11"
+		},
+		{
+			"name": "Massa Específica",
+			"order": {
+				"$numberInt": "5"
+			},
+			"spec": "1,02 a 1,05"
+		}
+	]
+}

@@ -1,0 +1,88 @@
+{
+	"_id": {
+		"$oid": "693849f985ef761097f51736"
+	},
+	"id": "250f3af6-e308-460d-8344-e68d28436c5c",
+	"name": "DAD",
+	"parent_id": null,
+	"created_at": "2025-12-09T16:10:33.052559+00:00",
+	"created_by": "8d8cab0d-4787-4569-985e-286f19c0f084",
+	"deleted": true
+}
+{
+	"_id": {
+		"$oid": "69384a0185ef761097f51737"
+	},
+	"id": "706611e2-6ae9-42d9-84a9-df8fc9a5fc72",
+	"name": "ADA",
+	"parent_id": null,
+	"created_at": "2025-12-09T16:10:41.233547+00:00",
+	"created_by": "8d8cab0d-4787-4569-985e-286f19c0f084",
+	"deleted": true
+}
+{
+	"_id": {
+		"$oid": "6964e4042a7839a88ff0cc82"
+	},
+	"id": "ff2a6b65-bc6b-4f46-b89b-568c2b763a35",
+	"name": "Laudos 2024",
+	"parent_id": null,
+	"created_at": "2026-01-12T12:07:32.504168+00:00",
+	"created_by": "7dd9d912-9ba9-42b5-9b6f-33af915c919d",
+	"deleted": false
+}
+{
+	"_id": {
+		"$oid": "6964e44b2a7839a88ff0cc83"
+	},
+	"id": "1571a5b6-89cf-4633-ba00-5f9b1e53009b",
+	"name": "Janeiro",
+	"parent_id": "ff2a6b65-bc6b-4f46-b89b-568c2b763a35",
+	"created_at": "2026-01-12T12:08:43.213032+00:00",
+	"created_by": "7dd9d912-9ba9-42b5-9b6f-33af915c919d",
+	"deleted": false
+}
+{
+	"_id": {
+		"$oid": "6964e4502a7839a88ff0cc84"
+	},
+	"id": "8f5f5420-c617-4f76-be21-e0f2f9e01c8e",
+	"name": "Fevereiro",
+	"parent_id": "ff2a6b65-bc6b-4f46-b89b-568c2b763a35",
+	"created_at": "2026-01-12T12:08:48.235149+00:00",
+	"created_by": "7dd9d912-9ba9-42b5-9b6f-33af915c919d",
+	"deleted": false
+}
+{
+	"_id": {
+		"$oid": "6964e4552a7839a88ff0cc85"
+	},
+	"id": "c8baae4f-32e4-42f1-9c90-6c1dd979c827",
+	"name": "Março",
+	"parent_id": "ff2a6b65-bc6b-4f46-b89b-568c2b763a35",
+	"created_at": "2026-01-12T12:08:53.253029+00:00",
+	"created_by": "7dd9d912-9ba9-42b5-9b6f-33af915c919d",
+	"deleted": false
+}
+{
+	"_id": {
+		"$oid": "6964e46e2a7839a88ff0cc86"
+	},
+	"id": "bc1a4f64-5e2c-40bc-a907-4fa9997e8867",
+	"name": "Semana 1",
+	"parent_id": "1571a5b6-89cf-4633-ba00-5f9b1e53009b",
+	"created_at": "2026-01-12T12:09:18.861131+00:00",
+	"created_by": "7dd9d912-9ba9-42b5-9b6f-33af915c919d",
+	"deleted": false
+}
+{
+	"_id": {
+		"$oid": "6964e4732a7839a88ff0cc87"
+	},
+	"id": "7b7b26fe-15bf-46bd-bc42-ed84dba750f8",
+	"name": "Semana 2",
+	"parent_id": "1571a5b6-89cf-4633-ba00-5f9b1e53009b",
+	"created_at": "2026-01-12T12:09:23.868425+00:00",
+	"created_by": "7dd9d912-9ba9-42b5-9b6f-33af915c919d",
+	"deleted": false
+}

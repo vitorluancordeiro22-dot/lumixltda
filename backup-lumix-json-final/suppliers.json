@@ -1,0 +1,52 @@
+{
+	"_id": {
+		"$oid": "6a43f3c9cf4e385a39ab5f94"
+	},
+	"id": "bce094e8-95f9-4036-b490-72236e0324c8",
+	"name": "TEST_Fornecedor_3f6576",
+	"contact": "Test",
+	"phone": "11999999999",
+	"email": "test@sup.com",
+	"address": "Rua Test",
+	"created_at": "2026-06-30T16:50:17.418397+00:00",
+	"deleted": true
+}
+{
+	"_id": {
+		"$oid": "6a4402c8f5bc354a3a66ef7c"
+	},
+	"id": "c2c24d18-08af-4daa-8213-92d2a0652816",
+	"name": "TEST_Fornecedor_7757b1",
+	"contact": "Test",
+	"phone": "11999999999",
+	"email": "test@sup.com",
+	"address": "Rua Test",
+	"created_at": "2026-06-30T17:54:16.659697+00:00",
+	"deleted": true
+}
+{
+	"_id": {
+		"$oid": "6a47af50aeea3c6e1a55f6e8"
+	},
+	"id": "92a08044-10d4-4d49-98c8-fdbd8a200e58",
+	"name": "f asef asef",
+	"contact": "",
+	"phone": "\\ses faew",
+	"email": "",
+	"address": "",
+	"created_at": "2026-07-03T12:47:12.487569+00:00",
+	"deleted": false
+}
+{
+	"_id": {
+		"$oid": "6a591d451f94ca0deb65fd5a"
+	},
+	"id": "ab723357-4a43-4784-9052-b2edc4d5d44a",
+	"name": "Fornecedor QA 1755265",
+	"contact": "",
+	"phone": "",
+	"email": "",
+	"address": "",
+	"created_at": "2026-07-16T18:04:53.821615+00:00",
+	"deleted": true
+}

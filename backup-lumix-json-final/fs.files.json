@@ -1,0 +1,742 @@
+{
+	"_id": {
+		"$oid": "6932d238c80b9a3f55f0d96f"
+	},
+	"filename": "FICHA - QUEROSENE GEL-DESKTOP-FL4VNO7.docx",
+	"metadata": {
+		"content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+		"file_type": "op_model",
+		"uploaded_by": "8d8cab0d-4787-4569-985e-286f19c0f084",
+		"uploaded_at": "2025-12-05T12:38:16.435574+00:00",
+		"version": {
+			"$numberInt": "1"
+		}
+	},
+	"chunkSize": {
+		"$numberInt": "261120"
+	},
+	"length": {
+		"$numberLong": "29232"
+	},
+	"uploadDate": {
+		"$date": {
+			"$numberLong": "1764938296467"
+		}
+	}
+}
+{
+	"_id": {
+		"$oid": "6932d241c80b9a3f55f0d971"
+	},
+	"filename": "OP - QUEROSENE GEL.xls",
+	"metadata": {
+		"content_type": "application/vnd.ms-excel",
+		"file_type": "op_model",
+		"uploaded_by": "8d8cab0d-4787-4569-985e-286f19c0f084",
+		"uploaded_at": "2025-12-05T12:38:25.659704+00:00",
+		"version": {
+			"$numberInt": "2"
+		}
+	},
+	"chunkSize": {
+		"$numberInt": "261120"
+	},
+	"length": {
+		"$numberLong": "32256"
+	},
+	"uploadDate": {
+		"$date": {
+			"$numberLong": "1764938305660"
+		}
+	}
+}
+{
+	"_id": {
+		"$oid": "6932d247c80b9a3f55f0d973"
+	},
+	"filename": "FICHA - QUEROSENE GEL-DESKTOP-FL4VNO7.docx",
+	"metadata": {
+		"content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+		"file_type": "ficha_analise",
+		"uploaded_by": "8d8cab0d-4787-4569-985e-286f19c0f084",
+		"uploaded_at": "2025-12-05T12:38:31.065005+00:00",
+		"version": {
+			"$numberInt": "1"
+		}
+	},
+	"chunkSize": {
+		"$numberInt": "261120"
+	},
+	"length": {
+		"$numberLong": "29232"
+	},
+	"uploadDate": {
+		"$date": {
+			"$numberLong": "1764938311066"
+		}
+	}
+}
+{
+	"_id": {
+		"$oid": "6932dce7fb409edf8d770e64"
+	},
+	"filename": "FICHA - QUEROSENE GEL-DESKTOP-FL4VNO7.docx",
+	"metadata": {
+		"content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+		"file_type": "op_model",
+		"uploaded_by": "8d8cab0d-4787-4569-985e-286f19c0f084",
+		"uploaded_at": "2025-12-05T13:23:51.792151+00:00",
+		"version": {
+			"$numberInt": "1"
+		}
+	},
+	"chunkSize": {
+		"$numberInt": "261120"
+	},
+	"length": {
+		"$numberLong": "29232"
+	},
+	"uploadDate": {
+		"$date": {
+			"$numberLong": "1764941031803"
+		}
+	}
+}
+{
+	"_id": {
+		"$oid": "6932e09afb409edf8d770e67"
+	},
+	"filename": "FICHA - QUEROSENE GEL-DESKTOP-FL4VNO7.docx",
+	"metadata": {
+		"content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+		"file_type": "op_model",
+		"uploaded_by": "8d8cab0d-4787-4569-985e-286f19c0f084",
+		"uploaded_at": "2025-12-05T13:39:38.988042+00:00",
+		"version": {
+			"$numberInt": "2"
+		}
+	},
+	"chunkSize": {
+		"$numberInt": "261120"
+	},
+	"length": {
+		"$numberLong": "29232"
+	},
+	"uploadDate": {
+		"$date": {
+			"$numberLong": "1764941978988"
+		}
+	}
+}
+{
+	"_id": {
+		"$oid": "6932e0a0fb409edf8d770e69"
+	},
+	"filename": "OP - QUEROSENE GEL-DESKTOP-FL4VNO7.xls",
+	"metadata": {
+		"content_type": "application/vnd.ms-excel",
+		"file_type": "op_model",
+		"uploaded_by": "8d8cab0d-4787-4569-985e-286f19c0f084",
+		"uploaded_at": "2025-12-05T13:39:44.705337+00:00",
+		"version": {
+			"$numberInt": "3"
+		}
+	},
+	"chunkSize": {
+		"$numberInt": "261120"
+	},
+	"length": {
+		"$numberLong": "32256"
+	},
+	"uploadDate": {
+		"$date": {
+			"$numberLong": "1764941984706"
+		}
+	}
+}
+{
+	"_id": {
+		"$oid": "6932e0a4fb409edf8d770e6b"
+	},
+	"filename": "FICHA - QUEROSENE GEL-DESKTOP-FL4VNO7.docx",
+	"metadata": {
+		"content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+		"file_type": "ficha_analise",
+		"uploaded_by": "8d8cab0d-4787-4569-985e-286f19c0f084",
+		"uploaded_at": "2025-12-05T13:39:48.429448+00:00",
+		"version": {
+			"$numberInt": "1"
+		}
+	},
+	"chunkSize": {
+		"$numberInt": "261120"
+	},
+	"length": {
+		"$numberLong": "29232"
+	},
+	"uploadDate": {
+		"$date": {
+			"$numberLong": "1764941988430"
+		}
+	}
+}
+{
+	"_id": {
+		"$oid": "693851377526be60151693f1"
+	},
+	"filename": "OP - QUEROSENE GEL-DESKTOP-FL4VNO7.xls",
+	"metadata": {
+		"content_type": "application/vnd.ms-excel",
+		"file_type": "op_model",
+		"uploaded_by": "8d8cab0d-4787-4569-985e-286f19c0f084",
+		"uploaded_at": "2025-12-09T16:41:27.230336+00:00",
+		"version": {
+			"$numberInt": "4"
+		}
+	},
+	"chunkSize": {
+		"$numberInt": "261120"
+	},
+	"length": {
+		"$numberLong": "32256"
+	},
+	"uploadDate": {
+		"$date": {
+			"$numberLong": "1765298487244"
+		}
+	}
+}
+{
+	"_id": {
+		"$oid": "6938513c7526be60151693f3"
+	},
+	"filename": "FICHA - QUEROSENE GEL-DESKTOP-FL4VNO7.docx",
+	"metadata": {
+		"content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+		"file_type": "ficha_analise",
+		"uploaded_by": "8d8cab0d-4787-4569-985e-286f19c0f084",
+		"uploaded_at": "2025-12-09T16:41:32.003271+00:00",
+		"version": {
+			"$numberInt": "2"
+		}
+	},
+	"chunkSize": {
+		"$numberInt": "261120"
+	},
+	"length": {
+		"$numberLong": "29232"
+	},
+	"uploadDate": {
+		"$date": {
+			"$numberLong": "1765298492004"
+		}
+	}
+}
+{
+	"_id": {
+		"$oid": "6938515d7526be60151693f5"
+	},
+	"filename": "FICHA - QUEROSENE GEL-DESKTOP-FL4VNO7.docx",
+	"metadata": {
+		"content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+		"file_type": "op_model",
+		"uploaded_by": "8d8cab0d-4787-4569-985e-286f19c0f084",
+		"uploaded_at": "2025-12-09T16:42:05.002233+00:00",
+		"version": {
+			"$numberInt": "5"
+		}
+	},
+	"chunkSize": {
+		"$numberInt": "261120"
+	},
+	"length": {
+		"$numberLong": "29232"
+	},
+	"uploadDate": {
+		"$date": {
+			"$numberLong": "1765298525003"
+		}
+	}
+}
+{
+	"_id": {
+		"$oid": "693851607526be60151693f7"
+	},
+	"filename": "OP - QUEROSENE GEL-DESKTOP-FL4VNO7.xls",
+	"metadata": {
+		"content_type": "application/vnd.ms-excel",
+		"file_type": "ficha_analise",
+		"uploaded_by": "8d8cab0d-4787-4569-985e-286f19c0f084",
+		"uploaded_at": "2025-12-09T16:42:08.353551+00:00",
+		"version": {
+			"$numberInt": "3"
+		}
+	},
+	"chunkSize": {
+		"$numberInt": "261120"
+	},
+	"length": {
+		"$numberLong": "32256"
+	},
+	"uploadDate": {
+		"$date": {
+			"$numberLong": "1765298528354"
+		}
+	}
+}
+{
+	"_id": {
+		"$oid": "693851757526be60151693f9"
+	},
+	"filename": "FICHA - QUEROSENE GEL-DESKTOP-FL4VNO7.docx",
+	"metadata": {
+		"content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+		"file_type": "op_model",
+		"uploaded_by": "8d8cab0d-4787-4569-985e-286f19c0f084",
+		"uploaded_at": "2025-12-09T16:42:29.536803+00:00",
+		"version": {
+			"$numberInt": "1"
+		}
+	},
+	"chunkSize": {
+		"$numberInt": "261120"
+	},
+	"length": {
+		"$numberLong": "29232"
+	},
+	"uploadDate": {
+		"$date": {
+			"$numberLong": "1765298549537"
+		}
+	}
+}
+{
+	"_id": {
+		"$oid": "693851787526be60151693fb"
+	},
+	"filename": "OP - QUEROSENE GEL-DESKTOP-FL4VNO7.xls",
+	"metadata": {
+		"content_type": "application/vnd.ms-excel",
+		"file_type": "ficha_analise",
+		"uploaded_by": "8d8cab0d-4787-4569-985e-286f19c0f084",
+		"uploaded_at": "2025-12-09T16:42:32.697268+00:00",
+		"version": {
+			"$numberInt": "1"
+		}
+	},
+	"chunkSize": {
+		"$numberInt": "261120"
+	},
+	"length": {
+		"$numberLong": "32256"
+	},
+	"uploadDate": {
+		"$date": {
+			"$numberLong": "1765298552698"
+		}
+	}
+}
+{
+	"_id": {
+		"$oid": "6938556de48c5904e33f95c0"
+	},
+	"filename": "template_ficha.docx",
+	"metadata": {
+		"content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+		"file_type": "ficha_analise",
+		"uploaded_by": "7dd9d912-9ba9-42b5-9b6f-33af915c919d",
+		"uploaded_at": "2025-12-09T16:59:25.040637+00:00",
+		"version": {
+			"$numberInt": "2"
+		}
+	},
+	"chunkSize": {
+		"$numberInt": "261120"
+	},
+	"length": {
+		"$numberLong": "36722"
+	},
+	"uploadDate": {
+		"$date": {
+			"$numberLong": "1765299565047"
+		}
+	}
+}
+{
+	"_id": {
+		"$oid": "6938556de48c5904e33f95c2"
+	},
+	"filename": "template_op.xlsx",
+	"metadata": {
+		"content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+		"file_type": "op_model",
+		"uploaded_by": "7dd9d912-9ba9-42b5-9b6f-33af915c919d",
+		"uploaded_at": "2025-12-09T16:59:25.142333+00:00",
+		"version": {
+			"$numberInt": "2"
+		}
+	},
+	"chunkSize": {
+		"$numberInt": "261120"
+	},
+	"length": {
+		"$numberLong": "4994"
+	},
+	"uploadDate": {
+		"$date": {
+			"$numberLong": "1765299565143"
+		}
+	}
+}
+{
+	"_id": {
+		"$oid": "693855b2e48c5904e33f95c5"
+	},
+	"filename": "FICHA_Produto Teste Final_2512012.pdf",
+	"metadata": {
+		"type": "ficha",
+		"op_id": "17d4be20-5067-4231-9c31-6861e5153a07",
+		"product_id": "0b9ded25-0fd2-478a-9305-42a50e645689",
+		"batch_number": "2512012",
+		"generated_at": "2025-12-09T17:00:34.653301+00:00"
+	},
+	"chunkSize": {
+		"$numberInt": "261120"
+	},
+	"length": {
+		"$numberLong": "20940"
+	},
+	"uploadDate": {
+		"$date": {
+			"$numberLong": "1765299634654"
+		}
+	}
+}
+{
+	"_id": {
+		"$oid": "693855b2e48c5904e33f95c7"
+	},
+	"filename": "OP_Produto Teste Final_2512012.pdf",
+	"metadata": {
+		"type": "op",
+		"op_id": "17d4be20-5067-4231-9c31-6861e5153a07",
+		"product_id": "0b9ded25-0fd2-478a-9305-42a50e645689",
+		"batch_number": "2512012",
+		"generated_at": "2025-12-09T17:00:34.655109+00:00"
+	},
+	"chunkSize": {
+		"$numberInt": "261120"
+	},
+	"length": {
+		"$numberLong": "14071"
+	},
+	"uploadDate": {
+		"$date": {
+			"$numberLong": "1765299634655"
+		}
+	}
+}
+{
+	"_id": {
+		"$oid": "69385620e48c5904e33f95c9"
+	},
+	"filename": "FICHA_Produto Teste Final_2512012.pdf",
+	"metadata": {
+		"type": "ficha",
+		"op_id": "17d4be20-5067-4231-9c31-6861e5153a07",
+		"product_id": "0b9ded25-0fd2-478a-9305-42a50e645689",
+		"batch_number": "2512012",
+		"generated_at": "2025-12-09T17:02:24.227048+00:00"
+	},
+	"chunkSize": {
+		"$numberInt": "261120"
+	},
+	"length": {
+		"$numberLong": "20940"
+	},
+	"uploadDate": {
+		"$date": {
+			"$numberLong": "1765299744228"
+		}
+	}
+}
+{
+	"_id": {
+		"$oid": "69385620e48c5904e33f95cb"
+	},
+	"filename": "OP_Produto Teste Final_2512012.pdf",
+	"metadata": {
+		"type": "op",
+		"op_id": "17d4be20-5067-4231-9c31-6861e5153a07",
+		"product_id": "0b9ded25-0fd2-478a-9305-42a50e645689",
+		"batch_number": "2512012",
+		"generated_at": "2025-12-09T17:02:24.229051+00:00"
+	},
+	"chunkSize": {
+		"$numberInt": "261120"
+	},
+	"length": {
+		"$numberLong": "14071"
+	},
+	"uploadDate": {
+		"$date": {
+			"$numberLong": "1765299744229"
+		}
+	}
+}
+{
+	"_id": {
+		"$oid": "6938566de48c5904e33f95d7"
+	},
+	"filename": "FICHA_Produto Teste Final_2512012.pdf",
+	"metadata": {
+		"type": "ficha",
+		"op_id": "17d4be20-5067-4231-9c31-6861e5153a07",
+		"product_id": "0b9ded25-0fd2-478a-9305-42a50e645689",
+		"batch_number": "2512012",
+		"generated_at": "2025-12-09T17:03:41.237848+00:00"
+	},
+	"chunkSize": {
+		"$numberInt": "261120"
+	},
+	"length": {
+		"$numberLong": "20940"
+	},
+	"uploadDate": {
+		"$date": {
+			"$numberLong": "1765299821239"
+		}
+	}
+}
+{
+	"_id": {
+		"$oid": "6938566de48c5904e33f95d9"
+	},
+	"filename": "OP_Produto Teste Final_2512012.pdf",
+	"metadata": {
+		"type": "op",
+		"op_id": "17d4be20-5067-4231-9c31-6861e5153a07",
+		"product_id": "0b9ded25-0fd2-478a-9305-42a50e645689",
+		"batch_number": "2512012",
+		"generated_at": "2025-12-09T17:03:41.239879+00:00"
+	},
+	"chunkSize": {
+		"$numberInt": "261120"
+	},
+	"length": {
+		"$numberLong": "14071"
+	},
+	"uploadDate": {
+		"$date": {
+			"$numberLong": "1765299821240"
+		}
+	}
+}
+{
+	"_id": {
+		"$oid": "693856cae48c5904e33f95db"
+	},
+	"filename": "FICHA - QUEROSENE GEL-DESKTOP-FL4VNO7.docx",
+	"metadata": {
+		"content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+		"file_type": "op_model",
+		"uploaded_by": "8d8cab0d-4787-4569-985e-286f19c0f084",
+		"uploaded_at": "2025-12-09T17:05:14.116699+00:00",
+		"version": {
+			"$numberInt": "1"
+		}
+	},
+	"chunkSize": {
+		"$numberInt": "261120"
+	},
+	"length": {
+		"$numberLong": "29232"
+	},
+	"uploadDate": {
+		"$date": {
+			"$numberLong": "1765299914117"
+		}
+	}
+}
+{
+	"_id": {
+		"$oid": "693856cfe48c5904e33f95dd"
+	},
+	"filename": "OP - QUEROSENE GEL-DESKTOP-FL4VNO7.xls",
+	"metadata": {
+		"content_type": "application/vnd.ms-excel",
+		"file_type": "ficha_analise",
+		"uploaded_by": "8d8cab0d-4787-4569-985e-286f19c0f084",
+		"uploaded_at": "2025-12-09T17:05:19.577164+00:00",
+		"version": {
+			"$numberInt": "1"
+		}
+	},
+	"chunkSize": {
+		"$numberInt": "261120"
+	},
+	"length": {
+		"$numberLong": "32256"
+	},
+	"uploadDate": {
+		"$date": {
+			"$numberLong": "1765299919578"
+		}
+	}
+}
+{
+	"_id": {
+		"$oid": "69b7f84f30b9d144f525bedc"
+	},
+	"filename": "FICHA - ALVEJANTE SEM CLORO-DESKTOP-FL4VNO7.docx",
+	"metadata": {
+		"content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+		"file_type": "op_model",
+		"uploaded_by": "8d8cab0d-4787-4569-985e-286f19c0f084",
+		"uploaded_at": "2026-03-16T12:32:15.908186+00:00",
+		"version": {
+			"$numberInt": "6"
+		}
+	},
+	"chunkSize": {
+		"$numberInt": "261120"
+	},
+	"length": {
+		"$numberLong": "28393"
+	},
+	"uploadDate": {
+		"$date": {
+			"$numberLong": "1773664335938"
+		}
+	}
+}
+{
+	"_id": {
+		"$oid": "69b7f85330b9d144f525bede"
+	},
+	"filename": "OP - ALVEJANTE SEM CLORO-DESKTOP-FL4VNO7.xls",
+	"metadata": {
+		"content_type": "application/vnd.ms-excel",
+		"file_type": "ficha_analise",
+		"uploaded_by": "8d8cab0d-4787-4569-985e-286f19c0f084",
+		"uploaded_at": "2026-03-16T12:32:19.860582+00:00",
+		"version": {
+			"$numberInt": "4"
+		}
+	},
+	"chunkSize": {
+		"$numberInt": "261120"
+	},
+	"length": {
+		"$numberLong": "26112"
+	},
+	"uploadDate": {
+		"$date": {
+			"$numberLong": "1773664339861"
+		}
+	}
+}
+{
+	"_id": {
+		"$oid": "69b7f8ad30b9d144f525bee0"
+	},
+	"filename": "OP - -DESKTOP-FL4VNO7.xls",
+	"metadata": {
+		"content_type": "application/vnd.ms-excel",
+		"file_type": "op_model",
+		"uploaded_by": "8d8cab0d-4787-4569-985e-286f19c0f084",
+		"uploaded_at": "2026-03-16T12:33:49.995668+00:00",
+		"version": {
+			"$numberInt": "3"
+		}
+	},
+	"chunkSize": {
+		"$numberInt": "261120"
+	},
+	"length": {
+		"$numberLong": "31744"
+	},
+	"uploadDate": {
+		"$date": {
+			"$numberLong": "1773664429996"
+		}
+	}
+}
+{
+	"_id": {
+		"$oid": "69b7f8b630b9d144f525bee2"
+	},
+	"filename": "OP - -DESKTOP-FL4VNO7.xls",
+	"metadata": {
+		"content_type": "application/vnd.ms-excel",
+		"file_type": "ficha_analise",
+		"uploaded_by": "8d8cab0d-4787-4569-985e-286f19c0f084",
+		"uploaded_at": "2026-03-16T12:33:58.226859+00:00",
+		"version": {
+			"$numberInt": "3"
+		}
+	},
+	"chunkSize": {
+		"$numberInt": "261120"
+	},
+	"length": {
+		"$numberLong": "31744"
+	},
+	"uploadDate": {
+		"$date": {
+			"$numberLong": "1773664438228"
+		}
+	}
+}
+{
+	"_id": {
+		"$oid": "69b7f9c630b9d144f525bee4"
+	},
+	"filename": "FICHA+RECEITA -DESKTOP-FL4VNO7.docx",
+	"metadata": {
+		"content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+		"file_type": "ficha_analise",
+		"uploaded_by": "8d8cab0d-4787-4569-985e-286f19c0f084",
+		"uploaded_at": "2026-03-16T12:38:30.150878+00:00",
+		"version": {
+			"$numberInt": "4"
+		}
+	},
+	"chunkSize": {
+		"$numberInt": "261120"
+	},
+	"length": {
+		"$numberLong": "28959"
+	},
+	"uploadDate": {
+		"$date": {
+			"$numberLong": "1773664710151"
+		}
+	}
+}
+{
+	"_id": {
+		"$oid": "69b7f9ca30b9d144f525bee6"
+	},
+	"filename": "OP - -DESKTOP-FL4VNO7.xls",
+	"metadata": {
+		"content_type": "application/vnd.ms-excel",
+		"file_type": "op_model",
+		"uploaded_by": "8d8cab0d-4787-4569-985e-286f19c0f084",
+		"uploaded_at": "2026-03-16T12:38:34.540998+00:00",
+		"version": {
+			"$numberInt": "4"
+		}
+	},
+	"chunkSize": {
+		"$numberInt": "261120"
+	},
+	"length": {
+		"$numberLong": "31744"
+	},
+	"uploadDate": {
+		"$date": {
+			"$numberLong": "1773664714542"
+		}
+	}
+}

@@ -1,0 +1,162 @@
+{
+	"_id": {
+		"$oid": "6968c94d12919ca8022d3eaa"
+	},
+	"id": "3787a383-e14e-4500-8281-1777512b9e52",
+	"product_id": "e39f2243-38c1-42d5-a437-955a0f442ab7",
+	"product_batch_id": "55287876-69f7-454a-b3c7-6c1f09122d67",
+	"month": {
+		"$numberInt": "1"
+	},
+	"year": {
+		"$numberInt": "2026"
+	},
+	"status": "retirado",
+	"requested_at": "2026-01-15T11:02:37.306721+00:00",
+	"collected_by": "Maria Silva",
+	"collected_at": "2026-01-15T11:02:42.109325+00:00"
+}
+{
+	"_id": {
+		"$oid": "6968ca7012919ca8022d3eac"
+	},
+	"id": "218be0a0-0dee-4231-8c49-df28d11d7b64",
+	"product_id": "0b3fa5d7-5d89-4785-861c-8924bf9f859b",
+	"product_batch_id": "5982fd34-9992-4019-88f7-1230b8a4c9c2",
+	"month": {
+		"$numberInt": "1"
+	},
+	"year": {
+		"$numberInt": "2026"
+	},
+	"status": "retirado",
+	"requested_at": "2026-01-15T11:07:28.591110+00:00",
+	"collected_by": "João Silva",
+	"collected_at": "2026-01-15T11:07:37.778540+00:00"
+}
+{
+	"_id": {
+		"$oid": "69b2aeb0e1c38d8b3951b382"
+	},
+	"id": "2ba1fa96-d1e3-4702-b87d-d2c039d7769f",
+	"product_id": "bd72d1f4-153a-45d4-a272-9b713af48323",
+	"product_batch_id": "e11c1e99-5efc-4913-9a79-9fc9a7f99c64",
+	"month": {
+		"$numberInt": "3"
+	},
+	"year": {
+		"$numberInt": "2026"
+	},
+	"status": "retirado",
+	"requested_at": "2026-03-12T12:16:48.348705+00:00",
+	"collected_by": "Maria Silva",
+	"collected_at": "2026-05-22T13:03:11.181619+00:00"
+}
+{
+	"_id": {
+		"$oid": "69b2af3be1c38d8b3951b384"
+	},
+	"id": "854ef4d1-f58a-4ae8-a3c9-329b02d5cbb6",
+	"product_id": "0b9ded25-0fd2-478a-9305-42a50e645689",
+	"product_batch_id": "b2259a79-e8a3-4ac1-9570-174661edab2f",
+	"month": {
+		"$numberInt": "3"
+	},
+	"year": {
+		"$numberInt": "2026"
+	},
+	"status": "retirado",
+	"requested_at": "2026-03-12T12:19:07.862605+00:00",
+	"collected_by": "Maria Silva",
+	"collected_at": "2026-05-22T13:03:20.304789+00:00"
+}
+{
+	"_id": {
+		"$oid": "69cc044aa70f79a6ac8ba8b2"
+	},
+	"id": "fa416b48-8d60-40c4-8a61-13f6e940eb6a",
+	"product_id": "3e10f0f3-8e5c-4b3e-a12e-73ebc4b7a3b5",
+	"product_batch_id": "1d210069-23ab-4f4a-a23a-ee130371a37a",
+	"month": {
+		"$numberInt": "3"
+	},
+	"year": {
+		"$numberInt": "2026"
+	},
+	"status": "retirado",
+	"requested_at": "2026-03-31T17:28:42.885132+00:00",
+	"collected_by": "João Silva",
+	"collected_at": "2026-05-22T13:03:13.871868+00:00"
+}
+{
+	"_id": {
+		"$oid": "69e11fc2208d7700a238c32d"
+	},
+	"id": "c1f8b898-2a74-40d8-a9e4-03687902c8ae",
+	"product_id": "bd72d1f4-153a-45d4-a272-9b713af48323",
+	"product_batch_id": "e7d9ced4-1143-4b2c-b26a-2ab3ffd1c37b",
+	"month": {
+		"$numberInt": "4"
+	},
+	"year": {
+		"$numberInt": "2026"
+	},
+	"status": "retirado",
+	"requested_at": "2026-04-16T17:43:30.270599+00:00",
+	"collected_by": "Maria Silva",
+	"collected_at": "2026-05-22T13:03:17.570833+00:00"
+}
+{
+	"_id": {
+		"$oid": "6a1055005bcb7357d6a85ca2"
+	},
+	"id": "ff8e9103-0cec-4fc4-b76b-3402a7bd44ae",
+	"product_id": "0b9ded25-0fd2-478a-9305-42a50e645689",
+	"product_batch_id": "12ce937f-107b-4d1c-8197-1664e541deae",
+	"month": {
+		"$numberInt": "5"
+	},
+	"year": {
+		"$numberInt": "2026"
+	},
+	"status": "pendente",
+	"requested_at": "2026-05-22T13:07:12.989339+00:00",
+	"collected_by": null,
+	"collected_at": null
+}
+{
+	"_id": {
+		"$oid": "6a157dd0862a79dea6e98169"
+	},
+	"id": "5ad777d2-114e-4250-9e7c-a443ddb7e443",
+	"product_id": "e39f2243-38c1-42d5-a437-955a0f442ab7",
+	"product_batch_id": "9e46606d-1d4d-43dd-9ab6-35a7f67d2538",
+	"month": {
+		"$numberInt": "2"
+	},
+	"year": {
+		"$numberInt": "2026"
+	},
+	"status": "pendente",
+	"requested_at": "2026-05-26T11:02:40.926935+00:00",
+	"collected_by": null,
+	"collected_at": null
+}
+{
+	"_id": {
+		"$oid": "6a47e98b99da1e2d82793c0d"
+	},
+	"id": "c0c49052-7070-414e-9e4a-826f2f9ddfba",
+	"product_id": "9704734c-0b9c-478c-9d43-840031cd0f48",
+	"product_batch_id": "a00b4353-698f-4eb8-af74-4802daf13466",
+	"month": {
+		"$numberInt": "7"
+	},
+	"year": {
+		"$numberInt": "2026"
+	},
+	"status": "pendente",
+	"requested_at": "2026-07-03T16:55:39.189177+00:00",
+	"collected_by": null,
+	"collected_at": null
+}
