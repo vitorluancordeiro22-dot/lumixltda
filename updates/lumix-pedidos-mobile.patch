@@ -1,0 +1,1538 @@
+diff --git a/frontend/src/components/NewPurchaseOrderDialog.js b/frontend/src/components/NewPurchaseOrderDialog.js
+new file mode 100644
+index 0000000000000000000000000000000000000000..093cd130b5bdc2a71502551efb3a4685933d22cc
+--- /dev/null
++++ b/frontend/src/components/NewPurchaseOrderDialog.js
+@@ -0,0 +1,429 @@
++import React, { useCallback, useEffect, useRef, useState } from 'react';
++import api from '../lib/api';
++import { useAuth } from '../context/AuthContext';
++import { Button } from './ui/button';
++import { Input } from './ui/input';
++import { Label } from './ui/label';
++import { Textarea } from './ui/textarea';
++import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from './ui/dialog';
++import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from './ui/alert-dialog';
++import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from './ui/dropdown-menu';
++import { Plus, Search, Truck, ChevronLeft, ArrowRight, Check, ShoppingCart, Trash2, Loader2, Building2, MoreHorizontal, X } from 'lucide-react';
++import { toast } from 'sonner';
++import { ORDER_UNITS, emptyOrderDraft, hasOrderDraft, readOrderDraft, parseOrderQuantity, searchOrderText, orderItemsPayload } from '../lib/purchaseOrderDraft';
++
++// ====================== Modal Novo Fornecedor ======================
++const AddSupplierDialog = ({ open, onOpenChange, onCreated }) => {
++  const [name, setName] = useState('');
++  const [contact, setContact] = useState('');
++  const [email, setEmail] = useState('');
++  const [submitting, setSubmitting] = useState(false);
++
++  const handleSubmit = async (e) => {
++    e.preventDefault();
++    if (!name.trim()) {
++      toast.error('Digite o nome do fornecedor');
++      return;
++    }
++    setSubmitting(true);
++    try {
++      const response = await api.post('/suppliers', {
++        name: name.trim(),
++        contact: contact.trim(),
++        email: email.trim(),
++      });
++      toast.success('Fornecedor adicionado com sucesso!');
++      setName('');
++      setContact('');
++      setEmail('');
++      onCreated(response.data);
++      onOpenChange(false);
++    } catch (e) {
++      toast.error(e.response?.data?.detail || 'Erro ao adicionar fornecedor');
++    } finally {
++      setSubmitting(false);
++    }
++  };
++
++  return (
++    <Dialog open={open} onOpenChange={onOpenChange}>
++      <DialogContent className="bg-card border-border w-[calc(100%-1rem)] max-w-md max-h-[85dvh] overflow-y-auto p-4 sm:p-6 rounded-2xl [&>button]:h-11 [&>button]:w-11 [&>button]:flex [&>button]:items-center [&>button]:justify-center [&>button]:right-1 [&>button]:top-1">
++        <DialogHeader>
++          <DialogTitle className="text-foreground flex items-center gap-2">
++            <Building2 className="w-5 h-5 text-primary" />
++            Novo Fornecedor
++          </DialogTitle>
++          <DialogDescription>Cadastre o fornecedor para montar o pedido.</DialogDescription>
++        </DialogHeader>
++
++        <form onSubmit={handleSubmit} className="space-y-4">
++          <div className="space-y-2">
++            <Label className="text-foreground">Nome *</Label>
++            <Input
++              placeholder="Ex: Distribuidora XYZ"
++              value={name}
++              onChange={(e) => setName(e.target.value)}
++              disabled={submitting}
++              className="bg-input border-border text-foreground h-12 text-base"
++            />
++          </div>
++
++          <div className="space-y-2">
++            <Label className="text-foreground">Contato (opcional)</Label>
++            <Input
++              placeholder="Ex: (11) 98765-4321"
++              value={contact}
++              onChange={(e) => setContact(e.target.value)}
++              disabled={submitting}
++              className="bg-input border-border text-foreground h-12 text-base"
++            />
++          </div>
++
++          <div className="space-y-2">
++            <Label className="text-foreground">E-mail (opcional)</Label>
++            <Input
++              type="email"
++              placeholder="Ex: contato@distribuidora.com"
++              value={email}
++              onChange={(e) => setEmail(e.target.value)}
++              disabled={submitting}
++              className="bg-input border-border text-foreground h-12 text-base"
++            />
++          </div>
++
++          <DialogFooter className="mt-6 gap-2">
++            <Button
++              type="button"
++              onClick={() => onOpenChange(false)}
++              variant="outline"
++              className="border-border text-foreground flex-1 h-12"
++              disabled={submitting}
++            >
++              Cancelar
++            </Button>
++            <Button
++              type="submit"
++              disabled={submitting}
++              className="w-full sm:flex-1 bg-primary hover:bg-primary/90 h-12"
++            >
++              {submitting ? (
++                <>
++                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
++                  Adicionando...
++                </>
++              ) : (
++                <>
++                  <Plus className="w-4 h-4 mr-2" />
++                  Adicionar
++                </>
++              )}
++            </Button>
++          </DialogFooter>
++        </form>
++      </DialogContent>
++    </Dialog>
++  );
++};
++
++const itemKey = (item) => item.raw_material_id ? `rm-${item.raw_material_id}` : `c-${item.name.toLowerCase()}`;
++const formatQuantity = (number) => number.toLocaleString('pt-BR', { maximumFractionDigits: 6 });
++
++// Account-scoped and browser-local: a draft never writes to inventory or creates an order.
++export const NewPurchaseOrderDialog = (props) => {
++  const { user } = useAuth();
++  if (!user) return null;
++  const storageKey = `lumix:purchase-order-draft:v1:${user.id || user.email}`;
++  return <OrderComposer key={storageKey} storageKey={storageKey} {...props} />;
++};
++
++const OrderComposer = ({ open, onOpenChange, onCreated, storageKey }) => {
++  const [initial] = useState(() => {
++    try { return { draft: readOrderDraft(localStorage, storageKey), warning: '' }; }
++    catch { return { draft: emptyOrderDraft(), warning: 'Não foi possível recuperar o rascunho deste navegador.' }; }
++  });
++  const [draft, setDraft] = useState(initial.draft);
++  const [storageWarning, setStorageWarning] = useState(initial.warning);
++  const [suppliers, setSuppliers] = useState([]);
++  const [loadingSuppliers, setLoadingSuppliers] = useState(false);
++  const [suppliersError, setSuppliersError] = useState(false);
++  const [supplierSearch, setSupplierSearch] = useState('');
++  const [catalog, setCatalog] = useState([]);
++  const [loadingCatalog, setLoadingCatalog] = useState(false);
++  const [catalogError, setCatalogError] = useState(false);
++  const [catalogRetry, setCatalogRetry] = useState(0);
++  const [itemSearch, setItemSearch] = useState('');
++  const [addSupplierOpen, setAddSupplierOpen] = useState(false);
++  const [confirmation, setConfirmation] = useState(null);
++  const [message, setMessage] = useState(null);
++  const notify = (type, text) => setMessage({ type, text });
++  const [submitting, setSubmitting] = useState(false);
++  const [addingItem, setAddingItem] = useState(false);
++  const [viewport, setViewport] = useState({ height: '100dvh', top: '0px' });
++  const bodyRef = useRef(null);
++  const submitRef = useRef(false);
++  const catalogGeneration = useRef(0);
++  const { step, supplier, cart, quantities, unit, observations, newName } = draft;
++  const change = (patch) => { setMessage(null); setDraft((previous) => ({ ...previous, ...patch })); };
++
++  useEffect(() => {
++    try {
++      if (hasOrderDraft(draft)) localStorage.setItem(storageKey, JSON.stringify({ ...draft, version: 1 }));
++      else localStorage.removeItem(storageKey);
++    } catch { setStorageWarning('O navegador não conseguiu salvar. Mantenha esta tela aberta até criar o pedido.'); }
++  }, [draft, storageKey]);
++
++  useEffect(() => {
++    if (!open) return undefined;
++    const visual = window.visualViewport;
++    let frame;
++    let keyboardTimer;
++    const revealField = () => {
++      const body = bodyRef.current;
++      const field = document.activeElement;
++      if (!body?.contains(field) || !field.matches('input, textarea')) return;
++      const bounds = body.getBoundingClientRect();
++      const input = field.getBoundingClientRect();
++      if (input.bottom > bounds.bottom - 12) body.scrollTop += input.bottom - bounds.bottom + 12;
++      else if (input.top < bounds.top + 12) body.scrollTop -= bounds.top - input.top + 12;
++    };
++    const update = () => {
++      setViewport({ height: `${visual?.height || window.innerHeight}px`, top: `${visual?.offsetTop || 0}px` });
++      window.cancelAnimationFrame(frame);
++      window.clearTimeout(keyboardTimer);
++      frame = window.requestAnimationFrame(revealField);
++      // Some browsers finish repositioning the focused field after the resize.
++      // Reveal it again once that keyboard/focus animation has settled.
++      keyboardTimer = window.setTimeout(revealField, 250);
++    };
++    update();
++    visual?.addEventListener('resize', update);
++    visual?.addEventListener('scroll', update);
++    window.addEventListener('resize', update);
++    return () => {
++      window.cancelAnimationFrame(frame);
++      window.clearTimeout(keyboardTimer);
++      visual?.removeEventListener('resize', update);
++      visual?.removeEventListener('scroll', update);
++      window.removeEventListener('resize', update);
++    };
++  }, [open]);
++
++  useEffect(() => { setMessage(null); }, [step, open]);
++
++  useEffect(() => { if (bodyRef.current) bodyRef.current.scrollTop = 0; }, [step, open]);
++
++  const loadSuppliers = useCallback(async () => {
++    setLoadingSuppliers(true);
++    setSuppliersError(false);
++    try { const response = await api.get('/suppliers'); setSuppliers(response.data); }
++    catch { setSuppliersError(true); }
++    finally { setLoadingSuppliers(false); }
++  }, []);
++  useEffect(() => { if (open) loadSuppliers(); }, [open, loadSuppliers]);
++
++  const supplierId = supplier?.id;
++  useEffect(() => {
++    if (!open || !supplierId) { setCatalog([]); return undefined; }
++    let active = true;
++    catalogGeneration.current += 1;
++    setCatalog([]);
++    setLoadingCatalog(true);
++    setCatalogError(false);
++    api.get(`/suppliers/${supplierId}/catalog`)
++      .then((response) => { if (active) setCatalog(response.data); })
++      .catch(() => { if (active) setCatalogError(true); })
++      .finally(() => { if (active) setLoadingCatalog(false); });
++    return () => { active = false; catalogGeneration.current += 1; };
++  }, [open, supplierId, catalogRetry]);
++
++  const close = (nextOpen) => { if (!submitting && !addingItem) onOpenChange(nextOpen); };
++  const selectSupplier = (nextSupplier) => {
++    if (supplier && supplier.id !== nextSupplier.id && hasOrderDraft({ ...draft, supplier: null })) {
++      setConfirmation({ kind: 'supplier', supplier: nextSupplier });
++      return;
++    }
++    change({ supplier: nextSupplier, step: 'items' });
++    setItemSearch('');
++  };
++
++  const addToCart = (item) => {
++    const quantity = parseOrderQuantity(quantities[item.id]);
++    if (quantity === null) { notify('error', 'Informe uma quantidade maior que zero. Exemplo: 1,5 (sem separador de milhar).'); return; }
++    const key = itemKey(item);
++    setDraft((previous) => ({
++      ...previous,
++      cart: previous.cart.some((entry) => entry.key === key)
++        ? previous.cart.map((entry) => entry.key === key ? { ...entry, quantity: String(quantities[item.id]) } : entry)
++        : [...previous.cart, { key, name: item.name, quantity: String(quantities[item.id]), raw_material_id: item.raw_material_id || null }],
++      quantities: { ...previous.quantities, [item.id]: '' },
++    }));
++    setMessage(null);
++  };
++
++  const addNewItem = async () => {
++    const name = newName.trim();
++    if (!name || addingItem) return;
++    const key = `c-${name.toLowerCase()}`;
++    if (cart.some((entry) => entry.key === key)) { notify('info', 'Esse item já está no pedido. Ajuste a quantidade na revisão.'); return; }
++    setAddingItem(true);
++    const generation = catalogGeneration.current;
++    try {
++      const response = await api.post(`/suppliers/${supplier.id}/catalog`, { name, unit: '' });
++      if (generation === catalogGeneration.current) setCatalog((previous) => previous.some((entry) => entry.id === response.data.id)
++        ? previous : [...previous, response.data].sort((a, b) => a.name.localeCompare(b.name)));
++    } catch { notify('info', 'Item incluído só neste pedido; não foi possível salvar no catálogo.'); }
++    setDraft((previous) => ({ ...previous, newName: '', cart: [...previous.cart, { key, name, quantity: '1', raw_material_id: null }] }));
++    setAddingItem(false);
++    notify('success', 'Item incluído com quantidade 1. Confira na revisão.');
++  };
++
++  const performConfirmation = async () => {
++    const action = confirmation;
++    setConfirmation(null);
++    if (action.kind === 'discard') {
++      setDraft(emptyOrderDraft());
++      setSupplierSearch(''); setItemSearch('');
++      notify('info', 'Rascunho descartado');
++    } else if (action.kind === 'supplier') {
++      setDraft({ ...emptyOrderDraft(), supplier: action.supplier, step: 'items' });
++      setItemSearch('');
++    } else if (action.kind === 'catalog') {
++      try {
++        await api.delete(`/suppliers/${supplier.id}/catalog/${action.item.id}`);
++        setCatalog((previous) => previous.filter((item) => item.id !== action.item.id));
++        // Removing a catalog entry does not silently remove an already selected order item.
++        notify('success', 'Item removido do catálogo. Os itens do pedido foram mantidos.');
++      } catch { notify('error', 'Não foi possível remover do catálogo'); }
++    }
++  };
++
++  const review = () => {
++    if (addingItem) return;
++    const pending = Object.values(quantities).some((value) => value.trim());
++    if (pending || newName.trim()) {
++      notify('error', 'Há um item ainda não incluído. Toque em Adicionar/Atualizar ou limpe o campo antes de revisar.');
++      return;
++    }
++    try { orderItemsPayload(draft); change({ step: 'summary' }); }
++    catch (error) { notify('error', error.message); }
++  };
++
++  const finalize = async () => {
++    if (submitRef.current) return;
++    let items;
++    try { items = orderItemsPayload(draft); }
++    catch (error) { notify('error', error.message); return; }
++    submitRef.current = true;
++    setSubmitting(true);
++    try {
++      await api.post('/purchase-orders', { supplier_id: supplier.id, supplier_name: supplier.name, items, unit, observations: observations.trim() });
++      setDraft(emptyOrderDraft());
++      try { localStorage.removeItem(storageKey); } catch { /* The storage warning is already visible. */ }
++      toast.success('Pedido criado com sucesso!', { position: 'bottom-center', duration: 2000 });
++      onOpenChange(false);
++      onCreated();
++    } catch (error) {
++      notify('error', error.response?.data?.detail || 'Não foi possível confirmar a criação. Confira o histórico antes de tentar novamente. Seu rascunho foi mantido.');
++    } finally { setSubmitting(false); submitRef.current = false; }
++  };
++
++  const filteredSuppliers = suppliers.filter((entry) => searchOrderText(entry.name).includes(searchOrderText(supplierSearch)));
++  const filteredCatalog = catalog.filter((entry) => searchOrderText(entry.name).includes(searchOrderText(itemSearch)));
++  const total = cart.reduce((sum, entry) => sum + (parseOrderQuantity(entry.quantity) || 0), 0);
++  const stepIndex = ['suppliers', 'items', 'summary'].indexOf(step);
++  const working = submitting || addingItem;
++
++  return <>
++    <Dialog open={open} onOpenChange={close}>
++      <DialogContent
++        aria-describedby="purchase-order-description"
++        onOpenAutoFocus={(event) => event.preventDefault()}
++        onInteractOutside={(event) => event.preventDefault()}
++        style={{ '--order-vh': viewport.height, '--order-top': viewport.top }}
++        className="left-0 top-[var(--order-top)] h-[var(--order-vh)] max-h-none w-screen max-w-none translate-x-0 translate-y-0 rounded-none border-0 p-0 gap-0 flex flex-col overflow-hidden bg-card sm:left-1/2 sm:top-1/2 sm:h-[min(90dvh,850px)] sm:max-w-2xl sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl sm:border [&>button]:hidden"
++      >
++        <header className="shrink-0 border-b px-4 pb-3 pt-[max(12px,env(safe-area-inset-top))] sm:px-6">
++          <div className="flex items-center justify-between gap-3">
++            <DialogTitle className="text-xl font-semibold text-foreground">Novo pedido</DialogTitle>
++            <Button variant="ghost" size="icon" className="h-11 w-11 shrink-0" onClick={() => close(false)} disabled={working} aria-label="Salvar rascunho e sair"><X className="h-5 w-5" /></Button>
++          </div>
++          <DialogDescription id="purchase-order-description" className="text-xs text-muted-foreground">
++            {storageWarning || 'Rascunho salvo automaticamente neste navegador.'}
++          </DialogDescription>
++          <ol className="mt-3 flex gap-2" aria-label="Etapas do pedido">
++            {['Fornecedor', 'Itens', 'Revisão'].map((label, index) => <li key={label} aria-current={index === stepIndex ? 'step' : undefined}
++              className={`flex flex-1 items-center gap-1.5 text-xs ${index === stepIndex ? 'font-semibold text-primary' : 'text-muted-foreground'}`}>
++              <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${index <= stepIndex ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
++                {index < stepIndex ? <Check className="h-3.5 w-3.5" /> : index + 1}
++              </span>{label}
++            </li>)}
++          </ol>
++        </header>
++
++        <div ref={bodyRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-5 sm:px-6" data-testid="order-scroll-body">
++          {step === 'suppliers' && <section className="space-y-4" aria-label="Escolher fornecedor">
++            <div><h2 className="text-lg font-semibold">De quem vamos comprar?</h2><p className="text-sm text-muted-foreground">Escolha o fornecedor para ver os materiais.</p></div>
++            {supplier && <Button variant="outline" className="h-12 w-full justify-between" onClick={() => change({ step: 'items' })}><span className="min-w-0 truncate">Continuar com {supplier.name}</span><ArrowRight className="ml-2 h-4 w-4 shrink-0" /></Button>}
++            <div className="relative"><Search className="absolute left-3 top-4 h-4 w-4 text-muted-foreground" /><Input aria-label="Buscar fornecedor" placeholder="Buscar fornecedor" value={supplierSearch} onChange={(event) => setSupplierSearch(event.target.value)} className="h-12 pl-10 text-base" /></div>
++            <Button variant="outline" className="h-12 w-full border-dashed" onClick={() => setAddSupplierOpen(true)}><Plus className="mr-2 h-4 w-4" />Cadastrar fornecedor</Button>
++            {loadingSuppliers ? <p role="status" className="py-6 text-center text-sm text-muted-foreground">Carregando fornecedores…</p> : suppliersError ? <div className="rounded-xl border p-4 text-sm"><p>Não foi possível carregar os fornecedores.</p><Button variant="outline" className="mt-3 h-11" onClick={loadSuppliers}>Tentar novamente</Button></div> : <div className="space-y-2">
++              {filteredSuppliers.map((entry) => <button type="button" key={entry.id} onClick={() => selectSupplier({ id: entry.id, name: entry.name })} className="flex min-h-16 w-full items-center gap-3 rounded-xl border p-3 text-left hover:bg-muted/50 active:bg-muted">
++                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><Truck className="h-5 w-5" /></span>
++                <span className="min-w-0 flex-1"><span className="block break-words text-sm font-semibold">{entry.name}</span>{entry.contact && <span className="block break-words text-xs text-muted-foreground">{entry.contact}</span>}</span><ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground" />
++              </button>)}
++              {!filteredSuppliers.length && <p className="py-8 text-center text-sm text-muted-foreground">{supplierSearch ? 'Nenhum fornecedor encontrado.' : 'Cadastre o primeiro fornecedor para começar.'}</p>}
++            </div>}
++          </section>}
++
++          {step === 'items' && supplier && <section className="space-y-5" aria-label="Escolher materiais">
++            <div className="flex items-center gap-3 rounded-xl bg-muted/60 p-3"><Truck className="h-5 w-5 shrink-0 text-primary" /><div className="min-w-0 flex-1"><p className="text-xs text-muted-foreground">Fornecedor</p><p className="break-words text-sm font-semibold">{supplier.name}</p></div><Button variant="ghost" className="h-11 shrink-0" disabled={working} onClick={() => change({ step: 'suppliers' })}>Trocar</Button></div>
++            <fieldset disabled={working}><legend className="mb-2 text-sm font-medium">Unidade para todos os itens</legend><div className="grid grid-cols-4 gap-2">{ORDER_UNITS.map((value) => <button type="button" key={value} aria-pressed={unit === value} onClick={() => change({ unit: value })} className={`min-h-11 rounded-lg border px-1 text-sm ${unit === value ? 'border-primary bg-primary text-primary-foreground' : 'border-border'}`}>{value}</button>)}</div></fieldset>
++            <div className="space-y-2"><Label htmlFor="order-item-search" className="text-base font-semibold">Materiais do fornecedor</Label><div className="relative"><Search className="absolute left-3 top-4 h-4 w-4 text-muted-foreground" /><Input id="order-item-search" placeholder="Buscar pelo nome do material" value={itemSearch} onChange={(event) => setItemSearch(event.target.value)} className="h-12 pl-10 text-base" /></div><p className="text-xs text-muted-foreground">Para decimais, use 1,5 ou 1.5. Não use separador de milhar.</p></div>
++            {loadingCatalog ? <p role="status" className="py-6 text-center text-sm text-muted-foreground">Carregando materiais…</p> : catalogError ? <div className="rounded-xl border p-4 text-sm"><p>Não foi possível carregar o catálogo.</p><Button className="mt-3 h-11" variant="outline" onClick={() => setCatalogRetry((value) => value + 1)}>Tentar novamente</Button></div> : <div className="space-y-3">
++              {filteredCatalog.map((item) => {
++                const selected = cart.find((entry) => entry.key === itemKey(item));
++                return <article key={item.id} className={`rounded-xl border p-3 ${selected ? 'border-primary/35 bg-primary/5' : 'bg-card'}`}>
++                  <div className="mb-3 flex items-start justify-between gap-2"><div className="min-w-0"><h3 className="break-words text-base font-medium leading-snug">{item.name}</h3>{selected && <p className="mt-1 text-xs font-medium text-primary">No pedido: {selected.quantity} {unit}</p>}</div>
++                    {item.source === 'custom' && <DropdownMenu><DropdownMenuTrigger asChild><Button size="icon" variant="ghost" className="h-11 w-11 shrink-0" aria-label={`Opções de ${item.name}`} disabled={working}><MoreHorizontal className="h-5 w-5" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem className="min-h-11 text-red-600" onSelect={() => setConfirmation({ kind: 'catalog', item })}><Trash2 />Remover do catálogo</DropdownMenuItem></DropdownMenuContent></DropdownMenu>}
++                  </div>
++                  <div className="flex items-end gap-3"><div className="min-w-0 flex-1"><Label htmlFor={`order-qty-${item.id}`} className="mb-1 block text-xs">Quantidade em {unit}</Label><Input id={`order-qty-${item.id}`} type="text" inputMode="decimal" autoComplete="off" placeholder={selected ? String(selected.quantity) : 'Ex.: 25'} value={quantities[item.id] || ''} disabled={working} onChange={(event) => change({ quantities: { ...quantities, [item.id]: event.target.value } })} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); addToCart(item); } }} className="h-12 text-base" /></div><Button className="h-12 min-w-[112px] px-3" disabled={working || !String(quantities[item.id] || '').trim()} onClick={() => addToCart(item)}>{selected ? <Check className="mr-1.5 h-4 w-4" /> : <Plus className="mr-1.5 h-4 w-4" />}{selected ? 'Atualizar' : 'Adicionar'}</Button></div>
++                </article>;
++              })}
++              {!filteredCatalog.length && <p className="py-5 text-center text-sm text-muted-foreground">{itemSearch ? 'Nenhum material encontrado. Tente outro nome.' : 'Este fornecedor ainda não tem materiais cadastrados.'}</p>}
++            </div>}
++            <div className="space-y-2 rounded-xl border border-dashed p-3"><Label htmlFor="order-new-item" className="text-sm font-medium">Não encontrou? Inclua outro item</Label><Input id="order-new-item" placeholder="Nome completo do material" className="h-12 text-base" value={newName} disabled={working} onChange={(event) => change({ newName: event.target.value })} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); addNewItem(); } }} /><Button variant="outline" className="h-11 w-full" disabled={working || !newName.trim()} onClick={addNewItem}>{addingItem ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}Incluir no pedido</Button><p className="text-xs text-muted-foreground">Será incluído com quantidade 1. Você pode ajustar na revisão.</p></div>
++          </section>}
++
++          {step === 'summary' && supplier && <section className="space-y-5" aria-label="Revisar pedido">
++            <div><h2 className="text-lg font-semibold">Confira antes de criar</h2><p className="mt-1 break-words text-sm text-muted-foreground">{supplier.name} · {cart.length} {cart.length === 1 ? 'item' : 'itens'}</p></div>
++            <div className="space-y-3">{cart.map((entry, index) => {
++              const invalid = parseOrderQuantity(entry.quantity) === null;
++              return <article key={entry.key} className="rounded-xl border p-3"><div className="mb-3 flex items-start justify-between gap-2"><h3 className="min-w-0 break-words pt-2 text-base font-medium">{entry.name}</h3><Button size="icon" variant="ghost" className="h-11 w-11 shrink-0 text-red-600" disabled={submitting} aria-label={`Remover ${entry.name} do pedido`} onClick={() => change({ cart: cart.filter((item) => item.key !== entry.key) })}><Trash2 className="h-5 w-5" /></Button></div><Label htmlFor={`review-qty-${index}`} className="mb-1 block text-xs">Quantidade em {unit}</Label><Input id={`review-qty-${index}`} type="text" inputMode="decimal" autoComplete="off" className="h-12 text-base" value={entry.quantity} disabled={submitting} aria-invalid={invalid} aria-describedby={invalid ? `review-error-${index}` : undefined} onChange={(event) => change({ cart: cart.map((item) => item.key === entry.key ? { ...item, quantity: event.target.value } : item) })} />{invalid && <p id={`review-error-${index}`} className="mt-1 text-xs text-red-600">Informe um número maior que zero. Exemplo: 1,5.</p>}</article>;
++            })}{!cart.length && <p className="rounded-xl bg-muted p-4 text-sm">Seu pedido está vazio. Volte para adicionar materiais.</p>}</div>
++            <div className="flex items-center justify-between rounded-xl bg-muted/60 p-4 text-sm"><span>Total em {unit}</span><strong>{formatQuantity(total)} {unit}</strong></div>
++            <div className="space-y-2"><Label htmlFor="order-notes">Observações (opcional)</Label><Textarea id="order-notes" rows={3} className="text-base" placeholder="Entrega, condições de pagamento ou outras informações" value={observations} disabled={submitting} onChange={(event) => change({ observations: event.target.value })} /></div>
++            <p className="text-xs text-muted-foreground">Criar o pedido registra a compra. A entrada no estoque continua sendo feita em “Lotear MP”.</p>
++          </section>}
++        </div>
++
++        <footer className="shrink-0 border-t bg-card px-4 pt-3 pb-[max(12px,env(safe-area-inset-bottom))] sm:px-6">
++          {message && <p role={message.type === 'error' ? 'alert' : 'status'} className={`mb-2 text-sm ${message.type === 'error' ? 'text-red-600' : 'text-muted-foreground'}`}>{message.text}</p>}
++          {step === 'items' && <p className="mb-2 flex items-center justify-between text-xs text-muted-foreground" aria-live="polite"><span>{cart.length} {cart.length === 1 ? 'item incluído' : 'itens incluídos'}</span><span>{formatQuantity(total)} {unit}</span></p>}
++          <div className="flex gap-2">
++            {step === 'suppliers' ? <Button variant="outline" className="h-12 flex-1" onClick={() => close(false)}>Salvar e sair</Button> : <>
++              <Button variant="outline" className="h-12 px-3 sm:px-4" disabled={working} onClick={() => change({ step: step === 'summary' ? 'items' : 'suppliers' })}><ChevronLeft className="mr-1 h-4 w-4" />Voltar</Button>
++              <Button className="h-12 min-w-0 flex-1 px-3" disabled={working || !cart.length || (step === 'summary' && cart.some((entry) => parseOrderQuantity(entry.quantity) === null))} onClick={step === 'summary' ? finalize : review}>
++                {submitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Criando…</> : step === 'summary' ? <><Check className="mr-2 h-4 w-4" />Criar pedido</> : <><ShoppingCart className="mr-2 h-4 w-4" />Revisar pedido · {cart.length}</>}
++              </Button>
++            </>}
++            {hasOrderDraft(draft) && <DropdownMenu><DropdownMenuTrigger asChild><Button size="icon" variant="outline" className="h-12 w-11 shrink-0" disabled={working} aria-label="Opções do rascunho"><MoreHorizontal className="h-5 w-5" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem className="min-h-11" onSelect={() => close(false)}>Salvar e sair</DropdownMenuItem><DropdownMenuItem className="min-h-11 text-red-600" onSelect={() => setConfirmation({ kind: 'discard' })}>Descartar rascunho</DropdownMenuItem></DropdownMenuContent></DropdownMenu>}
++          </div>
++        </footer>
++      </DialogContent>
++    </Dialog>
++    <AddSupplierDialog open={addSupplierOpen} onOpenChange={setAddSupplierOpen} onCreated={(created) => { loadSuppliers(); if (created?.id) selectSupplier({ id: created.id, name: created.name }); }} />
++    <AlertDialog open={Boolean(confirmation)} onOpenChange={(next) => { if (!next) setConfirmation(null); }}>
++      <AlertDialogContent className="w-[calc(100%-2rem)] max-w-md"><AlertDialogHeader><AlertDialogTitle>{confirmation?.kind === 'supplier' ? 'Trocar de fornecedor?' : confirmation?.kind === 'catalog' ? 'Remover do catálogo?' : 'Descartar rascunho?'}</AlertDialogTitle><AlertDialogDescription>{confirmation?.kind === 'supplier' ? 'Os itens e as observações atuais serão descartados. O novo pedido começará vazio para o outro fornecedor.' : confirmation?.kind === 'catalog' ? 'Esse material deixará o catálogo do fornecedor. Se já estiver no pedido, será mantido na revisão.' : 'Os itens e as informações deste rascunho serão apagados deste navegador. Pedidos já criados não serão alterados.'}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter className="gap-2"><AlertDialogCancel className="h-12">Continuar editando</AlertDialogCancel><AlertDialogAction className="h-12 bg-red-600 hover:bg-red-700" onClick={performConfirmation}>{confirmation?.kind === 'supplier' ? 'Trocar e limpar' : confirmation?.kind === 'catalog' ? 'Remover do catálogo' : 'Descartar'}</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
++    </AlertDialog>
++  </>;
++};
+diff --git a/frontend/src/lib/purchaseOrderDraft.js b/frontend/src/lib/purchaseOrderDraft.js
+new file mode 100644
+index 0000000000000000000000000000000000000000..ca74b001fd811c41ab1b9e54dbbef67cc6d9d2ce
+--- /dev/null
++++ b/frontend/src/lib/purchaseOrderDraft.js
+@@ -0,0 +1,54 @@
++export const ORDER_UNITS = ['Kg', 'Litros', 'Fardos', 'Unidades'];
++
++// Keep the typed string until validation: "1," must not turn into 1 mid-edit.
++// Quantities have a decimal separator, without thousands separators.
++export const parseOrderQuantity = (value) => {
++  const text = String(value ?? '').trim();
++  if (!/^\d+(?:[.,]\d+)?$/.test(text)) return null;
++  const number = Number(text.replace(',', '.'));
++  return Number.isFinite(number) && number > 0 ? number : null;
++};
++
++export const searchOrderText = (text) => String(text || '')
++  .normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR').trim();
++
++export const emptyOrderDraft = () => ({
++  step: 'suppliers', supplier: null, cart: [], quantities: {},
++  unit: 'Kg', observations: '', newName: '',
++});
++
++export const hasOrderDraft = (draft) => Boolean(draft.supplier || draft.cart.length
++  || draft.observations || draft.newName || Object.values(draft.quantities).some(Boolean));
++
++export const readOrderDraft = (storage, key) => {
++  const empty = emptyOrderDraft();
++  const raw = storage.getItem(key);
++  if (!raw) return empty;
++  const data = JSON.parse(raw);
++  if (data.version !== 1 || !Array.isArray(data.cart)
++      || !data.cart.every((item) => typeof item.key === 'string' && typeof item.name === 'string'
++        && ['string', 'number'].includes(typeof item.quantity))
++      || (data.supplier && (typeof data.supplier.id !== 'string' || typeof data.supplier.name !== 'string'))) {
++    throw new Error('Invalid order draft');
++  }
++  return {
++    ...empty,
++    supplier: data.supplier || null,
++    cart: data.cart,
++    quantities: data.quantities && typeof data.quantities === 'object' && !Array.isArray(data.quantities)
++      ? Object.fromEntries(Object.entries(data.quantities).filter(([, v]) => typeof v === 'string')) : {},
++    unit: ORDER_UNITS.includes(data.unit) ? data.unit : 'Kg',
++    observations: typeof data.observations === 'string' ? data.observations : '',
++    newName: typeof data.newName === 'string' ? data.newName : '',
++    step: data.supplier && ['items', 'summary'].includes(data.step) ? data.step : 'suppliers',
++  };
++};
++
++export const orderItemsPayload = (draft) => {
++  if (!draft.supplier || !draft.cart.length) throw new Error('Escolha um fornecedor e adicione itens.');
++  return draft.cart.map((item) => {
++    const quantity = parseOrderQuantity(item.quantity);
++    if (quantity === null) throw new Error(`Confira a quantidade de ${item.name}. Use um número maior que zero, como 1,5.`);
++    return { name: item.name, quantity, unit: draft.unit, raw_material_id: item.raw_material_id || null };
++  });
++};
+diff --git a/frontend/src/lib/purchaseOrderDraft.test.js b/frontend/src/lib/purchaseOrderDraft.test.js
+new file mode 100644
+index 0000000000000000000000000000000000000000..c6dfffe629e8c12edc1d41483db063b416c3e261
+--- /dev/null
++++ b/frontend/src/lib/purchaseOrderDraft.test.js
+@@ -0,0 +1,59 @@
++import { emptyOrderDraft, hasOrderDraft, orderItemsPayload, parseOrderQuantity, readOrderDraft, searchOrderText } from './purchaseOrderDraft';
++
++const draft = () => ({ ...emptyOrderDraft(), supplier: { id: 'supplier-1', name: 'Fornecedor' }, cart: [
++  { key: 'rm-1', name: 'Base perolizante', quantity: '1,5', raw_material_id: 'raw-1' },
++  { key: 'c-embalagem', name: 'Embalagem', quantity: '25', raw_material_id: null },
++] });
++
++test('accepts decimal comma/dot and integers without truncation', () => {
++  expect(parseOrderQuantity('1,5')).toBe(1.5);
++  expect(parseOrderQuantity(' 12.75 ')).toBe(12.75);
++  expect(parseOrderQuantity('4000')).toBe(4000);
++  expect(parseOrderQuantity('0,001')).toBe(0.001);
++});
++
++test.each(['', ' ', '0', '0,0', '-1', '1,', '.', '1e3', 'Infinity', 'NaN', '1,5kg', '1.000,50', '1,000.50', '1.2.3', '9'.repeat(400)])('rejects invalid quantity %s instead of silently parsing it', (value) => {
++  expect(parseOrderQuantity(value)).toBeNull();
++});
++
++test('payload converts valid quantities once and preserves all items and raw-material links', () => {
++  expect(orderItemsPayload(draft())).toEqual([
++    { name: 'Base perolizante', quantity: 1.5, unit: 'Kg', raw_material_id: 'raw-1' },
++    { name: 'Embalagem', quantity: 25, unit: 'Kg', raw_material_id: null },
++  ]);
++});
++
++test('one invalid item blocks the complete order rather than omitting it', () => {
++  const data = draft();
++  data.cart[1].quantity = '0';
++  expect(() => orderItemsPayload(data)).toThrow('Embalagem');
++});
++
++test('requires supplier and at least one item', () => {
++  expect(() => orderItemsPayload(emptyOrderDraft())).toThrow();
++  expect(() => orderItemsPayload({ ...draft(), cart: [] })).toThrow();
++});
++
++test('restores typed quantities, observations and review step from a versioned draft', () => {
++  const saved = { ...draft(), version: 1, step: 'summary', quantities: { item: '0,' }, observations: 'Entregar sexta', unit: 'Litros' };
++  const restored = readOrderDraft({ getItem: () => JSON.stringify(saved) }, 'account-1');
++  expect(restored).toEqual(expect.objectContaining(savedWithoutVersion(saved)));
++  expect(restored.quantities.item).toBe('0,');
++});
++const savedWithoutVersion = ({ version, ...data }) => data;
++
++test('empty storage starts clean and malformed drafts are rejected', () => {
++  expect(readOrderDraft({ getItem: () => null }, 'key')).toEqual(emptyOrderDraft());
++  expect(() => readOrderDraft({ getItem: () => '{broken' }, 'key')).toThrow();
++  expect(() => readOrderDraft({ getItem: () => JSON.stringify({ version: 1, cart: [{}] }) }, 'key')).toThrow();
++});
++
++test('keeps pending item text in the draft and distinguishes a completely empty one', () => {
++  expect(hasOrderDraft(emptyOrderDraft())).toBe(false);
++  expect(hasOrderDraft({ ...emptyOrderDraft(), quantities: { item: '1,' } })).toBe(true);
++  expect(hasOrderDraft({ ...emptyOrderDraft(), newName: 'Essência' })).toBe(true);
++});
++
++test('search ignores accents and case', () => {
++  expect(searchOrderText('  ESSÊNCIA CÍTRICA ')).toBe('essencia citrica');
++});
+diff --git a/frontend/src/pages/Pedidos.js b/frontend/src/pages/Pedidos.js
+index fcccceb0857f918f372cf66cb8e46efa09f4ba16..cc7896454e36a993ea7294958d80bfda55b29087 100644
+--- a/frontend/src/pages/Pedidos.js
++++ b/frontend/src/pages/Pedidos.js
+@@ -1,11 +1,9 @@
+ import React, { useEffect, useState, useCallback } from 'react';
+ import api from '../lib/api';
+-import { useAuth } from '../context/AuthContext';
+ import { Button } from '../components/ui/button';
+ import { Card } from '../components/ui/card';
+ import { Input } from '../components/ui/input';
+ import { Label } from '../components/ui/label';
+-import { Textarea } from '../components/ui/textarea';
+ import { Badge } from '../components/ui/badge';
+ import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs';
+ import {
+@@ -16,13 +14,15 @@ import {
+   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+ } from '../components/ui/alert-dialog';
+ import { toast } from 'sonner';
++import { NewPurchaseOrderDialog } from '../components/NewPurchaseOrderDialog';
++import { searchOrderText } from '../lib/purchaseOrderDraft';
++import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '../components/ui/dropdown-menu';
+ import {
+-  Plus, ShoppingCart, Search, Trash2, Truck, FileText, Share2,
+-  CheckCircle2, Send, Clock, PackageCheck, X, ChevronLeft,
+-  Download, Loader2, ArrowRight, Building2, Edit2, Layers,
++  Plus, Search, Trash2, Share2, Send, Clock, PackageCheck,
++  Download, Loader2, Layers, MoreHorizontal,
+ } from 'lucide-react';
+ 
+-const ORDER_UNITS = ['Kg', 'Litros', 'Fardos', 'Unidades'];
++
+ 
+ const STATUS_META = {
+   pendente: { label: 'Pendente', cls: 'bg-amber-500/10 text-amber-600 ring-1 ring-amber-500/20', icon: Clock },
+@@ -35,698 +35,6 @@ const fmtDate = (iso) => {
+   try { return new Date(iso).toLocaleDateString('pt-BR'); } catch { return iso; }
+ };
+ 
+-// ====================== Modal Novo Fornecedor ======================
+-const AddSupplierDialog = ({ open, onOpenChange, onCreated }) => {
+-  const [name, setName] = useState('');
+-  const [contact, setContact] = useState('');
+-  const [email, setEmail] = useState('');
+-  const [submitting, setSubmitting] = useState(false);
+-
+-  const handleSubmit = async (e) => {
+-    e.preventDefault();
+-    if (!name.trim()) {
+-      toast.error('Digite o nome do fornecedor');
+-      return;
+-    }
+-    setSubmitting(true);
+-    try {
+-      await api.post('/suppliers', {
+-        name: name.trim(),
+-        contact: contact.trim(),
+-        email: email.trim(),
+-      });
+-      toast.success('Fornecedor adicionado com sucesso!');
+-      setName('');
+-      setContact('');
+-      setEmail('');
+-      onCreated();
+-      onOpenChange(false);
+-    } catch (e) {
+-      toast.error(e.response?.data?.detail || 'Erro ao adicionar fornecedor');
+-    } finally {
+-      setSubmitting(false);
+-    }
+-  };
+-
+-  return (
+-    <Dialog open={open} onOpenChange={onOpenChange}>
+-      <DialogContent className="bg-card border-border w-[calc(100%-1rem)] max-w-md p-4 sm:p-6 rounded-2xl">
+-        <DialogHeader>
+-          <DialogTitle className="text-foreground flex items-center gap-2">
+-            <Building2 className="w-5 h-5 text-primary" />
+-            Novo Fornecedor
+-          </DialogTitle>
+-        </DialogHeader>
+-
+-        <form onSubmit={handleSubmit} className="space-y-4">
+-          <div className="space-y-2">
+-            <Label className="text-foreground">Nome *</Label>
+-            <Input
+-              placeholder="Ex: Distribuidora XYZ"
+-              value={name}
+-              onChange={(e) => setName(e.target.value)}
+-              disabled={submitting}
+-              className="bg-input border-border text-foreground h-10"
+-            />
+-          </div>
+-
+-          <div className="space-y-2">
+-            <Label className="text-foreground">Contato (opcional)</Label>
+-            <Input
+-              placeholder="Ex: (11) 98765-4321"
+-              value={contact}
+-              onChange={(e) => setContact(e.target.value)}
+-              disabled={submitting}
+-              className="bg-input border-border text-foreground h-10"
+-            />
+-          </div>
+-
+-          <div className="space-y-2">
+-            <Label className="text-foreground">E-mail (opcional)</Label>
+-            <Input
+-              type="email"
+-              placeholder="Ex: contato@distribuidora.com"
+-              value={email}
+-              onChange={(e) => setEmail(e.target.value)}
+-              disabled={submitting}
+-              className="bg-input border-border text-foreground h-10"
+-            />
+-          </div>
+-
+-          <DialogFooter className="mt-6 gap-2">
+-            <Button
+-              type="button"
+-              onClick={() => onOpenChange(false)}
+-              variant="outline"
+-              className="border-border text-foreground flex-1 h-10"
+-              disabled={submitting}
+-            >
+-              Cancelar
+-            </Button>
+-            <Button
+-              type="submit"
+-              disabled={submitting}
+-              className="w-full sm:flex-1 bg-primary hover:bg-primary/90 h-10"
+-            >
+-              {submitting ? (
+-                <>
+-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+-                  Adicionando...
+-                </>
+-              ) : (
+-                <>
+-                  <Plus className="w-4 h-4 mr-2" />
+-                  Adicionar
+-                </>
+-              )}
+-            </Button>
+-          </DialogFooter>
+-        </form>
+-      </DialogContent>
+-    </Dialog>
+-  );
+-};
+-
+-// ====================== Componente: Carrinho de Itens ======================
+-const CartPreview = ({ cart, orderUnit, onRemove, onUpdateQty, showDeleteButtons = false }) => {
+-  if (cart.length === 0) {
+-    return <p className="text-sm text-muted-foreground text-center py-4">Nenhum item adicionado.</p>;
+-  }
+-
+-  return (
+-    <div className="space-y-2 max-h-64 overflow-y-auto pr-2 border border-border/30 rounded-lg p-3 bg-muted/30">
+-      {cart.map((c) => (
+-        <div
+-          key={c.key}
+-          className="flex items-center gap-2 p-2 rounded-lg bg-card border border-border/50 hover:bg-muted/50 transition-all group"
+-        >
+-          <span className="flex-1 text-sm text-foreground truncate font-medium">{c.name}</span>
+-          <div className="flex items-center gap-2">
+-            <Input
+-              type="number"
+-              min="0"
+-              step="any"
+-              value={c.quantity || ''}
+-              onChange={(e) => onUpdateQty(c.key, e.target.value)}
+-              className="w-16 h-8 bg-input border-border text-foreground text-sm"
+-            />
+-            <span className="text-xs text-muted-foreground w-12 text-right">{orderUnit}</span>
+-            {showDeleteButtons && (
+-              <Button
+-                size="icon"
+-                variant="ghost"
+-                onClick={() => onRemove(c.key)}
+-                className="text-red-600 hover:text-red-500 hover:bg-red-50 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+-                title="Remover item"
+-              >
+-                <Trash2 className="w-4 h-4" />
+-              </Button>
+-            )}
+-            {!showDeleteButtons && (
+-              <Button
+-                size="icon"
+-                variant="ghost"
+-                onClick={() => onRemove(c.key)}
+-                className="text-red-600 hover:text-red-500 hover:bg-red-50 h-8 w-8"
+-                title="Remover item"
+-              >
+-                <X className="w-4 h-4" />
+-              </Button>
+-            )}
+-          </div>
+-        </div>
+-      ))}
+-    </div>
+-  );
+-};
+-
+-// ====================== Novo Pedido (modal) ======================
+-const NewOrderDialog = ({ open, onOpenChange, onCreated }) => {
+-  const [step, setStep] = useState('suppliers'); // suppliers, items, summary
+-  const [suppliers, setSuppliers] = useState([]);
+-  const [supplierSearch, setSupplierSearch] = useState('');
+-  const [selectedSupplier, setSelectedSupplier] = useState(null);
+-  const [catalog, setCatalog] = useState([]);
+-  const [loadingCatalog, setLoadingCatalog] = useState(false);
+-  const [addSupplierOpen, setAddSupplierOpen] = useState(false);
+-  const [qtyMap, setQtyMap] = useState({});
+-  const [cart, setCart] = useState([]);
+-  const [observations, setObservations] = useState('');
+-  const [newName, setNewName] = useState('');
+-  const [orderUnit, setOrderUnit] = useState('Kg');
+-  const [submitting, setSubmitting] = useState(false);
+-
+-  const loadSuppliers = async () => {
+-    try {
+-      const r = await api.get('/suppliers');
+-      setSuppliers(r.data);
+-    } catch {
+-      toast.error('Erro ao carregar fornecedores');
+-    }
+-  };
+-
+-  const reset = useCallback(() => {
+-    setStep('suppliers');
+-    setSupplierSearch('');
+-    setSelectedSupplier(null);
+-    setCatalog([]);
+-    setQtyMap({});
+-    setCart([]);
+-    setObservations('');
+-    setNewName('');
+-    setOrderUnit('Kg');
+-  }, []);
+-
+-  useEffect(() => {
+-    if (open) {
+-      reset();
+-      loadSuppliers();
+-    }
+-  }, [open, reset]);
+-
+-  const selectSupplier = async (supplier) => {
+-    setSelectedSupplier(supplier);
+-    setStep('items');
+-    if (!supplier.id) {
+-      setCatalog([]);
+-      return;
+-    }
+-    setLoadingCatalog(true);
+-    try {
+-      const r = await api.get(`/suppliers/${supplier.id}/catalog`);
+-      setCatalog(r.data);
+-    } catch {
+-      toast.error('Erro ao carregar itens do fornecedor');
+-    } finally {
+-      setLoadingCatalog(false);
+-    }
+-  };
+-
+-  const addToCart = (item) => {
+-    const qty = parseFloat(qtyMap[item.id]);
+-    if (!qty || qty <= 0) {
+-      toast.error('Informe a quantidade');
+-      return;
+-    }
+-    const key = item.raw_material_id ? `rm-${item.raw_material_id}` : `c-${item.name.toLowerCase()}`;
+-    setCart((prev) => {
+-      const exists = prev.find((c) => c.key === key);
+-      if (exists) return prev.map((c) => (c.key === key ? { ...c, quantity: qty } : c));
+-      return [...prev, {
+-        key, name: item.name, unit: item.unit, quantity: qty, raw_material_id: item.raw_material_id || null,
+-      }];
+-    });
+-    setQtyMap((m) => ({ ...m, [item.id]: '' }));
+-    toast.success(`${item.name} adicionado`);
+-  };
+-
+-  const addNewItem = async () => {
+-    const name = newName.trim();
+-    if (!name) {
+-      toast.error('Digite o nome do item');
+-      return;
+-    }
+-    if (selectedSupplier?.id) {
+-      try {
+-        const r = await api.post(`/suppliers/${selectedSupplier.id}/catalog`, { name, unit: '' });
+-        setCatalog((prev) => (prev.find((p) => p.id === r.data.id)
+-          ? prev
+-          : [...prev, r.data].sort((a, b) => a.name.localeCompare(b.name))));
+-      } catch { /* segue mesmo assim */ }
+-    }
+-    const key = `c-${name.toLowerCase()}`;
+-    const newItem = { key, name, quantity: 1, raw_material_id: null };
+-    setCart((prev) => (prev.find((c) => c.key === key) ? prev : [...prev, newItem]));
+-    setNewName('');
+-    toast.success('Item adicionado ao carrinho');
+-  };
+-
+-  const updateCartQty = (key, qty) => {
+-    setCart((prev) => prev.map((c) => (c.key === key ? { ...c, quantity: parseFloat(qty) || 0 } : c)));
+-  };
+-
+-  const removeFromCart = (key) => {
+-    setCart((prev) => prev.filter((c) => c.key !== key));
+-    toast.success('Item removido do carrinho');
+-  };
+-
+-  const handleDeleteCatalogItem = async (item) => {
+-    if (!selectedSupplier?.id || item.source !== 'custom') return;
+-    try {
+-      await api.delete(`/suppliers/${selectedSupplier.id}/catalog/${item.id}`);
+-      setCatalog((prev) => prev.filter((c) => c.id !== item.id));
+-      setCart((prev) => prev.filter((c) => c.key !== `c-${item.name.toLowerCase()}`));
+-      setQtyMap((m) => {
+-        const next = { ...m };
+-        delete next[item.id];
+-        return next;
+-      });
+-      toast.success('Item removido do catálogo');
+-    } catch {
+-      toast.error('Erro ao remover item');
+-    }
+-  };
+-
+-  const nextStep = () => {
+-    if (step === 'items') {
+-      if (cart.length === 0) {
+-        toast.error('Adicione pelo menos um item ao carrinho');
+-        return;
+-      }
+-      setStep('summary');
+-    }
+-  };
+-
+-  const prevStep = () => {
+-    if (step === 'items') setStep('suppliers');
+-    if (step === 'summary') setStep('items');
+-  };
+-
+-  const finalize = async () => {
+-    const items = cart
+-      .filter((c) => parseFloat(c.quantity) > 0)
+-      .map((c) => ({
+-        name: c.name,
+-        unit: orderUnit,
+-        quantity: parseFloat(c.quantity),
+-        raw_material_id: c.raw_material_id,
+-      }));
+-    if (items.length === 0) {
+-      toast.error('Adicione itens com quantidade ao pedido');
+-      return;
+-    }
+-    setSubmitting(true);
+-    try {
+-      await api.post('/purchase-orders', {
+-        supplier_id: selectedSupplier.id || '',
+-        supplier_name: selectedSupplier.name,
+-        items,
+-        unit: orderUnit,
+-        observations,
+-      });
+-      toast.success('Pedido criado com sucesso!');
+-      onOpenChange(false);
+-      onCreated();
+-    } catch (e) {
+-      toast.error(e.response?.data?.detail || 'Erro ao criar pedido');
+-    } finally {
+-      setSubmitting(false);
+-    }
+-  };
+-
+-  const filteredSuppliers = suppliers.filter(
+-    (s) => s.name.toLowerCase().includes(supplierSearch.toLowerCase()),
+-  );
+-
+-  const cartTotalItems = cart.length;
+-  const cartTotalQty = cart.reduce((sum, c) => sum + parseFloat(c.quantity || 0), 0);
+-
+-  return (
+-    <>
+-      <Dialog open={open} onOpenChange={onOpenChange}>
+-        <DialogContent className="bg-card border-border w-[calc(100%-1rem)] max-w-lg sm:max-w-2xl max-h-[88vh] overflow-y-auto p-4 sm:p-6 rounded-2xl">
+-          <DialogHeader className="mb-6">
+-            <div className="flex items-center justify-between">
+-              <DialogTitle className="text-foreground flex items-center gap-2 text-xl sm:text-2xl">
+-                <ShoppingCart className="w-5 h-5 text-primary" />
+-                Novo Pedido
+-              </DialogTitle>
+-              <div className="text-xs text-muted-foreground">
+-                Etapa
+-                {' '}
+-                {step === 'suppliers' ? '1' : step === 'items' ? '2' : '3'}
+-                {' '}
+-                de 3
+-              </div>
+-            </div>
+-          </DialogHeader>
+-
+-          {/* ETAPA 1 — Fornecedores */}
+-          {step === 'suppliers' && (
+-            <div className="space-y-4">
+-              <div>
+-                <Label className="text-foreground text-base mb-3 block">Escolha um fornecedor</Label>
+-                <div className="relative mb-4">
+-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
+-                  <Input
+-                    placeholder="Pesquisar fornecedor..."
+-                    value={supplierSearch}
+-                    onChange={(e) => setSupplierSearch(e.target.value)}
+-                    className="pl-9 bg-input border-border text-foreground h-10"
+-                  />
+-                </div>
+-
+-                <div className="max-h-72 overflow-y-auto space-y-2 pr-2 mb-4">
+-                  {filteredSuppliers.length > 0 ? (
+-                    filteredSuppliers.map((s) => (
+-                      <button
+-                        key={s.id}
+-                        onClick={() => selectSupplier({ id: s.id, name: s.name })}
+-                        className="w-full flex items-center gap-3 p-3 rounded-lg border border-border hover:border-primary/50 hover:bg-primary/5 transition-all text-left active:bg-primary/10 group"
+-                      >
+-                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0 group-hover:bg-primary/20 transition-all">
+-                          <Truck className="w-5 h-5 text-primary" />
+-                        </div>
+-                        <div className="flex-1 min-w-0">
+-                          <p className="text-sm font-semibold text-foreground truncate">{s.name}</p>
+-                          {s.contact && <p className="text-xs text-muted-foreground truncate">{s.contact}</p>}
+-                        </div>
+-                        <ArrowRight className="w-4 h-4 text-muted-foreground shrink-0" />
+-                      </button>
+-                    ))
+-                  ) : supplierSearch ? (
+-                    <p className="text-sm text-muted-foreground text-center py-6">Nenhum fornecedor encontrado</p>
+-                  ) : (
+-                    <p className="text-sm text-muted-foreground text-center py-6">Nenhum fornecedor registrado</p>
+-                  )}
+-                </div>
+-
+-                <Button
+-                  onClick={() => setAddSupplierOpen(true)}
+-                  variant="outline"
+-                  className="w-full border-dashed border-primary/50 text-primary hover:bg-primary/5 h-10"
+-                >
+-                  <Plus className="w-4 h-4 mr-2" />
+-                  Adicionar Novo Fornecedor
+-                </Button>
+-              </div>
+-            </div>
+-          )}
+-
+-          {/* ETAPA 2 — Itens */}
+-          {step === 'items' && selectedSupplier && (
+-            <div className="space-y-4">
+-              {/* Fornecedor selecionado */}
+-              <div className="flex items-center justify-between p-3 rounded-lg bg-primary/5 ring-1 ring-primary/15">
+-                <div className="flex items-center gap-3 min-w-0 flex-1">
+-                  <Truck className="w-5 h-5 text-primary shrink-0" />
+-                  <div className="min-w-0">
+-                    <p className="text-sm font-semibold text-foreground truncate">{selectedSupplier.name}</p>
+-                    {!selectedSupplier.id && <span className="text-xs text-muted-foreground">Fornecedor customizado</span>}
+-                  </div>
+-                </div>
+-                <Button
+-                  variant="ghost"
+-                  size="sm"
+-                  onClick={() => {
+-                    setSelectedSupplier(null);
+-                    setStep('suppliers');
+-                  }}
+-                  className="h-8 text-xs"
+-                >
+-                  <ChevronLeft className="w-4 h-4 mr-1" />
+-                  Trocar
+-                </Button>
+-              </div>
+-
+-              {/* Unidade de medida */}
+-              <div className="space-y-2">
+-                <Label className="text-foreground text-sm">
+-                  Unidade de medida
+-                  {' '}
+-                  <span className="text-muted-foreground font-normal">(todos os itens)</span>
+-                </Label>
+-                <div className="grid grid-cols-4 gap-2">
+-                  {ORDER_UNITS.map((u) => (
+-                    <button
+-                      key={u}
+-                      type="button"
+-                      onClick={() => setOrderUnit(u)}
+-                      className={`py-2 rounded-lg text-xs sm:text-sm font-medium border transition-all ${
+-                        orderUnit === u
+-                          ? 'bg-primary text-primary-foreground border-primary'
+-                          : 'border-border text-foreground hover:bg-primary/5'
+-                      }`}
+-                    >
+-                      {u}
+-                    </button>
+-                  ))}
+-                </div>
+-              </div>
+-
+-              {/* Catálogo */}
+-              <div className="space-y-2">
+-                <Label className="text-foreground text-base">Itens do fornecedor</Label>
+-                {loadingCatalog ? (
+-                  <div className="flex items-center justify-center py-8">
+-                    <Loader2 className="w-5 h-5 animate-spin text-primary" />
+-                  </div>
+-                ) : catalog.length === 0 ? (
+-                  <p className="text-sm text-muted-foreground text-center py-4">
+-                    Nenhum item no catálogo. Adicione itens abaixo.
+-                  </p>
+-                ) : (
+-                  <div className="max-h-56 overflow-y-auto space-y-2 pr-2 border border-border/30 rounded-lg p-3 bg-muted/30">
+-                    {catalog.map((item) => (
+-                      <div
+-                        key={item.id}
+-                        className="flex items-center gap-2 p-2 rounded-lg border border-border bg-card hover:bg-muted/50 transition-all"
+-                      >
+-                        <div className="flex-1 min-w-0">
+-                          <p className="text-sm font-medium text-foreground truncate">{item.name}</p>
+-                        </div>
+-                        <Input
+-                          type="number"
+-                          min="0"
+-                          step="any"
+-                          value={qtyMap[item.id] || ''}
+-                          onChange={(e) => setQtyMap((m) => ({ ...m, [item.id]: e.target.value }))}
+-                          placeholder="Qtd"
+-                          className="w-16 h-8 bg-input border-border text-foreground text-sm"
+-                        />
+-                        <Button
+-                          size="sm"
+-                          onClick={() => addToCart(item)}
+-                          className="bg-primary hover:bg-primary/90 h-8 px-2 shrink-0"
+-                        >
+-                          <Plus className="w-4 h-4" />
+-                        </Button>
+-                        {item.source === 'custom' && (
+-                          <Button
+-                            size="sm"
+-                            variant="ghost"
+-                            onClick={() => handleDeleteCatalogItem(item)}
+-                            className="text-red-500 hover:text-red-600 hover:bg-red-50 h-8 w-8 px-0 shrink-0"
+-                            title="Remover do catálogo"
+-                            data-testid={`catalog-del-${item.id}`}
+-                          >
+-                            <Trash2 className="w-4 h-4" />
+-                          </Button>
+-                        )}
+-                      </div>
+-                    ))}
+-                  </div>
+-                )}
+-              </div>
+-
+-              {/* Adicionar item novo */}
+-              <div className="space-y-2 border-t border-border/60 pt-2">
+-                <Label className="text-foreground text-sm">Adicionar item customizado</Label>
+-                <div className="flex gap-2">
+-                  <Input
+-                    placeholder="Nome do item..."
+-                    value={newName}
+-                    onChange={(e) => setNewName(e.target.value)}
+-                    className="flex-1 bg-input border-border text-foreground h-9 text-sm"
+-                    onKeyPress={(e) => e.key === 'Enter' && addNewItem()}
+-                  />
+-                  <Button
+-                    onClick={addNewItem}
+-                    variant="outline"
+-                    className="border-border text-foreground h-9 px-3"
+-                  >
+-                    <Plus className="w-4 h-4 mr-1" />
+-                    Add
+-                  </Button>
+-                </div>
+-              </div>
+-
+-              {/* Preview do carrinho na etapa de items */}
+-              {cart.length > 0 && (
+-                <div className="space-y-2 border-t border-border/60 pt-4">
+-                  <div className="flex items-center justify-between">
+-                    <Label className="text-foreground text-sm">
+-                      Carrinho (
+-                      {cartTotalItems}
+-                      )
+-                    </Label>
+-                    <span className="text-xs text-muted-foreground">
+-                      Total:
+-                      {' '}
+-                      {fmtQty(cartTotalQty)}
+-                    </span>
+-                  </div>
+-                  <CartPreview
+-                    cart={cart}
+-                    orderUnit={orderUnit}
+-                    onRemove={removeFromCart}
+-                    onUpdateQty={updateCartQty}
+-                    showDeleteButtons
+-                  />
+-                </div>
+-              )}
+-            </div>
+-          )}
+-
+-          {/* ETAPA 3 — Resumo */}
+-          {step === 'summary' && selectedSupplier && (
+-            <div className="space-y-4">
+-              <div className="grid grid-cols-2 gap-3 p-3 rounded-lg bg-muted/40 border border-border/50">
+-                <div>
+-                  <p className="text-xs text-muted-foreground">Fornecedor</p>
+-                  <p className="text-sm font-semibold text-foreground truncate">{selectedSupplier.name}</p>
+-                </div>
+-                <div>
+-                  <p className="text-xs text-muted-foreground">Unidade</p>
+-                  <p className="text-sm font-semibold text-foreground">{orderUnit}</p>
+-                </div>
+-                <div>
+-                  <p className="text-xs text-muted-foreground">Itens</p>
+-                  <p className="text-sm font-semibold text-foreground">{cartTotalItems}</p>
+-                </div>
+-                <div>
+-                  <p className="text-xs text-muted-foreground">Quantidade Total</p>
+-                  <p className="text-sm font-semibold text-foreground">{fmtQty(cartTotalQty)}</p>
+-                </div>
+-              </div>
+-
+-              {/* Itens do carrinho */}
+-              <div className="space-y-2">
+-                <Label className="text-foreground text-base">Itens do pedido</Label>
+-                <CartPreview
+-                  cart={cart}
+-                  orderUnit={orderUnit}
+-                  onRemove={removeFromCart}
+-                  onUpdateQty={updateCartQty}
+-                  showDeleteButtons
+-                />
+-              </div>
+-
+-              {/* Observações */}
+-              <div className="space-y-2">
+-                <Label className="text-foreground text-sm">Observações (opcional)</Label>
+-                <Textarea
+-                  value={observations}
+-                  onChange={(e) => setObservations(e.target.value)}
+-                  placeholder="Especifique detalhes da entrega, condições de pagamento, etc..."
+-                  className="bg-input border-border text-foreground resize-none text-sm"
+-                  rows={2}
+-                />
+-              </div>
+-            </div>
+-          )}
+-
+-          {/* Footer com botões de navegação */}
+-          <DialogFooter className="sticky bottom-0 -mx-4 sm:-mx-6 mt-4 px-4 sm:px-6 pt-3 pb-1 bg-card border-t border-border gap-2 flex">
+-            {step !== 'suppliers' && (
+-              <Button
+-                onClick={prevStep}
+-                variant="outline"
+-                className="border-border text-foreground h-10"
+-              >
+-                <ChevronLeft className="w-4 h-4 mr-2" />
+-                Voltar
+-              </Button>
+-            )}
+-            {step === 'suppliers' && (
+-              <Button
+-                onClick={() => onOpenChange(false)}
+-                variant="outline"
+-                className="border-border text-foreground flex-1 h-10"
+-              >
+-                Cancelar
+-              </Button>
+-            )}
+-            {step !== 'summary' && step !== 'suppliers' && (
+-              <Button
+-                onClick={nextStep}
+-                className="flex-1 bg-primary hover:bg-primary/90 h-10"
+-              >
+-                Próximo
+-                <ArrowRight className="w-4 h-4 ml-2" />
+-              </Button>
+-            )}
+-            {step === 'summary' && (
+-              <>
+-                <Button
+-                  onClick={() => onOpenChange(false)}
+-                  variant="outline"
+-                  className="border-border text-foreground h-10"
+-                >
+-                  Cancelar
+-                </Button>
+-                <Button
+-                  onClick={finalize}
+-                  disabled={submitting}
+-                  className="flex-1 bg-primary hover:bg-primary/90 h-10"
+-                >
+-                  {submitting ? (
+-                    <>
+-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+-                      Criando...
+-                    </>
+-                  ) : (
+-                    <>
+-                      <CheckCircle2 className="w-4 h-4 mr-2" />
+-                      Finalizar Pedido
+-                    </>
+-                  )}
+-                </Button>
+-              </>
+-            )}
+-          </DialogFooter>
+-        </DialogContent>
+-      </Dialog>
+-
+-      <AddSupplierDialog
+-        open={addSupplierOpen}
+-        onOpenChange={setAddSupplierOpen}
+-        onCreated={loadSuppliers}
+-      />
+-    </>
+-  );
+-};
+-
+ // ====================== Modal Lotear Matérias-Primas ======================
+ const LoteMateriaisDialog = ({ open, onOpenChange, order, onDone }) => {
+   const [loading, setLoading] = useState(false);
+@@ -877,149 +185,42 @@ const OrderCard = ({
+     }
+   };
+ 
+-  return (
+-    <Card className="p-3 sm:p-4 border shadow-sm hover:shadow-md transition-all">
+-      <div className="flex items-start justify-between gap-2 mb-3">
+-        <div className="min-w-0 flex-1">
+-          <div className="flex items-center gap-2 flex-wrap">
+-            <span className="text-base sm:text-lg font-bold text-foreground">{order.order_number}</span>
+-            <Badge className={`text-[10px] sm:text-[11px] font-semibold px-1.5 sm:px-2 py-0.5 ${meta.cls}`}>
+-              <StatusIcon className="w-3 h-3 mr-1" />
+-              {meta.label}
+-            </Badge>
+-          </div>
+-          <p className="text-xs sm:text-sm text-muted-foreground truncate">
+-            {order.supplier_name}
+-            {' '}
+-            •
+-            {' '}
+-            {fmtDate(order.created_at)}
+-          </p>
+-        </div>
+-        <Button
+-          size="icon"
+-          variant="ghost"
+-          onClick={() => onDelete(order)}
+-          className="text-red-600 hover:text-red-500 shrink-0 h-8 w-8"
+-        >
+-          <Trash2 className="w-4 h-4" />
+-        </Button>
+-      </div>
+-
+-      {/* Items Preview */}
+-      <div className="space-y-1 mb-3">
+-        {(order.items || []).slice(0, 4).map((it, i) => (
+-          <div key={i} className="flex justify-between text-xs sm:text-sm gap-2">
+-            <span className="text-foreground truncate">{it.name}</span>
+-            <span className="text-muted-foreground shrink-0">
+-              {fmtQty(it.quantity)}
+-              {' '}
+-              {it.unit}
+-            </span>
+-          </div>
+-        ))}
+-        {(order.items || []).length > 4 && (
+-          <p className="text-xs text-muted-foreground">
+-            +
+-            {order.items.length - 4}
+-            {' '}
+-            item(ns)
+-          </p>
+-        )}
++  const [expanded, setExpanded] = useState(false);
++  const items = order.items || [];
++  return <Card className="p-4 border shadow-sm">
++    <div className="mb-4 flex items-start justify-between gap-2">
++      <div className="min-w-0 flex-1">
++        <div className="flex flex-wrap items-center gap-2"><span className="text-base font-bold">{order.order_number}</span><Badge className={`px-2 py-0.5 text-xs ${meta.cls}`}><StatusIcon className="mr-1 h-3 w-3" />{meta.label}</Badge></div>
++        <p className="mt-1 break-words text-sm font-medium">{order.supplier_name}</p>
++        <p className="mt-1 text-xs text-muted-foreground">{fmtDate(order.created_at)} · {items.length} itens</p>
+       </div>
+-
+-      {order.observations && (
+-        <p className="text-xs text-muted-foreground italic mb-3 line-clamp-2">
+-          Obs:
+-          {' '}
+-          {order.observations}
+-        </p>
+-      )}
+-
+-      {/* Action Buttons */}
+-      <div className="space-y-2 sm:space-y-0 sm:flex sm:flex-wrap gap-2">
+-        <Button
+-          size="sm"
+-          variant="outline"
+-          onClick={() => onPdf(order)}
+-          className="border-border text-foreground flex-1 sm:flex-none h-9 text-xs sm:text-sm"
+-        >
+-          <Download className="w-3.5 h-3.5 mr-1" />
+-          PDF
+-        </Button>
+-        <Button
+-          size="sm"
+-          onClick={handleSharePdf}
+-          disabled={sharingPdf}
+-          className="bg-green-600 hover:bg-green-700 flex-1 sm:flex-none h-9 text-xs sm:text-sm"
+-        >
+-          {sharingPdf ? (
+-            <>
+-              <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+-              Enviando...
+-            </>
+-          ) : (
+-            <>
+-              <Share2 className="w-3.5 h-3.5 mr-1" />
+-              WhatsApp
+-            </>
+-          )}
+-        </Button>
+-
+-        {order.status === 'pendente' && (
+-          <Button
+-            size="sm"
+-            variant="outline"
+-            onClick={() => onStatus(order, 'enviado')}
+-            className="border-border text-foreground flex-1 sm:flex-none h-9 text-xs sm:text-sm"
+-          >
+-            <Send className="w-3.5 h-3.5 mr-1" />
+-            Enviado
+-          </Button>
+-        )}
+-        {order.status !== 'recebido' && (
+-          <Button
+-            size="sm"
+-            variant="outline"
+-            onClick={() => onStatus(order, 'recebido')}
+-            className="border-emerald-500/40 text-emerald-600 hover:bg-emerald-50 flex-1 sm:flex-none h-9 text-xs sm:text-sm"
+-          >
+-            <PackageCheck className="w-3.5 h-3.5 mr-1" />
+-            Recebido
+-          </Button>
+-        )}
+-        {order.status === 'recebido' && (
+-          <Button
+-            size="sm"
+-            variant="ghost"
+-            onClick={() => onStatus(order, 'pendente')}
+-            className="text-muted-foreground flex-1 sm:flex-none h-9 text-xs sm:text-sm"
+-          >
+-            Reabrir
+-          </Button>
+-        )}
+-        <Button
+-          size="sm"
+-          onClick={() => onLote(order)}
+-          className="bg-primary hover:bg-primary/90 text-primary-foreground flex-1 sm:flex-none h-9 text-xs sm:text-sm"
+-          data-testid={`lotear-btn-${order.id}`}
+-        >
+-          <Layers className="w-3.5 h-3.5 mr-1" />
+-          Lotear MP
+-        </Button>
+-      </div>
+-    </Card>
+-  );
++      <DropdownMenu><DropdownMenuTrigger asChild><Button size="icon" variant="ghost" className="h-11 w-11 shrink-0" aria-label={`Ações do pedido ${order.order_number}`}><MoreHorizontal className="h-5 w-5" /></Button></DropdownMenuTrigger>
++        <DropdownMenuContent align="end" className="min-w-52">
++          <DropdownMenuItem className="min-h-11" onSelect={() => onPdf(order)}><Download />Baixar PDF</DropdownMenuItem>
++          {order.status === 'pendente' && <DropdownMenuItem className="min-h-11" onSelect={() => onStatus(order, 'enviado')}><Send />Marcar como enviado</DropdownMenuItem>}
++          {order.status !== 'recebido' ? <DropdownMenuItem className="min-h-11" onSelect={() => onStatus(order, 'recebido')}><PackageCheck />Marcar como recebido</DropdownMenuItem> : <DropdownMenuItem className="min-h-11" onSelect={() => onStatus(order, 'pendente')}><Clock />Reabrir pedido</DropdownMenuItem>}
++          <DropdownMenuItem className="min-h-11" onSelect={() => onLote(order)} data-testid={`lotear-btn-${order.id}`}><Layers />Lotear MP</DropdownMenuItem>
++          <DropdownMenuSeparator /><DropdownMenuItem className="min-h-11 text-red-600" onSelect={() => onDelete(order)}><Trash2 />Excluir pedido</DropdownMenuItem>
++        </DropdownMenuContent>
++      </DropdownMenu>
++    </div>
++    <div className="space-y-2 border-t pt-3">
++      {(expanded ? items : items.slice(0, 3)).map((item, index) => <div key={index} className="flex justify-between gap-3 text-sm"><span className="min-w-0 break-words">{item.name}</span><span className="shrink-0 font-medium">{fmtQty(item.quantity)} {item.unit}</span></div>)}
++      {items.length > 3 && <Button variant="ghost" className="h-11 w-full text-sm" aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>{expanded ? 'Mostrar menos' : `Ver todos os ${items.length} itens`}</Button>}
++    </div>
++    {order.observations && <p className="mt-3 break-words text-xs text-muted-foreground">{order.observations}</p>}
++    <Button variant="outline" onClick={handleSharePdf} disabled={sharingPdf} className="mt-4 h-12 w-full">{sharingPdf ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Compartilhando…</> : <><Share2 className="mr-2 h-4 w-4" />Compartilhar pedido</>}</Button>
++  </Card>;
+ };
+ 
+ // ====================== Página Pedidos ======================
+ export const Pedidos = () => {
+-  const { user } = useAuth();
+   const [orders, setOrders] = useState([]);
+   const [loading, setLoading] = useState(true);
+   const [dialogOpen, setDialogOpen] = useState(false);
+   const [deleteTarget, setDeleteTarget] = useState(null);
+   const [loteOrder, setLoteOrder] = useState(null);
++  const [orderSearch, setOrderSearch] = useState('');
+ 
+   const fetchOrders = useCallback(async () => {
+     try {
+@@ -1102,8 +303,9 @@ export const Pedidos = () => {
+     }
+   };
+ 
+-  const pendentes = orders.filter((o) => o.status !== 'recebido');
+-  const recebidos = orders.filter((o) => o.status === 'recebido');
++  const filteredOrders = orders.filter((order) => searchOrderText(`${order.order_number || ''} ${order.supplier_name || ''} ${(order.items || []).map((item) => item.name).join(' ')}`).includes(searchOrderText(orderSearch)));
++  const pendentes = filteredOrders.filter((o) => o.status !== 'recebido');
++  const recebidos = filteredOrders.filter((o) => o.status === 'recebido');
+ 
+   const renderList = (list, emptyMsg, testid) => (
+     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4" data-testid={testid}>
+@@ -1127,29 +329,30 @@ export const Pedidos = () => {
+   );
+ 
+   return (
+-    <div className="space-y-4 sm:space-y-6 p-3 sm:p-0">
++    <div className="space-y-4 sm:space-y-6">
+       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+         <div className="min-w-0">
+-          <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-foreground mb-1 sm:mb-2">
++          <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-1 sm:mb-2">
+             Pedidos
+           </h1>
+           <p className="text-sm sm:text-base text-muted-foreground">Gerencie seus pedidos de compra</p>
+         </div>
+         <Button
+           onClick={() => setDialogOpen(true)}
+-          className="bg-primary hover:bg-primary/90 w-full sm:w-auto h-10 text-sm"
++          className="bg-primary hover:bg-primary/90 w-full sm:w-auto h-12 text-base"
+         >
+           <Plus className="w-4 h-4 mr-2" />
+           Novo Pedido
+         </Button>
+       </div>
+ 
++      <div className="relative"><Search className="absolute left-3 top-4 h-4 w-4 text-muted-foreground" /><Input aria-label="Buscar pedido" placeholder="Buscar pedido, fornecedor ou material" className="h-12 pl-10 text-base" value={orderSearch} onChange={(event) => setOrderSearch(event.target.value)} /></div>
+       <Tabs defaultValue="historico" className="w-full">
+-        <TabsList className="grid w-full grid-cols-2 mb-4">
+-          <TabsTrigger value="historico" className="text-xs sm:text-sm">
++        <TabsList className="grid w-full grid-cols-2 mb-4 h-12">
++          <TabsTrigger value="historico" className="min-h-10 text-sm">
+             Histórico
+           </TabsTrigger>
+-          <TabsTrigger value="status" className="text-xs sm:text-sm">
++          <TabsTrigger value="status" className="min-h-10 text-sm">
+             Pendentes/Entregues
+           </TabsTrigger>
+         </TabsList>
+@@ -1161,7 +364,7 @@ export const Pedidos = () => {
+               <p className="text-muted-foreground">Carregando...</p>
+             </div>
+           ) : (
+-            renderList(orders, 'Nenhum pedido realizado. Clique em "Novo Pedido".', 'historico-list')
++            renderList(filteredOrders, 'Nenhum pedido encontrado.', 'historico-list')
+           )}
+         </TabsContent>
+ 
+@@ -1187,7 +390,7 @@ export const Pedidos = () => {
+         </TabsContent>
+       </Tabs>
+ 
+-      <NewOrderDialog open={dialogOpen} onOpenChange={setDialogOpen} onCreated={fetchOrders} />
++      <NewPurchaseOrderDialog open={dialogOpen} onOpenChange={setDialogOpen} onCreated={fetchOrders} />
+ 
+       <LoteMateriaisDialog
+         open={!!loteOrder}
