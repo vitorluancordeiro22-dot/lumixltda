@@ -10,6 +10,9 @@ O GitHub e o Emergent têm históricos divergentes; por isso a atualização é 
 patch dos quinze arquivos corrigidos. Não é necessário fazer merge, reset ou
 substituir a aplicação por uma cópia antiga do GitHub.
 
+A melhoria da tela de pedidos no celular está em um
+[complemento separado](README-pedidos-mobile.md), aplicável antes da mesma republicação.
+
 ## Escolha o pacote correto
 
 **Se já aplicou a correção de estoque e a liberação para todos, use somente o
