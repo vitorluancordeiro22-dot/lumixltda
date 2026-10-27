@@ -101,7 +101,7 @@ index 944acb648d4f8a0ee1f5284b3a58d644165f3ed1..43427bfe6cd972c92fbf46a3ee2fa1e1
      
      @api_router.get('/industrial-ops', response_model=List[IndustrialOP])
 diff --git a/backend/server.py b/backend/server.py
-index 09394248665bb27aa58883fe69f7fdd2338ba7c3..07e34b0684737a28379e07413a9cfd6882489d30 100644
+index 09394248665bb27aa58883fe69f7fdd2338ba7c3..2ad986f5d38316eef0e96203de2192adb63a54d0 100644
 --- a/backend/server.py
 +++ b/backend/server.py
 @@ -18,6 +18,11 @@ import io
@@ -673,7 +673,41 @@ index 09394248665bb27aa58883fe69f7fdd2338ba7c3..07e34b0684737a28379e07413a9cfd68
  
  @api_router.post('/product-batches/{batch_id}/finalize')
  async def finalize_product_batch(batch_id: str, current_user = Depends(get_current_user)):
-@@ -1000,7 +898,9 @@ async def reopen_archived_batch(batch_id: str, current_user = Depends(get_curren
+@@ -937,13 +835,8 @@ async def reopen_product_batch(batch_id: str, current_user = Depends(get_current
+ async def mark_ready_for_bottling(batch_id: str, current_user = Depends(get_current_user)):
+     """
+     Marca um lote como pronto para envase.
+-    Apenas usuários autorizados (laboratoriolumix@outlook.com e luan_ssss@hotmail.com) podem executar.
++    Qualquer usuário autenticado pode liberar; o responsável fica registrado.
+     """
+-    # Verificar permissão
+-    allowed_emails = ['laboratoriolumix@outlook.com', 'luan_ssss@hotmail.com']
+-    if current_user.get('email') not in allowed_emails:
+-        raise HTTPException(status_code=403, detail='Você não tem permissão para liberar lotes para envase')
+-    
+     batch = await db.product_batches.find_one({'id': batch_id, 'deleted': False}, {'_id': 0})
+     if not batch:
+         raise HTTPException(status_code=404, detail='Lote não encontrado')
+@@ -951,14 +844,16 @@ async def mark_ready_for_bottling(batch_id: str, current_user = Depends(get_curr
+     if batch.get('status') != 'em_producao':
+         raise HTTPException(status_code=400, detail='Apenas lotes em produção podem ser liberados para envase')
+     
+-    await db.product_batches.update_one(
+-        {'id': batch_id},
++    result = await db.product_batches.update_one(
++        {'id': batch_id, 'deleted': False, 'status': 'em_producao'},
+         {'$set': {
+             'status': 'em_aberto',
+             'released_for_bottling_at': datetime.now(timezone.utc).isoformat(),
+             'released_by': current_user.get('email')
+         }}
+     )
++    if result.modified_count != 1:
++        raise HTTPException(status_code=409, detail='Este lote já foi liberado ou atualizado por outro usuário')
+     
+     return {
+         'message': 'Lote liberado para envase com sucesso',
+@@ -1000,7 +895,9 @@ async def reopen_archived_batch(batch_id: str, current_user = Depends(get_curren
          'created_at': archived_batch.get('created_at', datetime.now(timezone.utc).isoformat()),
          'deleted': False,
          'reopened_at': datetime.now(timezone.utc).isoformat(),
@@ -684,7 +718,7 @@ index 09394248665bb27aa58883fe69f7fdd2338ba7c3..07e34b0684737a28379e07413a9cfd68
      }
      
      # Inserir de volta na coleção de lotes ativos
-@@ -1031,6 +931,8 @@ async def get_raw_materials(current_user = Depends(get_current_user)):
+@@ -1031,6 +928,8 @@ async def get_raw_materials(current_user = Depends(get_current_user)):
  
  @api_router.post('/raw-materials', response_model=RawMaterial)
  async def create_raw_material(data: RawMaterialCreate, current_user = Depends(get_current_user)):
@@ -693,7 +727,7 @@ index 09394248665bb27aa58883fe69f7fdd2338ba7c3..07e34b0684737a28379e07413a9cfd68
      import uuid
      material_id = str(uuid.uuid4())
      material_doc = {
-@@ -1048,12 +950,16 @@ async def create_raw_material(data: RawMaterialCreate, current_user = Depends(ge
+@@ -1048,12 +947,16 @@ async def create_raw_material(data: RawMaterialCreate, current_user = Depends(ge
  
  @api_router.put('/raw-materials/{material_id}', response_model=RawMaterial)
  async def update_raw_material(material_id: str, data: RawMaterialCreate, current_user = Depends(get_current_user)):
@@ -711,7 +745,7 @@ index 09394248665bb27aa58883fe69f7fdd2338ba7c3..07e34b0684737a28379e07413a9cfd68
              'supplier_id': data.supplier_id,
              'received_date': data.received_date
          }}
-@@ -1126,153 +1032,84 @@ async def create_raw_material_batch(data: RawMaterialBatchCreate, current_user =
+@@ -1126,153 +1029,84 @@ async def create_raw_material_batch(data: RawMaterialBatchCreate, current_user =
          'deleted': False,
          'is_custom': bool(data.custom_batch_number)
      }
@@ -924,7 +958,7 @@ index 09394248665bb27aa58883fe69f7fdd2338ba7c3..07e34b0684737a28379e07413a9cfd68
  
  
  @api_router.get('/raw-materials/audit')
-@@ -1590,14 +1427,16 @@ async def create_production_order(data: ProductionOrderCreate, current_user = De
+@@ -1590,14 +1424,16 @@ async def create_production_order(data: ProductionOrderCreate, current_user = De
      import uuid
      order_id = str(uuid.uuid4())
      
@@ -949,7 +983,7 @@ index 09394248665bb27aa58883fe69f7fdd2338ba7c3..07e34b0684737a28379e07413a9cfd68
      
      order_doc = {
          'id': order_id,
-@@ -1606,7 +1445,8 @@ async def create_production_order(data: ProductionOrderCreate, current_user = De
+@@ -1606,7 +1442,8 @@ async def create_production_order(data: ProductionOrderCreate, current_user = De
          'date': data.date,
          'weigher': data.weigher,
          'production_size': data.production_size,
@@ -959,7 +993,7 @@ index 09394248665bb27aa58883fe69f7fdd2338ba7c3..07e34b0684737a28379e07413a9cfd68
          'status': 'em_producao',
          'created_at': datetime.now(timezone.utc).isoformat(),
          'deleted': False
-@@ -2027,11 +1867,42 @@ async def restore_from_trash(item_id: str, current_user = Depends(get_current_us
+@@ -2027,11 +1864,42 @@ async def restore_from_trash(item_id: str, current_user = Depends(get_current_us
          'team_member': 'team'
      }
      
@@ -1006,7 +1040,7 @@ index 09394248665bb27aa58883fe69f7fdd2338ba7c3..07e34b0684737a28379e07413a9cfd68
          await db.trash.delete_one({'id': item_id})
          return {'message': 'Item restored'}
      
-@@ -2057,7 +1928,8 @@ async def auto_archive_finished_items(current_user = Depends(get_current_user)):
+@@ -2057,7 +1925,8 @@ async def auto_archive_finished_items(current_user = Depends(get_current_user)):
      # Mover lotes de produtos finalizados
      product_batches = await db.product_batches.find({
          'status': 'finalizado',
@@ -1016,7 +1050,7 @@ index 09394248665bb27aa58883fe69f7fdd2338ba7c3..07e34b0684737a28379e07413a9cfd68
      }, {'_id': 0}).to_list(10000)
      
      archived_products = 0
-@@ -2088,7 +1960,8 @@ async def auto_archive_finished_items(current_user = Depends(get_current_user)):
+@@ -2088,7 +1957,8 @@ async def auto_archive_finished_items(current_user = Depends(get_current_user)):
              {'status': 'finalizado'},
              {'quantity': {'$lte': 0}}  # Incluir lotes zerados
          ],
@@ -1026,7 +1060,7 @@ index 09394248665bb27aa58883fe69f7fdd2338ba7c3..07e34b0684737a28379e07413a9cfd68
      }, {'_id': 0}).to_list(10000)
      
      archived_materials = 0
-@@ -3772,7 +3645,7 @@ async def delete_purchase_order(order_id: str, current_user=Depends(get_current_
+@@ -3772,7 +3642,7 @@ async def delete_purchase_order(order_id: str, current_user=Depends(get_current_
  
  class LoteEntry(BaseModel):
      raw_material_id: str
@@ -1035,7 +1069,7 @@ index 09394248665bb27aa58883fe69f7fdd2338ba7c3..07e34b0684737a28379e07413a9cfd68
      supplier_batch_number: str = ''
      expiry_date: str = ''
  
-@@ -3824,50 +3697,50 @@ async def generate_batches_from_order(order_id: str, req: GenerateBatchesRequest
+@@ -3824,50 +3694,50 @@ async def generate_batches_from_order(order_id: str, req: GenerateBatchesRequest
      automático sequencial; o lote do fornecedor e a validade são informados manualmente.
      """
      require_pedidos_access(current_user)
@@ -1126,7 +1160,7 @@ index 09394248665bb27aa58883fe69f7fdd2338ba7c3..07e34b0684737a28379e07413a9cfd68
      return {'created': created, 'count': len(created)}
  
  
-@@ -4255,4 +4128,4 @@ logger = logging.getLogger(__name__)
+@@ -4255,4 +4125,4 @@ logger = logging.getLogger(__name__)
  
  @app.on_event("shutdown")
  async def shutdown_db_client():
@@ -1459,10 +1493,10 @@ index 0000000000000000000000000000000000000000..5c85bb9b8188775c0d8e554e1153d54e
 +            'message': 'Conferência sem alterar saldos. Divergências antigas exigem conferir movimentações ou contagem física.'}
 diff --git a/backend/unit_tests/test_stock.py b/backend/unit_tests/test_stock.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..0807281fb76cbf8f80f86eb1ba22c5735e2bdf72
+index 0000000000000000000000000000000000000000..73b975f129af72ce8c74cef15d51ec9f4f951700
 --- /dev/null
 +++ b/backend/unit_tests/test_stock.py
-@@ -0,0 +1,377 @@
+@@ -0,0 +1,419 @@
 +"""Regressões offline: nenhuma conexão com MongoDB ou URL publicada.
 +
 +Instale mongomock==4.3.0 além das dependências do backend e execute:
@@ -1673,6 +1707,21 @@ index 0000000000000000000000000000000000000000..0807281fb76cbf8f80f86eb1ba22c573
 +            'allocations': [{'batch_id': 'a', 'quantity': 4}]}]})
 +        self.assertEqual(legacy[0]['batches_consumed'][0]['quantity_used'], 4)
 +
++    async def test_concurrent_releases_keep_first_responsible_user(self):
++        fixture(DB)
++        batch = await server.create_product_batch(server.ProductBatchCreate(
++            product_id='soap', date='2026-10-27', unit='Litros', planned_liters=100), USER)
++        results = await asyncio.gather(
++            server.mark_ready_for_bottling(batch.id, {'id': 'a', 'email': 'operador-a@example.test'}),
++            server.mark_ready_for_bottling(batch.id, {'id': 'b', 'email': 'operador-b@example.test'}),
++            return_exceptions=True,
++        )
++        self.assertEqual(sum(isinstance(result, dict) for result in results), 1)
++        document = DB.store.product_batches.find_one({'id': batch.id})
++        self.assertEqual(document['status'], 'em_aberto')
++        self.assertIn(document['released_by'], ['operador-a@example.test', 'operador-b@example.test'])
++        self.assertEqual(DB.store.raw_materials.find_one({'id': 'base'})['total_stock'], 5.5)
++
 +
 +class RouteTests(unittest.TestCase):
 +    def setUp(self):
@@ -1837,9 +1886,82 @@ index 0000000000000000000000000000000000000000..0807281fb76cbf8f80f86eb1ba22c573
 +        self.assertEqual(self.stock(), 10)
 +        self.assertEqual(DB.store.raw_material_batches.count_documents({}), 1)
 +
++    def test_users_outside_original_email_list_can_release(self):
++        for role in ['producao', 'pedidos', 'outro']:
++            with self.subTest(role=role):
++                fixture()
++                server.app.dependency_overrides[server.get_current_user] = lambda: USER
++                batch = self.make_product_batch()
++                account = {'id': role, 'name': 'Operador offline', 'email': role + '@example.test', 'role': role}
++                DB.store.users.insert_one(account)
++                # Testar autenticação JWT real, sem substituir a dependência.
++                server.app.dependency_overrides.clear()
++                response = self.client.post('/api/product-batches/' + batch['id'] + '/ready-for-bottling',
++                    headers={'Authorization': 'Bearer ' + server.create_token(role)})
++                self.assertEqual(response.status_code, 200, response.text)
++                document = DB.store.product_batches.find_one({'id': batch['id']})
++                self.assertEqual(document['status'], 'em_aberto')
++                self.assertEqual(document['released_by'], account['email'])
++                self.assertTrue(document['released_for_bottling_at'])
++                self.assertEqual(self.stock(), 5.5)
++
++    def test_anonymous_release_stays_blocked(self):
++        batch = self.make_product_batch()
++        server.app.dependency_overrides.clear()
++        response = self.client.post('/api/product-batches/' + batch['id'] + '/ready-for-bottling')
++        self.assertIn(response.status_code, (401, 403))
++        self.assertEqual(DB.store.product_batches.find_one({'id': batch['id']})['status'], 'em_producao')
++        self.assertEqual(self.stock(), 5.5)
++
 +
 +if __name__ == '__main__':
 +    unittest.main()
+diff --git a/frontend/src/App.js b/frontend/src/App.js
+index 59444774080bbc7c6b57b4c12109306f8bf4927e..dccb8c78cbb5908c099ff2b693c2f9c294a4d8c0 100644
+--- a/frontend/src/App.js
++++ b/frontend/src/App.js
+@@ -76,7 +76,7 @@ function App() {
+               <Route path="products" element={<RoleRoute allowedRoles={['laboratorio']}><Products /></RoleRoute>} />
+               <Route path="raw-materials" element={<RoleRoute allowedRoles={['laboratorio']}><RawMaterials /></RoleRoute>} />
+               <Route path="production-orders" element={<RoleRoute allowedRoles={['laboratorio']}><ProductionOrders /></RoleRoute>} />
+-              <Route path="in-production" element={<RoleRoute allowedRoles={['laboratorio', 'producao']}><InProduction /></RoleRoute>} />
++              <Route path="in-production" element={<InProduction />} />
+               <Route path="counting" element={<RoleRoute allowedRoles={['laboratorio', 'producao']}><Counting /></RoleRoute>} />
+               <Route path="samples" element={<RoleRoute allowedRoles={['laboratorio', 'producao']}><Samples /></RoleRoute>} />
+               <Route path="archives" element={<RoleRoute allowedRoles={['laboratorio', 'producao']}><Archives /></RoleRoute>} />
+diff --git a/frontend/src/components/Layout.js b/frontend/src/components/Layout.js
+index 9ef36e868d362d65a99ef83e62fee564232a8ee5..9072715fd390892241ae13c2990987f1b9bbd486 100644
+--- a/frontend/src/components/Layout.js
++++ b/frontend/src/components/Layout.js
+@@ -46,7 +46,7 @@ const menuCategories = [
+     title: 'PRODUÇÃO',
+     items: [
+       { path: '/fichas-analise', icon: ClipboardCheck, label: 'Ordem de Produção', roles: ['laboratorio'], emailOnly: LAB_EMAIL },
+-      { path: '/in-production', icon: Factory, label: 'Em Produção', roles: ['laboratorio', 'producao'] },
++      { path: '/in-production', icon: Factory, label: 'Em Produção', allAuthenticated: true },
+       { path: '/batch-management', icon: ListChecks, label: 'Gerenciar Lotes', roles: ['laboratorio'] },
+       { path: '/impressao', icon: Printer, label: 'Impressão', roles: ['laboratorio'] },
+     ],
+@@ -86,6 +86,7 @@ const Sidebar = ({ onItemClick }) => {
+   const { user, role, logout } = useAuth();
+ 
+   const isVisible = (item) => {
++    if (item.allAuthenticated) return Boolean(user);
+     if (!item.roles.includes(role || 'producao')) return false;
+     if (item.emailOnly && user?.email !== item.emailOnly) return false;
+     if (item.emailAllowlist && !item.emailAllowlist.some((e) => e.toLowerCase() === (user?.email || '').toLowerCase())) return false;
+diff --git a/frontend/src/context/AuthContext.js b/frontend/src/context/AuthContext.js
+index d76a81b9a9d571559832c2436ed632ac6be3d983..dff0a9969cf0d0456b07a6559587e2ae7cf5ceb9 100644
+--- a/frontend/src/context/AuthContext.js
++++ b/frontend/src/context/AuthContext.js
+@@ -76,6 +76,7 @@ export const AuthProvider = ({ children }) => {
+ 
+   // Verifica se o usuário tem acesso a determinada rota
+   const hasAccess = (path) => {
++    if (path === '/in-production') return Boolean(user);
+     if (role === 'laboratorio') return true;
+     // Rotas permitidas para produção
+     const producaoRoutes = ['/counting', '/samples', '/archives', '/dashboard'];
 diff --git a/frontend/src/pages/BatchManagement.js b/frontend/src/pages/BatchManagement.js
 index a78924c700d29627fea8c7022aa9cff15ffd6a58..7563b3c4f5d7ef512b521f04427e24d5a7c12a79 100644
 --- a/frontend/src/pages/BatchManagement.js
@@ -1853,6 +1975,77 @@ index a78924c700d29627fea8c7022aa9cff15ffd6a58..7563b3c4f5d7ef512b521f04427e24d5
        return;
      }
  
+diff --git a/frontend/src/pages/InProduction.js b/frontend/src/pages/InProduction.js
+index 45b11427b4c8ad2cc0f63bb07941985377be9015..2d03eda8b34fcd53a83d2994ddcfb069163f9e53 100644
+--- a/frontend/src/pages/InProduction.js
++++ b/frontend/src/pages/InProduction.js
+@@ -1,6 +1,5 @@
+ import React, { useEffect, useState, useRef } from 'react';
+ import api from '../lib/api';
+-import { useAuth } from '../context/AuthContext';
+ import { Button } from '../components/ui/button';
+ import { Card } from '../components/ui/card';
+ import { Badge } from '../components/ui/badge';
+@@ -10,7 +9,6 @@ import { toast } from 'sonner';
+ import { Factory, Package, Calendar, Search, CheckCircle, Clock } from 'lucide-react';
+ 
+ export const InProduction = () => {
+-  const { user } = useAuth();
+   const [batches, setBatches] = useState([]);
+   const [products, setProducts] = useState([]);
+   const [loading, setLoading] = useState(true);
+@@ -18,13 +16,6 @@ export const InProduction = () => {
+   const [searchTerm, setSearchTerm] = useState('');
+   const isMountedRef = useRef(true);
+ 
+-  // Emails autorizados para liberar lotes
+-  const authorizedEmails = [
+-  'laboratoriolumix@outlook.com',
+-  'luan_ssss@hotmail.com'
+-];
+-  const canRelease = authorizedEmails.includes(user?.email);
+-
+   useEffect(() => {
+     isMountedRef.current = true;
+     fetchData();
+@@ -128,15 +119,6 @@ export const InProduction = () => {
+         />
+       </div>
+ 
+-      {/* Info Card para usuários não autorizados */}
+-      {!canRelease && (
+-        <Card className="p-4 border-amber-300 bg-amber-50">
+-          <p className="text-amber-800 text-sm">
+-            <strong>Atenção:</strong> Apenas usuários autorizados podem liberar lotes para envase.
+-          </p>
+-        </Card>
+-      )}
+-
+       {/* Lista de Lotes */}
+       {filteredBatches.length === 0 ? (
+         <Card className="p-12 border text-center">
+@@ -183,7 +165,6 @@ export const InProduction = () => {
+               </div>
+ 
+               {/* Botão de Liberação */}
+-              {canRelease ? (
+                 <AlertDialog>
+                   <AlertDialogTrigger asChild>
+                     <Button 
+@@ -227,13 +208,6 @@ export const InProduction = () => {
+                     </AlertDialogFooter>
+                   </AlertDialogContent>
+                 </AlertDialog>
+-              ) : (
+-                <div className="p-3 rounded-lg bg-muted text-center">
+-                  <p className="text-sm text-muted-foreground">
+-                    Aguardando liberação pelo laboratório
+-                  </p>
+-                </div>
+-              )}
+             </Card>
+           ))}
+         </div>
 diff --git a/frontend/src/pages/ProductionOrders.js b/frontend/src/pages/ProductionOrders.js
 index c173dd4c9d49309ca467149fdc78b40875d7d367..bbd08c5cba3e6cd663d1af959ce107c8b6ddb2fc 100644
 --- a/frontend/src/pages/ProductionOrders.js

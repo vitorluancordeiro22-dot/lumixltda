@@ -7,7 +7,7 @@ Exemplo: 9 kg para uma receita de 200 L devem consumir 4,5 kg num lote de 100 L.
 
 Este pacote foi preparado sobre o código exportado do Emergent em 27/10/2026.
 O GitHub e o Emergent têm históricos divergentes; por isso a atualização é um
-patch dos oito arquivos corrigidos. Não é necessário fazer merge, reset ou
+patch dos doze arquivos corrigidos. Não é necessário fazer merge, reset ou
 substituir a aplicação por uma cópia antiga do GitHub.
 
 ## Aplicar no terminal do Emergent, em /app
@@ -32,6 +32,15 @@ Depois da aplicação, confira `supervisorctl status` para identificar os servi�
 do preview e seu estado. Recarregue os processos do preview conforme a
 configuração desse projeto e confira a interface antes de usar Re-publish no
 mesmo projeto. Nenhuma publicação é executada por este pacote.
+
+## Liberação de lotes
+
+O pacote também remove a restrição aos dois e-mails antigos na ação **Pronto
+para Envase**. Qualquer usuário autenticado pode abrir **Em Produção** e liberar
+um lote, inclusive no modo Pedidos. O backend continua exigindo login e registra
+`released_by` e `released_for_bottling_at`. Uma atualização condicional preserva
+o primeiro responsável em liberações concorrentes. Essa ação muda apenas o
+status e os dados da liberação; não faz outra baixa de matéria-prima.
 
 ## Comportamento corrigido
 
@@ -71,10 +80,10 @@ Não limpar bloqueios automaticamente nem repetir créditos para tentar reparar 
 
 ## Verificação realizada
 
-- 30 testes offline passaram, usando banco em memória e driver substituído antes de importar a aplicação.
-- Cobertura: entrada → produção → ordem sem segunda baixa; falta de ingrediente; cancelamento concorrente/repetido; restauração; edições; arquivo; recebimento duplicado; falhas de gravação; unidades; decimais; conferência sem escrita.
+- 33 testes offline passaram, usando banco em memória e driver substituído antes de importar a aplicação.
+- Cobertura: entrada → produção → ordem sem segunda baixa; falta de ingrediente; cancelamento concorrente/repetido; restauração; edições; arquivo; recebimento duplicado; falhas de gravação; unidades; decimais; conferência sem escrita; liberação por usuários fora da lista antiga com JWT real, bloqueio sem login e liberação concorrente.
 - Build de produção da interface concluído com sucesso.
-- O patch foi aplicado em uma cópia limpa da exportação e os oito arquivos resultantes foram comparados byte a byte.
+- O patch foi aplicado em uma cópia limpa da exportação e os doze arquivos resultantes foram comparados byte a byte.
 - Nenhuma consulta ou alteração foi feita no banco real.
 
 Para executar os testes de regressão num ambiente isolado com as dependências
@@ -87,5 +96,5 @@ PYTHONPATH=backend python -m unittest discover -s backend/unit_tests -v
 SHA-256 de `lumix-stock-fix.patch`:
 
 ```text
-c903a69766321599da7e15fb09387a1c3ffce956b28c8cb73255fbea81fe8d9d
+e09244ab8b133f0a1ae6236183212c773a7be869d4a7db013233f346feb7c4ca
 ```
