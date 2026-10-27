@@ -7,8 +7,17 @@ Exemplo: 9 kg para uma receita de 200 L devem consumir 4,5 kg num lote de 100 L.
 
 Este pacote foi preparado sobre o código exportado do Emergent em 27/10/2026.
 O GitHub e o Emergent têm históricos divergentes; por isso a atualização é um
-patch dos doze arquivos corrigidos. Não é necessário fazer merge, reset ou
+patch dos quinze arquivos corrigidos. Não é necessário fazer merge, reset ou
 substituir a aplicação por uma cópia antiga do GitHub.
+
+## Escolha o pacote correto
+
+**Se já aplicou a correção de estoque e a liberação para todos, use somente o
+[complemento de contagem física](README-contagem.md).** Não reaplique o pacote
+completo sobre esses arquivos já atualizados.
+
+As instruções abaixo são para um ambiente que ainda não recebeu nenhuma das
+correções. O pacote completo agora inclui a contagem física.
 
 ## Aplicar no terminal do Emergent, em /app
 
@@ -64,26 +73,36 @@ status e os dados da liberação; não faz outra baixa de matéria-prima.
 
 Não há tarefa de startup, migração, exclusão de coleções nem troca de conexão.
 `MONGO_URL`, `DB_NAME` e `JWT_SECRET` continuam vindo da configuração existente.
-A correção do código não estabelece qual é o saldo físico verdadeiro de um
-material que aparece com 4.000 kg. A conferência mostra o saldo cadastrado, a
-soma dos lotes em aberto, sobras encerradas e possíveis entradas repetidas de
-pedidos. Só após conferir movimentações ou contagem física deve ser preparado
-um ajuste histórico específico. Não executar os antigos testes de integração
-contra uma URL publicada para validar esta atualização.
+O botão **Conferir Estoque** é somente de leitura. O novo botão **Contagem física**
+permite informar o saldo realmente contado e revisar as quantidades de cada
+lote. Apenas a confirmação explícita grava o ajuste, alinhando o total e o saldo
+restante dos lotes e guardando os valores anteriores, motivo, responsável e data.
+O saldo que não foi atribuído a lotes existentes fica identificado como ajuste
+por contagem, sem inventar fornecedor ou validade. Veja [o fluxo completo](README-contagem.md).
 
-Os bloqueios de edição/cancelamento e de recebimento são persistidos nos
-documentos. Se um processo morrer no meio de uma operação, ela pode ficar
-bloqueada e exigir inspeção antes de ser retomada. As compensações cobrem
-falhas observadas durante a requisição; não substituem transações MongoDB nem
-prometem atomicidade de múltiplos documentos durante uma queda abrupta.
-Não limpar bloqueios automaticamente nem repetir créditos para tentar reparar isso.
+Após republicar, registre a contagem real no site publicado que a equipe usa.
+Não registre os valores reais apenas no preview. Não executar os antigos testes
+de integração contra uma URL publicada para validar esta atualização.
+
+As movimentações de estoque são serializadas por um bloqueio compartilhado no
+MongoDB. A prévia detecta movimentações posteriores e exige outra conferência;
+confirmações repetidas usam a mesma chave e não gravam o ajuste duas vezes.
+Consumos/exclusões anteriores à contagem não podem devolver saldo antigo sem
+conferência. Os dois formatos antigos de rastreabilidade continuam sendo lidos.
+
+O histórico é gravado como pendente com os valores anteriores antes do ajuste.
+Falhas observadas tentam restaurar esses valores. Em falha inesperada ou queda
+abrupta do processo, o bloqueio pode ficar retido para impedir novos movimentos
+até inspecionar a operação e seu histórico. Não há expiração automática que
+permita repetir créditos e não se promete transação de múltiplos documentos em
+MongoDB standalone. Não limpar bloqueios automaticamente sem conferir o estado.
 
 ## Verificação realizada
 
-- 33 testes offline passaram, usando banco em memória e driver substituído antes de importar a aplicação.
-- Cobertura: entrada → produção → ordem sem segunda baixa; falta de ingrediente; cancelamento concorrente/repetido; restauração; edições; arquivo; recebimento duplicado; falhas de gravação; unidades; decimais; conferência sem escrita; liberação por usuários fora da lista antiga com JWT real, bloqueio sem login e liberação concorrente.
+- 50 testes offline passaram, usando banco em memória e driver substituído antes de importar a aplicação.
+- Cobertura: entrada → produção → ordem sem segunda baixa; falta de ingrediente; cancelamento concorrente/repetido; restauração; edições; arquivo; recebimento duplicado; falhas de gravação; unidades; decimais; conferência sem escrita; contagem física com prévia, histórico, saldo por lote, confirmação repetida, falha compensada e bloqueio de devolução antiga; liberação por usuários fora da lista antiga com JWT real, bloqueio sem login e liberação concorrente.
 - Build de produção da interface concluído com sucesso.
-- O patch foi aplicado em uma cópia limpa da exportação e os doze arquivos resultantes foram comparados byte a byte.
+- O patch foi aplicado em uma cópia limpa da exportação e os quinze arquivos resultantes foram comparados byte a byte.
 - Nenhuma consulta ou alteração foi feita no banco real.
 
 Para executar os testes de regressão num ambiente isolado com as dependências
@@ -96,5 +115,5 @@ PYTHONPATH=backend python -m unittest discover -s backend/unit_tests -v
 SHA-256 de `lumix-stock-fix.patch`:
 
 ```text
-e09244ab8b133f0a1ae6236183212c773a7be869d4a7db013233f346feb7c4ca
+4a7e5e155130569b59d30667c8087709459e987cf0510b039270dd3e18255f27
 ```

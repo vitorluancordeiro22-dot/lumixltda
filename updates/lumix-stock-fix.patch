@@ -1,17 +1,26 @@
 diff --git a/backend/industrial_op_routes.py b/backend/industrial_op_routes.py
-index 944acb648d4f8a0ee1f5284b3a58d644165f3ed1..43427bfe6cd972c92fbf46a3ee2fa1e161109391 100644
+index 944acb648d4f8a0ee1f5284b3a58d644165f3ed1..435400a4813c60278375b8a56f208c38284ea554 100644
 --- a/backend/industrial_op_routes.py
 +++ b/backend/industrial_op_routes.py
-@@ -2,6 +2,8 @@
+@@ -2,6 +2,9 @@
  Rotas e Endpoints para Sistema de OP Industrial
  """
  
 +from stock import product_requirements, consume_requirements, restore_usages
++from stock_control import serialized_stock_write
 +
  from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, status as http_status
  from fastapi.responses import StreamingResponse
  from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorGridFSBucket
-@@ -202,52 +204,13 @@ def setup_industrial_op_routes(api_router: APIRouter, db, fs, get_current_user,
+@@ -172,6 +175,7 @@ def setup_industrial_op_routes(api_router: APIRouter, db, fs, get_current_user,
+     # ========== CRUD DE ORDENS DE PRODUÇÃO ==========
+     
+     @api_router.post('/industrial-ops', response_model=IndustrialOP)
++    @serialized_stock_write(lambda: db)
+     async def create_industrial_op(
+         op_data: IndustrialOPCreate,
+         current_user = Depends(get_current_user)
+@@ -202,52 +206,13 @@ def setup_industrial_op_routes(api_router: APIRouter, db, fs, get_current_user,
          date_str = now.isoformat()
          batch_number = await generate_batch_number_fn(date_str)
          
@@ -70,7 +79,7 @@ index 944acb648d4f8a0ee1f5284b3a58d644165f3ed1..43427bfe6cd972c92fbf46a3ee2fa1e1
          # Criar snapshot dos modelos (versionamento)
          op_model_snapshot = file_models.get('op_model')
          ficha_analise_snapshot = file_models.get('ficha_analise')
-@@ -295,9 +258,26 @@ def setup_industrial_op_routes(api_router: APIRouter, db, fs, get_current_user,
+@@ -295,9 +260,26 @@ def setup_industrial_op_routes(api_router: APIRouter, db, fs, get_current_user,
              history=[h.dict() for h in history]
          )
          
@@ -101,10 +110,17 @@ index 944acb648d4f8a0ee1f5284b3a58d644165f3ed1..43427bfe6cd972c92fbf46a3ee2fa1e1
      
      @api_router.get('/industrial-ops', response_model=List[IndustrialOP])
 diff --git a/backend/server.py b/backend/server.py
-index 09394248665bb27aa58883fe69f7fdd2338ba7c3..2ad986f5d38316eef0e96203de2192adb63a54d0 100644
+index 09394248665bb27aa58883fe69f7fdd2338ba7c3..7074e44303fb4bfbe45f031dc9a79672f357855b 100644
 --- a/backend/server.py
 +++ b/backend/server.py
-@@ -18,6 +18,11 @@ import io
+@@ -12,12 +12,19 @@ from typing import List, Optional, Dict, Any
+ from datetime import datetime, timezone, timedelta
+ import bcrypt
+ import jwt
+-from uuid import uuid4
++from uuid import uuid4, UUID
+ import uuid
+ import io
  import re
  import json
  import asyncio
@@ -113,10 +129,12 @@ index 09394248665bb27aa58883fe69f7fdd2338ba7c3..2ad986f5d38316eef0e96203de2192ad
 +    quantity as stock_quantity, product_requirements, consume_requirements,
 +    batch_usages, restore_usages, receive_batch, stock_audit, resize_usages,
 +)
++from stock_control import serialized_stock_write
++from stock_counts import preview_count, apply_count, public_count
  from bson import ObjectId
  
  # Industrial OP imports
-@@ -79,7 +84,7 @@ class TokenResponse(BaseModel):
+@@ -79,7 +86,7 @@ class TokenResponse(BaseModel):
  
  class ProductRecipe(BaseModel):
      raw_material_id: str
@@ -125,7 +143,7 @@ index 09394248665bb27aa58883fe69f7fdd2338ba7c3..2ad986f5d38316eef0e96203de2192ad
      unit: str = 'L'  # L (Litros) ou Kg
  
  class Product(BaseModel):
-@@ -95,7 +100,7 @@ class Product(BaseModel):
+@@ -95,7 +102,7 @@ class Product(BaseModel):
  class ProductCreate(BaseModel):
      name: str
      unit: str
@@ -134,7 +152,7 @@ index 09394248665bb27aa58883fe69f7fdd2338ba7c3..2ad986f5d38316eef0e96203de2192ad
      recipes: List[ProductRecipe]
  
  class RawMaterial(BaseModel):
-@@ -111,7 +116,7 @@ class RawMaterial(BaseModel):
+@@ -111,7 +118,7 @@ class RawMaterial(BaseModel):
  class RawMaterialCreate(BaseModel):
      name: str
      type: str
@@ -143,7 +161,7 @@ index 09394248665bb27aa58883fe69f7fdd2338ba7c3..2ad986f5d38316eef0e96203de2192ad
      supplier_id: str = ''
      received_date: str = ''
  
-@@ -133,14 +138,14 @@ class ProductBatchCreate(BaseModel):
+@@ -133,14 +140,14 @@ class ProductBatchCreate(BaseModel):
      product_id: str
      date: str
      unit: str
@@ -160,7 +178,7 @@ index 09394248665bb27aa58883fe69f7fdd2338ba7c3..2ad986f5d38316eef0e96203de2192ad
  
  class RawMaterialBatch(BaseModel):
      id: str
-@@ -157,7 +162,7 @@ class RawMaterialBatch(BaseModel):
+@@ -157,7 +164,7 @@ class RawMaterialBatch(BaseModel):
  class RawMaterialBatchCreate(BaseModel):
      raw_material_id: str
      date: str
@@ -169,7 +187,7 @@ index 09394248665bb27aa58883fe69f7fdd2338ba7c3..2ad986f5d38316eef0e96203de2192ad
      supplier_batch_number: str = ''
      expiry_date: str = ''
      custom_batch_number: Optional[str] = None  # Número de lote customizado
-@@ -165,7 +170,7 @@ class RawMaterialBatchCreate(BaseModel):
+@@ -165,7 +172,7 @@ class RawMaterialBatchCreate(BaseModel):
  class RawMaterialBatchUpdate(BaseModel):
      batch_number: Optional[str] = None
      date: Optional[str] = None
@@ -178,7 +196,7 @@ index 09394248665bb27aa58883fe69f7fdd2338ba7c3..2ad986f5d38316eef0e96203de2192ad
      supplier_batch_number: Optional[str] = None
      expiry_date: Optional[str] = None
  
-@@ -190,7 +195,7 @@ class ProductionOrderCreate(BaseModel):
+@@ -190,7 +197,7 @@ class ProductionOrderCreate(BaseModel):
      product_batch_id: str
      date: str
      weigher: str
@@ -187,7 +205,7 @@ index 09394248665bb27aa58883fe69f7fdd2338ba7c3..2ad986f5d38316eef0e96203de2192ad
      materials_used: List[MaterialUsed]
  
  class Counting(BaseModel):
-@@ -338,156 +343,37 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
+@@ -338,156 +345,37 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
  
  # ========== RAW MATERIAL DEDUCTION LOGIC ==========
  
@@ -345,11 +363,11 @@ index 09394248665bb27aa58883fe69f7fdd2338ba7c3..2ad986f5d38316eef0e96203de2192ad
 -        needed = round(needed, 4)
 -        if needed <= 0:
 -            continue
--
--        used_batches = await deduct_from_raw_material_batches(rm_id, needed)
 +    requirements = await product_requirements(db, product, planned_liters)
 +    return await consume_requirements(db, requirements)
  
+-        used_batches = await deduct_from_raw_material_batches(rm_id, needed)
+-
 -        rm_doc = await db.raw_materials.find_one({'id': rm_id}, {'_id': 0})
 -        rm_name = rm_doc['name'] if rm_doc else rm_id
 -
@@ -365,7 +383,24 @@ index 09394248665bb27aa58883fe69f7fdd2338ba7c3..2ad986f5d38316eef0e96203de2192ad
  
  # ========== AUTH ENDPOINTS ==========
  
-@@ -708,138 +594,150 @@ async def create_product_batch(data: ProductBatchCreate, current_user = Depends(
+@@ -617,7 +505,7 @@ async def generate_batch_number(date_str: str) -> str:
+     
+     # Buscar o ÚLTIMO lote criado (mais recente) de matérias-primas
+     last_rm_batch = await db.raw_material_batches.find_one(
+-        {'deleted': False},
++        {'deleted': False, 'is_inventory_adjustment': {'$ne': True}},
+         {'_id': 0, 'batch_number': 1, 'created_at': 1},
+         sort=[('created_at', -1)]
+     )
+@@ -666,6 +554,7 @@ async def get_product_batches(current_user = Depends(get_current_user)):
+     return batches
+ 
+ @api_router.post('/product-batches', response_model=ProductBatch)
++@serialized_stock_write(lambda: db)
+ async def create_product_batch(data: ProductBatchCreate, current_user = Depends(get_current_user)):
+     import uuid
+     batch_id = str(uuid.uuid4())
+@@ -708,138 +597,151 @@ async def create_product_batch(data: ProductBatchCreate, current_user = Depends(
          'raw_materials_used': []  # Rastreabilidade de MP usadas
      }
      
@@ -532,6 +567,7 @@ index 09394248665bb27aa58883fe69f7fdd2338ba7c3..2ad986f5d38316eef0e96203de2192ad
      return ProductBatch(**batch_doc)
  
  @api_router.put('/product-batches/{batch_id}', response_model=ProductBatch)
++@serialized_stock_write(lambda: db)
  async def update_product_batch(batch_id: str, data: ProductBatchUpdate, current_user = Depends(get_current_user)):
 -    batch = await db.product_batches.find_one({'id': batch_id}, {'_id': 0})
 -    if not batch:
@@ -628,9 +664,11 @@ index 09394248665bb27aa58883fe69f7fdd2338ba7c3..2ad986f5d38316eef0e96203de2192ad
  
  @api_router.get('/product-batches/check-open/{product_id}')
  async def check_open_batch(product_id: str, current_user = Depends(get_current_user)):
-@@ -866,25 +764,25 @@ async def check_open_batch(product_id: str, current_user = Depends(get_current_u
+@@ -865,28 +767,30 @@ async def check_open_batch(product_id: str, current_user = Depends(get_current_u
+     }
  
  @api_router.delete('/product-batches/{batch_id}')
++@serialized_stock_write(lambda: db)
  async def delete_product_batch(batch_id: str, current_user = Depends(get_current_user)):
 -    batch = await db.product_batches.find_one({'id': batch_id}, {'_id': 0})
 -    if not batch:
@@ -672,8 +710,23 @@ index 09394248665bb27aa58883fe69f7fdd2338ba7c3..2ad986f5d38316eef0e96203de2192ad
 +    return {'message': 'Batch moved to trash', 'raw_materials_restored': usage}
  
  @api_router.post('/product-batches/{batch_id}/finalize')
++@serialized_stock_write(lambda: db)
  async def finalize_product_batch(batch_id: str, current_user = Depends(get_current_user)):
-@@ -937,13 +835,8 @@ async def reopen_product_batch(batch_id: str, current_user = Depends(get_current
+     """
+     Finaliza um lote de produto mesmo que não tenha atingido a meta de litragem.
+@@ -912,6 +816,7 @@ async def finalize_product_batch(batch_id: str, current_user = Depends(get_curre
+     }
+ 
+ @api_router.post('/product-batches/{batch_id}/reopen')
++@serialized_stock_write(lambda: db)
+ async def reopen_product_batch(batch_id: str, current_user = Depends(get_current_user)):
+     """
+     Reabre um lote finalizado (não arquivado), mudando o status de volta para 'em_aberto'.
+@@ -934,16 +839,12 @@ async def reopen_product_batch(batch_id: str, current_user = Depends(get_current
+     }
+ 
+ @api_router.post('/product-batches/{batch_id}/ready-for-bottling')
++@serialized_stock_write(lambda: db)
  async def mark_ready_for_bottling(batch_id: str, current_user = Depends(get_current_user)):
      """
      Marca um lote como pronto para envase.
@@ -688,7 +741,7 @@ index 09394248665bb27aa58883fe69f7fdd2338ba7c3..2ad986f5d38316eef0e96203de2192ad
      batch = await db.product_batches.find_one({'id': batch_id, 'deleted': False}, {'_id': 0})
      if not batch:
          raise HTTPException(status_code=404, detail='Lote não encontrado')
-@@ -951,14 +844,16 @@ async def mark_ready_for_bottling(batch_id: str, current_user = Depends(get_curr
+@@ -951,14 +852,16 @@ async def mark_ready_for_bottling(batch_id: str, current_user = Depends(get_curr
      if batch.get('status') != 'em_producao':
          raise HTTPException(status_code=400, detail='Apenas lotes em produção podem ser liberados para envase')
      
@@ -707,7 +760,15 @@ index 09394248665bb27aa58883fe69f7fdd2338ba7c3..2ad986f5d38316eef0e96203de2192ad
      
      return {
          'message': 'Lote liberado para envase com sucesso',
-@@ -1000,7 +895,9 @@ async def reopen_archived_batch(batch_id: str, current_user = Depends(get_curren
+@@ -977,6 +880,7 @@ async def get_batches_in_production(current_user = Depends(get_current_user)):
+     return batches
+ 
+ @api_router.post('/archive/reopen/{batch_id}')
++@serialized_stock_write(lambda: db)
+ async def reopen_archived_batch(batch_id: str, current_user = Depends(get_current_user)):
+     """
+     Reabre um lote arquivado, movendo-o de volta para a coleção de lotes ativos.
+@@ -1000,7 +904,9 @@ async def reopen_archived_batch(batch_id: str, current_user = Depends(get_curren
          'created_at': archived_batch.get('created_at', datetime.now(timezone.utc).isoformat()),
          'deleted': False,
          'reopened_at': datetime.now(timezone.utc).isoformat(),
@@ -718,18 +779,22 @@ index 09394248665bb27aa58883fe69f7fdd2338ba7c3..2ad986f5d38316eef0e96203de2192ad
      }
      
      # Inserir de volta na coleção de lotes ativos
-@@ -1031,6 +928,8 @@ async def get_raw_materials(current_user = Depends(get_current_user)):
+@@ -1030,7 +936,10 @@ async def get_raw_materials(current_user = Depends(get_current_user)):
+     return materials
  
  @api_router.post('/raw-materials', response_model=RawMaterial)
++@serialized_stock_write(lambda: db)
  async def create_raw_material(data: RawMaterialCreate, current_user = Depends(get_current_user)):
 +    if data.total_stock != 0:
 +        raise HTTPException(status_code=400, detail='O estoque inicial deve ser registrado como um lote de matéria-prima')
      import uuid
      material_id = str(uuid.uuid4())
      material_doc = {
-@@ -1048,12 +947,16 @@ async def create_raw_material(data: RawMaterialCreate, current_user = Depends(ge
+@@ -1047,13 +956,18 @@ async def create_raw_material(data: RawMaterialCreate, current_user = Depends(ge
+     return RawMaterial(**material_doc)
  
  @api_router.put('/raw-materials/{material_id}', response_model=RawMaterial)
++@serialized_stock_write(lambda: db)
  async def update_raw_material(material_id: str, data: RawMaterialCreate, current_user = Depends(get_current_user)):
 +    current = await db.raw_materials.find_one({'id': material_id, 'deleted': False}, {'_id': 0})
 +    if not current:
@@ -745,7 +810,23 @@ index 09394248665bb27aa58883fe69f7fdd2338ba7c3..2ad986f5d38316eef0e96203de2192ad
              'supplier_id': data.supplier_id,
              'received_date': data.received_date
          }}
-@@ -1126,153 +1029,84 @@ async def create_raw_material_batch(data: RawMaterialBatchCreate, current_user =
+@@ -1064,6 +978,7 @@ async def update_raw_material(material_id: str, data: RawMaterialCreate, current
+     return RawMaterial(**material)
+ 
+ @api_router.delete('/raw-materials/{material_id}')
++@serialized_stock_write(lambda: db)
+ async def delete_raw_material(material_id: str, current_user = Depends(get_current_user)):
+     material = await db.raw_materials.find_one({'id': material_id}, {'_id': 0})
+     if not material:
+@@ -1086,6 +1001,7 @@ async def get_raw_material_batches(current_user = Depends(get_current_user)):
+     return batches
+ 
+ @api_router.post('/raw-material-batches', response_model=RawMaterialBatch)
++@serialized_stock_write(lambda: db)
+ async def create_raw_material_batch(data: RawMaterialBatchCreate, current_user = Depends(get_current_user)):
+     import uuid
+     batch_id = str(uuid.uuid4())
+@@ -1126,153 +1042,140 @@ async def create_raw_material_batch(data: RawMaterialBatchCreate, current_user =
          'deleted': False,
          'is_custom': bool(data.custom_batch_number)
      }
@@ -764,6 +845,7 @@ index 09394248665bb27aa58883fe69f7fdd2338ba7c3..2ad986f5d38316eef0e96203de2192ad
      return RawMaterialBatch(**batch_doc)
  
  @api_router.put('/raw-material-batches/{batch_id}', response_model=RawMaterialBatch)
++@serialized_stock_write(lambda: db)
  async def update_raw_material_batch(batch_id: str, data: RawMaterialBatchUpdate, current_user = Depends(get_current_user)):
 -    batch = await db.raw_material_batches.find_one({'id': batch_id}, {'_id': 0})
 -    if not batch:
@@ -839,6 +921,7 @@ index 09394248665bb27aa58883fe69f7fdd2338ba7c3..2ad986f5d38316eef0e96203de2192ad
 -    return RawMaterialBatch(**updated)
  
  @api_router.delete('/raw-material-batches/{batch_id}')
++@serialized_stock_write(lambda: db)
  async def delete_raw_material_batch(batch_id: str, current_user = Depends(get_current_user)):
 -    batch = await db.raw_material_batches.find_one({'id': batch_id}, {'_id': 0})
 -    if not batch:
@@ -852,8 +935,9 @@ index 09394248665bb27aa58883fe69f7fdd2338ba7c3..2ad986f5d38316eef0e96203de2192ad
 -    })
 -    await db.raw_material_batches.update_one({'id': batch_id}, {'$set': {'deleted': True}})
 +    async with stock_operation(db.raw_material_batches, batch_id) as batch:
++        material = await db.raw_materials.find_one({'id': batch['raw_material_id']}, {'_id': 0})
 +        remaining = stock_quantity(batch.get('quantity', 0))
-+        await db.raw_material_batches.update_one({'id': batch_id}, {'$set': {'deleted': True, 'stock_removed_on_delete': True}})
++        await db.raw_material_batches.update_one({'id': batch_id}, {'$set': {'deleted': True, 'stock_removed_on_delete': True, 'stock_count_id_on_delete': (material or {}).get('last_physical_count_id')}})
 +        try:
 +            await db.raw_materials.update_one({'id': batch['raw_material_id']}, {'$inc': {'total_stock': -remaining}})
 +        except Exception:
@@ -865,6 +949,7 @@ index 09394248665bb27aa58883fe69f7fdd2338ba7c3..2ad986f5d38316eef0e96203de2192ad
  
 +
  @api_router.post('/raw-material-batches/{batch_id}/finalize')
++@serialized_stock_write(lambda: db)
  async def finalize_raw_material_batch(batch_id: str, current_user = Depends(get_current_user)):
 -    """Finaliza um lote de matéria-prima manualmente"""
 -    batch = await db.raw_material_batches.find_one({'id': batch_id, 'deleted': False}, {'_id': 0})
@@ -895,6 +980,58 @@ index 09394248665bb27aa58883fe69f7fdd2338ba7c3..2ad986f5d38316eef0e96203de2192ad
 -    )
      
 -    return {'message': 'Lote finalizado com sucesso'}
++def require_stock_count_access(current_user):
++    allowed = {'laboratoriolumix@outlook.com', 'leonicelaboratorio@lumix.com'}
++    if current_user.get('email', '').lower() not in allowed:
++        raise HTTPException(status_code=403, detail='A contagem física deve ser confirmada por um usuário do laboratório')
++
++
++class PhysicalCountPreview(BaseModel):
++    counted_stock: float = Field(ge=0, allow_inf_nan=False)
++
++
++class PhysicalLotCount(BaseModel):
++    batch_id: str
++    quantity: float = Field(ge=0, allow_inf_nan=False)
++
++
++class PhysicalCountConfirmation(PhysicalCountPreview):
++    expected_version: str = Field(pattern=r'^[a-f0-9]{64}$')
++    request_id: UUID
++    reason: str = Field(min_length=3, max_length=500)
++    lot_counts: List[PhysicalLotCount]
++    confirmed: bool = False
++
++
++@api_router.post('/raw-materials/{material_id}/physical-count/preview')
++async def preview_physical_count(material_id: str, data: PhysicalCountPreview, current_user = Depends(get_current_user)):
++    require_stock_count_access(current_user)
++    try:
++        return await preview_count(db, material_id, data.counted_stock)
++    except ValueError as exc:
++        raise HTTPException(status_code=400, detail=str(exc))
++
++
++@api_router.post('/raw-materials/{material_id}/physical-count')
++@serialized_stock_write(lambda: db)
++async def confirm_physical_count(material_id: str, data: PhysicalCountConfirmation, current_user = Depends(get_current_user)):
++    require_stock_count_access(current_user)
++    if not data.confirmed:
++        raise HTTPException(status_code=400, detail='Confirme a contagem e as quantidades por lote antes de salvar')
++    try:
++        return await apply_count(db, material_id, data.counted_stock, data.reason, data.expected_version,
++                                 str(data.request_id), [row.model_dump() for row in data.lot_counts], current_user)
++    except ValueError as exc:
++        raise HTTPException(status_code=400, detail=str(exc))
++
++
++@api_router.get('/raw-materials/{material_id}/stock-counts')
++async def get_physical_counts(material_id: str, current_user = Depends(get_current_user)):
++    require_stock_count_access(current_user)
++    records = await db.stock_counts.find({'raw_material_id': material_id}, {'_id': 0}).sort('created_at', -1).to_list(20)
++    return [public_count(record) for record in records]
++
++
 +@api_router.get('/raw-materials/stock-audit')
 +async def audit_stock_balances(current_user = Depends(get_current_user)):
 +    return await stock_audit(db)
@@ -958,7 +1095,7 @@ index 09394248665bb27aa58883fe69f7fdd2338ba7c3..2ad986f5d38316eef0e96203de2192ad
  
  
  @api_router.get('/raw-materials/audit')
-@@ -1590,14 +1424,16 @@ async def create_production_order(data: ProductionOrderCreate, current_user = De
+@@ -1590,14 +1493,16 @@ async def create_production_order(data: ProductionOrderCreate, current_user = De
      import uuid
      order_id = str(uuid.uuid4())
      
@@ -983,7 +1120,7 @@ index 09394248665bb27aa58883fe69f7fdd2338ba7c3..2ad986f5d38316eef0e96203de2192ad
      
      order_doc = {
          'id': order_id,
-@@ -1606,7 +1442,8 @@ async def create_production_order(data: ProductionOrderCreate, current_user = De
+@@ -1606,7 +1511,8 @@ async def create_production_order(data: ProductionOrderCreate, current_user = De
          'date': data.date,
          'weigher': data.weigher,
          'production_size': data.production_size,
@@ -993,7 +1130,23 @@ index 09394248665bb27aa58883fe69f7fdd2338ba7c3..2ad986f5d38316eef0e96203de2192ad
          'status': 'em_producao',
          'created_at': datetime.now(timezone.utc).isoformat(),
          'deleted': False
-@@ -2027,11 +1864,42 @@ async def restore_from_trash(item_id: str, current_user = Depends(get_current_us
+@@ -1637,6 +1543,7 @@ async def get_counting(batch_id: str, current_user = Depends(get_current_user)):
+     return counts
+ 
+ @api_router.post('/counting/{batch_id}', response_model=Counting)
++@serialized_stock_write(lambda: db)
+ async def add_counting(batch_id: str, data: CountingCreate, current_user = Depends(get_current_user)):
+     import uuid
+     
+@@ -2010,6 +1917,7 @@ async def get_trash(current_user = Depends(get_current_user)):
+     return items
+ 
+ @api_router.post('/trash/restore/{item_id}')
++@serialized_stock_write(lambda: db)
+ async def restore_from_trash(item_id: str, current_user = Depends(get_current_user)):
+     trash_item = await db.trash.find_one({'id': item_id}, {'_id': 0})
+     if not trash_item:
+@@ -2027,11 +1935,47 @@ async def restore_from_trash(item_id: str, current_user = Depends(get_current_us
          'team_member': 'team'
      }
      
@@ -1022,6 +1175,11 @@ index 09394248665bb27aa58883fe69f7fdd2338ba7c3..2ad986f5d38316eef0e96203de2192ad
 +                # só retorna o saldo restante que saiu com a exclusão.
 +                if not item.get('stock_removed_on_delete'):
 +                    raise HTTPException(status_code=409, detail='Exclusão antiga sem comprovante de baixa. Confira o estoque antes de restaurar')
++                material = await db.raw_materials.find_one({'id': item['raw_material_id']}, {'_id': 0})
++                if not material or material.get('deleted'):
++                    raise HTTPException(status_code=409, detail='Restaure o cadastro da matéria-prima antes do lote')
++                if material.get('last_physical_count_id') and item.get('stock_count_id_on_delete') != material['last_physical_count_id']:
++                    raise HTTPException(status_code=409, detail='Esta exclusão é anterior à última contagem física. Confira a movimentação antes de somar estoque antigo')
 +                amount = stock_quantity(item.get('quantity', 0))
 +                await db.raw_materials.update_one({'id': item['raw_material_id']}, {'$inc': {'total_stock': amount}})
 +                try:
@@ -1040,7 +1198,15 @@ index 09394248665bb27aa58883fe69f7fdd2338ba7c3..2ad986f5d38316eef0e96203de2192ad
          await db.trash.delete_one({'id': item_id})
          return {'message': 'Item restored'}
      
-@@ -2057,7 +1925,8 @@ async def auto_archive_finished_items(current_user = Depends(get_current_user)):
+@@ -2047,6 +1991,7 @@ async def delete_from_trash_permanently(item_id: str, current_user = Depends(get
+ # ========== MONTHLY ARCHIVE ==========
+ 
+ @api_router.post('/archive/auto-archive-month')
++@serialized_stock_write(lambda: db)
+ async def auto_archive_finished_items(current_user = Depends(get_current_user)):
+     """
+     Arquiva automaticamente TODOS os itens finalizados, independente do mês.
+@@ -2057,7 +2002,8 @@ async def auto_archive_finished_items(current_user = Depends(get_current_user)):
      # Mover lotes de produtos finalizados
      product_batches = await db.product_batches.find({
          'status': 'finalizado',
@@ -1050,7 +1216,7 @@ index 09394248665bb27aa58883fe69f7fdd2338ba7c3..2ad986f5d38316eef0e96203de2192ad
      }, {'_id': 0}).to_list(10000)
      
      archived_products = 0
-@@ -2088,7 +1957,8 @@ async def auto_archive_finished_items(current_user = Depends(get_current_user)):
+@@ -2088,7 +2034,8 @@ async def auto_archive_finished_items(current_user = Depends(get_current_user)):
              {'status': 'finalizado'},
              {'quantity': {'$lte': 0}}  # Incluir lotes zerados
          ],
@@ -1060,7 +1226,7 @@ index 09394248665bb27aa58883fe69f7fdd2338ba7c3..2ad986f5d38316eef0e96203de2192ad
      }, {'_id': 0}).to_list(10000)
      
      archived_materials = 0
-@@ -3772,7 +3642,7 @@ async def delete_purchase_order(order_id: str, current_user=Depends(get_current_
+@@ -3772,7 +3719,7 @@ async def delete_purchase_order(order_id: str, current_user=Depends(get_current_
  
  class LoteEntry(BaseModel):
      raw_material_id: str
@@ -1069,7 +1235,15 @@ index 09394248665bb27aa58883fe69f7fdd2338ba7c3..2ad986f5d38316eef0e96203de2192ad
      supplier_batch_number: str = ''
      expiry_date: str = ''
  
-@@ -3824,50 +3694,50 @@ async def generate_batches_from_order(order_id: str, req: GenerateBatchesRequest
+@@ -3817,6 +3764,7 @@ async def lote_preview_from_order(order_id: str, current_user=Depends(get_curren
+ 
+ 
+ @api_router.post('/purchase-orders/{order_id}/generate-batches')
++@serialized_stock_write(lambda: db)
+ async def generate_batches_from_order(order_id: str, req: GenerateBatchesRequest, current_user=Depends(get_current_user)):
+     """
+     'Soltar lotes' de todas as matérias-primas do pedido de uma só vez.
+@@ -3824,50 +3772,50 @@ async def generate_batches_from_order(order_id: str, req: GenerateBatchesRequest
      automático sequencial; o lote do fornecedor e a validade são informados manualmente.
      """
      require_pedidos_access(current_user)
@@ -1160,7 +1334,7 @@ index 09394248665bb27aa58883fe69f7fdd2338ba7c3..2ad986f5d38316eef0e96203de2192ad
      return {'created': created, 'count': len(created)}
  
  
-@@ -4255,4 +4125,4 @@ logger = logging.getLogger(__name__)
+@@ -4255,4 +4203,4 @@ logger = logging.getLogger(__name__)
  
  @app.on_event("shutdown")
  async def shutdown_db_client():
@@ -1169,10 +1343,10 @@ index 09394248665bb27aa58883fe69f7fdd2338ba7c3..2ad986f5d38316eef0e96203de2192ad
 +    client.close()
 diff --git a/backend/stock.py b/backend/stock.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..5c85bb9b8188775c0d8e554e1153d54ee3c9830e
+index 0000000000000000000000000000000000000000..48e2cc30c2d621cd6c32b86221a7e79052cbb0df
 --- /dev/null
 +++ b/backend/stock.py
-@@ -0,0 +1,318 @@
+@@ -0,0 +1,322 @@
 +"""Movimentos de estoque, sem migração ou recálculo automático de dados antigos.
 +
 +Receitas guardam a quantidade TOTAL para ``expected_liters``. Lotes de MP
@@ -1287,6 +1461,7 @@ index 0000000000000000000000000000000000000000..5c85bb9b8188775c0d8e554e1153d54e
 +                'expiry_date': batch.get('expiry_date', ''), 'quantity_used': take,
 +                'previous_quantity': batch['quantity'],
 +                'remaining_after': round(float(batch['quantity']) - take, 6),
++                'stock_count_id': material.get('last_physical_count_id'),
 +            })
 +            remaining = quantity(Decimal(str(remaining)) - Decimal(str(take)))
 +        plans.append({
@@ -1367,12 +1542,15 @@ index 0000000000000000000000000000000000000000..5c85bb9b8188775c0d8e554e1153d54e
 +    plans = []
 +    for usage in usages:
 +        material_id = usage['raw_material_id']
-+        if not await db.raw_materials.find_one({'id': material_id, 'deleted': {'$ne': True}}):
++        material = await db.raw_materials.find_one({'id': material_id, 'deleted': {'$ne': True}})
++        if not material:
 +            raise ValueError('Matéria-prima excluída; restaure seu cadastro antes de devolver o estoque')
 +        rows = []
 +        for allocation in usage.get('batches_consumed') or []:
 +            amount = quantity(allocation.get('quantity_used', 0))
 +            if amount > 0:
++                if material.get('last_physical_count_id') and allocation.get('stock_count_id') != material['last_physical_count_id']:
++                    raise ValueError('Este consumo é anterior à última contagem física. Confira a movimentação antes de devolver estoque antigo')
 +                query = await _return_lot(db, allocation, material_id)
 +                rows.append((query, amount))
 +        plans.append((material_id, rows))
@@ -1491,12 +1669,252 @@ index 0000000000000000000000000000000000000000..5c85bb9b8188775c0d8e554e1153d54e
 +    return {'read_only': True, 'materials': rows, 'total_materials_checked': len(rows),
 +            'total_with_issues': sum(bool(row['issues']) for row in rows),
 +            'message': 'Conferência sem alterar saldos. Divergências antigas exigem conferir movimentações ou contagem física.'}
+diff --git a/backend/stock_control.py b/backend/stock_control.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..1dd9b44b54156ba92873574e228c5d43788d1877
+--- /dev/null
++++ b/backend/stock_control.py
+@@ -0,0 +1,62 @@
++"""Exclusão mútua das movimentações entre processos, sem depender de replica set."""
++from contextlib import asynccontextmanager
++from contextvars import ContextVar
++from datetime import datetime, timezone
++from functools import wraps
++from uuid import uuid4
++
++from fastapi import HTTPException
++from pymongo.errors import DuplicateKeyError
++
++
++_active = ContextVar('stock_write_control', default=None)
++
++
++def current_stock_operation():
++    return _active.get()
++
++
++@asynccontextmanager
++async def stock_write_lock(db):
++    current = _active.get()
++    if current is not None and current['db'] is db:
++        yield
++        return
++    owner = str(uuid4())
++    try:
++        await db.stock_control.update_one(
++            {'_id': 'inventory', 'owner': None},
++            {'$set': {'owner': owner, 'started_at': datetime.now(timezone.utc).isoformat()},
++             '$setOnInsert': {'revision': 0}}, upsert=True,
++        )
++    except DuplicateKeyError:
++        raise HTTPException(status_code=409, detail='Há uma movimentação de estoque em andamento ou pendente de conferência. Aguarde; se persistir, confira a última operação')
++    state = {'db': db, 'owner': owner, 'retain': False}
++    token = _active.set(state)
++    try:
++        yield
++    except Exception as exc:
++        # Falhas de validação são controladas. Numa falha inesperada de banco,
++        # manter o bloqueio impede repetir créditos até conferir a operação.
++        if not isinstance(exc, (HTTPException, ValueError)):
++            state['retain'] = True
++        raise
++    finally:
++        try:
++            if not state['retain']:
++                await db.stock_control.update_one(
++                    {'_id': 'inventory', 'owner': owner},
++                    {'$set': {'owner': None}, '$inc': {'revision': 1}},
++                )
++        finally:
++            _active.reset(token)
++
++
++def serialized_stock_write(get_db):
++    def decorate(function):
++        @wraps(function)
++        async def wrapped(*args, **kwargs):
++            async with stock_write_lock(get_db()):
++                return await function(*args, **kwargs)
++        return wrapped
++    return decorate
+diff --git a/backend/stock_counts.py b/backend/stock_counts.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..50a0939ba821a44ee349465cf6c490f1f509eb7a
+--- /dev/null
++++ b/backend/stock_counts.py
+@@ -0,0 +1,166 @@
++"""Contagem física explícita com prévia, controle de versão e histórico."""
++from datetime import datetime, timezone
++from hashlib import sha256
++import json
++from uuid import uuid4
++
++from fastapi import HTTPException
++
++from stock import quantity
++from stock_control import current_stock_operation
++
++
++def digest(data):
++    return sha256(json.dumps(data, sort_keys=True, ensure_ascii=False, default=str).encode()).hexdigest()
++
++
++async def snapshot(db, material_id):
++    first = await db.stock_control.find_one({'_id': 'inventory'}) or {}
++    operation = current_stock_operation()
++    own_owner = operation['owner'] if operation and operation['db'] is db else None
++    if first.get('owner') is not None and first['owner'] != own_owner:
++        raise HTTPException(status_code=409, detail='Aguarde a movimentação de estoque terminar antes de conferir a contagem')
++    material = await db.raw_materials.find_one({'id': material_id, 'deleted': False}, {'_id': 0})
++    if not material:
++        raise HTTPException(status_code=404, detail='Matéria-prima não encontrada')
++    lots = await db.raw_material_batches.find(
++        {'raw_material_id': material_id, 'deleted': {'$ne': True}}, {'_id': 0},
++    ).sort([('date', -1), ('created_at', -1), ('id', -1)]).to_list(None)
++    if any(lot.get('_stock_operation') for lot in lots):
++        raise HTTPException(status_code=409, detail='Existe um lote com movimentação pendente. Confira essa operação antes de ajustar')
++    last = await db.stock_control.find_one({'_id': 'inventory'}) or {}
++    if last.get('revision', 0) != first.get('revision', 0) or last.get('owner') != first.get('owner'):
++        raise HTTPException(status_code=409, detail='O estoque mudou durante a consulta. Confira novamente')
++    version = digest({'material': material, 'lots': lots, 'revision': last.get('revision', 0)})
++    return material, lots, version
++
++
++def make_plan(material, all_lots, counted_stock, lot_counts=None):
++    counted = quantity(counted_stock)
++    lots = [lot for lot in all_lots if lot.get('status') == 'em_aberto']
++    if lot_counts is None:
++        values = {lot['id']: quantity(max(float(lot.get('quantity', 0)), 0)) for lot in lots}
++        excess = max(round(sum(values.values()) - counted, 6), 0)
++        # A sugestão fica visível e editável antes de confirmar: diminuir os
++        # lotes mais recentes primeiro segue a mesma ordem de consumo LIFO.
++        for lot in lots:
++            removed = min(values[lot['id']], excess)
++            values[lot['id']] = round(values[lot['id']] - removed, 6)
++            excess = round(excess - removed, 6)
++    else:
++        if len(lot_counts) != len(lots) or {row['batch_id'] for row in lot_counts} != {lot['id'] for lot in lots}:
++            raise ValueError('A lista de lotes mudou ou contém itens repetidos. Gere outra prévia')
++        values = {row['batch_id']: quantity(row['quantity']) for row in lot_counts}
++    allocated = round(sum(values.values()), 6)
++    if allocated > counted:
++        raise ValueError('A soma das quantidades dos lotes excede o saldo contado')
++    changes = [{
++        'batch_id': lot['id'], 'batch_number': lot.get('batch_number', ''),
++        'supplier_batch_number': lot.get('supplier_batch_number', ''),
++        'before': float(lot.get('quantity', 0)), 'after': values[lot['id']],
++    } for lot in lots]
++    before_lots = round(sum(float(lot.get('quantity', 0)) for lot in lots), 6)
++    return {
++        'raw_material_id': material['id'], 'name': material.get('name', ''), 'unit': material['type'],
++        'before_total': float(material.get('total_stock', 0)), 'before_lots_total': before_lots,
++        'counted_stock': counted, 'difference': round(counted - float(material.get('total_stock', 0)), 6),
++        'lot_changes': changes, 'unassigned_quantity': round(counted - allocated, 6),
++    }
++
++
++async def preview_count(db, material_id, counted_stock):
++    material, lots, version = await snapshot(db, material_id)
++    return {**make_plan(material, lots, counted_stock), 'expected_version': version, 'read_only': True}
++
++
++def public_count(document):
++    fields = ('id', 'raw_material_id', 'name', 'unit', 'before_total', 'before_lots_total',
++              'counted_stock', 'difference', 'lot_changes', 'unassigned_quantity',
++              'reason', 'created_at', 'created_by_name', 'created_by_email', 'status')
++    return {key: document.get(key) for key in fields}
++
++
++async def apply_count(db, material_id, counted_stock, reason, expected_version, request_id, lot_counts, user):
++    counted = quantity(counted_stock)
++    reason = reason.strip()
++    if len(reason) < 3:
++        raise ValueError('Informe o motivo da contagem')
++    signature = digest({'material_id': material_id, 'counted': counted, 'reason': reason,
++                        'version': expected_version, 'lot_counts': lot_counts, 'actor': user['id']})
++    old = await db.stock_counts.find_one({'_id': request_id})
++    if old:
++        if old.get('status') == 'applied' and old.get('request_signature') == signature:
++            return public_count(old)
++        raise HTTPException(status_code=409, detail='Esta confirmação já foi usada. Gere uma nova prévia')
++    material, all_lots, version = await snapshot(db, material_id)
++    if version != expected_version:
++        raise HTTPException(status_code=409, detail='Houve movimentação desde a prévia. Confira o saldo e gere outra prévia antes de confirmar')
++    plan = make_plan(material, all_lots, counted, lot_counts)
++    lots = {lot['id']: lot for lot in all_lots if lot.get('status') == 'em_aberto'}
++    now = datetime.now(timezone.utc).isoformat()
++    journal = {**plan, '_id': request_id, 'id': request_id, 'status': 'pending',
++               'reason': reason, 'created_at': now, 'created_by': user['id'],
++               'created_by_name': user.get('name', ''), 'created_by_email': user.get('email', ''),
++               'request_signature': signature, 'before_material': material,
++               'before_batches': list(lots.values())}
++    # O histórico pendente preserva os valores anteriores antes de qualquer ajuste.
++    await db.stock_counts.insert_one(journal)
++    touched = []
++    adjustment_id = None
++    material_touched = False
++    try:
++        for change in plan['lot_changes']:
++            touched.append(change['batch_id'])
++            result = await db.raw_material_batches.update_one(
++                {'id': change['batch_id'], 'quantity': change['before'], 'status': 'em_aberto'},
++                {'$set': {'quantity': change['after'],
++                          'status': 'em_aberto' if change['after'] > 0 else 'finalizado',
++                          'last_physical_count_id': request_id, 'stock_counted_at': now}},
++            )
++            if result.matched_count != 1:
++                raise ValueError('Um lote mudou durante a contagem. O ajuste foi cancelado')
++        if plan['unassigned_quantity'] > 0:
++            adjustment_id = str(uuid4())
++            await db.raw_material_batches.insert_one({
++                'id': adjustment_id, 'raw_material_id': material_id,
++                'batch_number': f'AJUSTE-{now[:10].replace("-", "")}-{request_id[:8].upper()}',
++                'date': now[:10], 'quantity': plan['unassigned_quantity'], 'status': 'em_aberto',
++                'supplier_batch_number': '', 'expiry_date': '', 'created_at': now, 'deleted': False,
++                'is_inventory_adjustment': True, 'stock_count_id': request_id,
++                'last_physical_count_id': request_id,
++            })
++        material_touched = True
++        result = await db.raw_materials.update_one(
++            {'id': material_id, 'deleted': False},
++            {'$set': {'total_stock': counted, 'last_physical_count_id': request_id, 'stock_counted_at': now}},
++        )
++        if result.matched_count != 1:
++            raise ValueError('A matéria-prima mudou durante a contagem')
++        await db.stock_counts.update_one({'_id': request_id}, {'$set': {'status': 'applied', 'adjustment_batch_id': adjustment_id}})
++    except Exception:
++        try:
++            if adjustment_id:
++                await db.raw_material_batches.delete_one({'id': adjustment_id, 'stock_count_id': request_id})
++            for batch_id in reversed(touched):
++                restored = await db.raw_material_batches.replace_one(
++                    {'id': batch_id, 'last_physical_count_id': request_id}, lots[batch_id])
++                if restored.matched_count != 1:
++                    current = await db.raw_material_batches.find_one({'id': batch_id}, {'_id': 0})
++                    if current != lots[batch_id]:
++                        raise RuntimeError('Saldo do lote exige conferência antes de liberar novas movimentações')
++            if material_touched:
++                restored = await db.raw_materials.replace_one(
++                    {'id': material_id, 'last_physical_count_id': request_id}, material)
++                if restored.matched_count != 1:
++                    current = await db.raw_materials.find_one({'id': material_id}, {'_id': 0})
++                    if current != material:
++                        raise RuntimeError('Saldo da matéria-prima exige conferência antes de liberar novas movimentações')
++            await db.stock_counts.update_one({'_id': request_id}, {'$set': {'status': 'failed'}})
++        except Exception:
++            operation = current_stock_operation()
++            if operation:
++                operation['retain'] = True
++            raise
++        raise
++    journal['status'] = 'applied'
++    return public_count(journal)
 diff --git a/backend/unit_tests/test_stock.py b/backend/unit_tests/test_stock.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..73b975f129af72ce8c74cef15d51ec9f4f951700
+index 0000000000000000000000000000000000000000..bf3fefa13198c978f89d9b3e20c5e800f9076d5f
 --- /dev/null
 +++ b/backend/unit_tests/test_stock.py
-@@ -0,0 +1,419 @@
+@@ -0,0 +1,614 @@
 +"""Regressões offline: nenhuma conexão com MongoDB ou URL publicada.
 +
 +Instale mongomock==4.3.0 além das dependências do backend e execute:
@@ -1507,6 +1925,7 @@ index 0000000000000000000000000000000000000000..73b975f129af72ce8c74cef15d51ec9f
 +import os
 +import sys
 +import unittest
++from uuid import uuid4
 +from pathlib import Path
 +from unittest.mock import patch
 +
@@ -1547,7 +1966,7 @@ index 0000000000000000000000000000000000000000..73b975f129af72ce8c74cef15d51ec9f
 +    def __getattr__(self, method):
 +        async def call(*args, **kwargs):
 +            await asyncio.sleep(0)  # permite testar requisições concorrentes
-+            if method.startswith(('insert', 'update', 'delete')):
++            if method.startswith(('insert', 'update', 'delete', 'replace')):
 +                self.db.writes += 1
 +                failure = self.db.failures.pop((self.name, method), None)
 +                if failure:
@@ -1914,6 +2333,200 @@ index 0000000000000000000000000000000000000000..73b975f129af72ce8c74cef15d51ec9f
 +        self.assertEqual(self.stock(), 5.5)
 +
 +
++class PhysicalCountTests(unittest.TestCase):
++    stock = RouteTests.stock
++    make_product_batch = RouteTests.make_product_batch
++
++    def setUp(self):
++        fixture()
++        server.app.dependency_overrides[server.get_current_user] = lambda: USER
++        self.client = TestClient(server.app)
++
++    def tearDown(self):
++        self.client.close()
++        server.app.dependency_overrides.clear()
++
++    def prepare(self, amount):
++        response = self.client.post('/api/raw-materials/base/physical-count/preview', json={'counted_stock': amount})
++        self.assertEqual(response.status_code, 200, response.text)
++        data = response.json()
++        return data, {'counted_stock': amount, 'reason': 'Contagem física offline',
++            'expected_version': data['expected_version'], 'request_id': str(uuid4()), 'confirmed': True,
++            'lot_counts': [{'batch_id': row['batch_id'], 'quantity': row['after']} for row in data['lot_changes']]}
++
++    def confirm(self, payload):
++        return self.client.post('/api/raw-materials/base/physical-count', json=payload)
++
++    def test_preview_is_read_only_even_for_four_thousand(self):
++        DB.store.raw_materials.update_one({'id': 'base'}, {'$set': {'total_stock': 4000}})
++        before = deepcopy(list(DB.store.raw_material_batches.find()))
++        writes = DB.writes
++        preview, _ = self.prepare(100)
++        self.assertEqual(preview['before_total'], 4000)
++        self.assertEqual(preview['unassigned_quantity'], 90)
++        self.assertTrue(preview['read_only'])
++        self.assertEqual(DB.writes, writes)
++        self.assertEqual(self.stock(), 4000)
++        self.assertEqual(list(DB.store.raw_material_batches.find()), before)
++
++    def test_physical_count_aligns_total_and_lots_and_preserves_history(self):
++        DB.store.raw_materials.update_one({'id': 'base'}, {'$set': {'total_stock': 4000}})
++        DB.store.raw_material_batches.update_one({'id': 'input'}, {'$set': {'quantity': 100}})
++        _, payload = self.prepare(50)
++        response = self.confirm(payload)
++        self.assertEqual(response.status_code, 200, response.text)
++        self.assertEqual(self.stock(), 50)
++        self.assertEqual(DB.store.raw_material_batches.find_one({'id': 'input'})['quantity'], 50)
++        journal = DB.store.stock_counts.find_one({'id': payload['request_id']})
++        self.assertEqual(journal['before_total'], 4000)
++        self.assertEqual(journal['before_batches'][0]['quantity'], 100)
++        self.assertEqual(journal['created_by_email'], USER['email'])
++        self.assertEqual(journal['status'], 'applied')
++        self.assertEqual(DB.store.products.count_documents({}), 1)
++        self.assertEqual(DB.store.raw_materials.find_one({'id': 'base'})['name'], 'Base LRC')
++
++    def test_count_then_receipt_then_production_follows_real_baseline(self):
++        _, payload = self.prepare(100)
++        self.assertEqual(self.confirm(payload).status_code, 200)
++        receipt = self.client.post('/api/raw-material-batches', json={'raw_material_id': 'base', 'date': '2026-10-27', 'quantity': 50})
++        self.assertEqual(receipt.status_code, 200, receipt.text)
++        self.assertEqual(self.stock(), 150)
++        self.make_product_batch(200)
++        self.assertEqual(self.stock(), 141)
++        balance = sum(b['quantity'] for b in DB.store.raw_material_batches.find({'status': 'em_aberto', 'deleted': False}))
++        self.assertEqual(balance, 141)
++
++    def test_duplicate_confirmation_is_idempotent(self):
++        _, payload = self.prepare(100)
++        first = self.confirm(payload)
++        second = self.confirm(payload)
++        self.assertEqual(first.status_code, 200, first.text)
++        self.assertEqual(second.status_code, 200, second.text)
++        self.assertEqual(first.json()['id'], second.json()['id'])
++        self.assertEqual(self.stock(), 100)
++        self.assertEqual(DB.store.stock_counts.count_documents({}), 1)
++        self.assertEqual(DB.store.raw_material_batches.count_documents({'is_inventory_adjustment': True}), 1)
++
++    def test_stale_preview_rejects_instead_of_overwriting_new_receipt(self):
++        _, payload = self.prepare(100)
++        receipt = self.client.post('/api/raw-material-batches', json={'raw_material_id': 'base', 'date': '2026-10-27', 'quantity': 20})
++        self.assertEqual(receipt.status_code, 200)
++        response = self.confirm(payload)
++        self.assertEqual(response.status_code, 409, response.text)
++        self.assertEqual(self.stock(), 30)
++        self.assertEqual(DB.store.stock_counts.count_documents({}), 0)
++
++    def test_zero_count_closes_available_lots_without_deleting_them(self):
++        _, payload = self.prepare(0)
++        self.assertEqual(self.confirm(payload).status_code, 200)
++        self.assertEqual(self.stock(), 0)
++        lot = DB.store.raw_material_batches.find_one({'id': 'input'})
++        self.assertEqual(lot['quantity'], 0)
++        self.assertEqual(lot['status'], 'finalizado')
++        self.assertFalse(lot['deleted'])
++
++    def test_operator_can_choose_physical_distribution_per_lot(self):
++        DB.store.raw_material_batches.insert_one({'id': 'other', 'raw_material_id': 'base', 'batch_number': '2610002',
++            'date': '2026-10-20', 'quantity': 4, 'status': 'em_aberto', 'created_at': '2026-10-20', 'deleted': False})
++        _, payload = self.prepare(5)
++        payload['lot_counts'] = [{'batch_id': 'input', 'quantity': 2}, {'batch_id': 'other', 'quantity': 3}]
++        response = self.confirm(payload)
++        self.assertEqual(response.status_code, 200, response.text)
++        self.assertEqual(DB.store.raw_material_batches.find_one({'id': 'input'})['quantity'], 2)
++        self.assertEqual(DB.store.raw_material_batches.find_one({'id': 'other'})['quantity'], 3)
++        self.assertEqual(self.stock(), 5)
++
++    def test_invalid_distribution_does_not_write_count_or_stock(self):
++        _, payload = self.prepare(5)
++        payload['lot_counts'][0]['quantity'] = 6
++        response = self.confirm(payload)
++        self.assertEqual(response.status_code, 400, response.text)
++        self.assertEqual(self.stock(), 10)
++        self.assertEqual(DB.store.stock_counts.count_documents({}), 0)
++
++    def test_count_requires_explicit_confirmation(self):
++        _, payload = self.prepare(5)
++        payload['confirmed'] = False
++        self.assertEqual(self.confirm(payload).status_code, 400)
++        self.assertEqual(self.stock(), 10)
++        self.assertEqual(DB.store.stock_counts.count_documents({}), 0)
++
++    def test_unauthorized_and_anonymous_users_cannot_count(self):
++        _, payload = self.prepare(5)
++        server.app.dependency_overrides[server.get_current_user] = lambda: {'id': 'operator', 'email': 'operator@example.test'}
++        self.assertEqual(self.confirm(payload).status_code, 403)
++        self.assertEqual(self.client.post('/api/raw-materials/base/physical-count/preview', json={'counted_stock': 5}).status_code, 403)
++        server.app.dependency_overrides.clear()
++        self.assertIn(self.confirm(payload).status_code, (401, 403))
++        self.assertEqual(self.stock(), 10)
++
++    def test_failed_count_restores_balances_and_keeps_audit(self):
++        _, payload = self.prepare(5)
++        DB.failures[('raw_materials', 'update_one')] = RuntimeError('simulated failure during count')
++        with self.assertRaises(RuntimeError):
++            self.confirm(payload)
++        self.assertEqual(self.stock(), 10)
++        self.assertEqual(DB.store.raw_material_batches.find_one({'id': 'input'})['quantity'], 10)
++        self.assertEqual(DB.store.stock_counts.find_one({'id': payload['request_id']})['status'], 'failed')
++        self.assertTrue(DB.store.stock_control.find_one({'_id': 'inventory'})['owner'])
++
++    def test_old_cancellation_cannot_inflate_new_physical_balance(self):
++        old_batch = self.make_product_batch()
++        _, payload = self.prepare(5.5)
++        self.assertEqual(self.confirm(payload).status_code, 200)
++        response = self.client.delete('/api/product-batches/' + old_batch['id'])
++        self.assertEqual(response.status_code, 409, response.text)
++        self.assertEqual(self.stock(), 5.5)
++        new_batch = self.make_product_batch()
++        self.assertEqual(self.stock(), 1)
++        self.assertEqual(self.client.delete('/api/product-batches/' + new_batch['id']).status_code, 200)
++        self.assertEqual(self.stock(), 5.5)
++
++    def test_old_trash_receipt_cannot_be_added_after_count(self):
++        self.assertEqual(self.client.delete('/api/raw-material-batches/input').status_code, 200)
++        trash = DB.store.trash.find_one({'item_type': 'raw_material_batch'})
++        _, payload = self.prepare(0)
++        self.assertEqual(self.confirm(payload).status_code, 200)
++        response = self.client.post('/api/trash/restore/' + trash['id'])
++        self.assertEqual(response.status_code, 409, response.text)
++        self.assertEqual(self.stock(), 0)
++
++    def test_adjustment_lot_does_not_reset_receipt_numbering(self):
++        _, payload = self.prepare(100)
++        self.assertEqual(self.confirm(payload).status_code, 200)
++        response = self.client.get('/api/batches/next-number?date=2026-10-27')
++        self.assertEqual(response.status_code, 200)
++        self.assertEqual(response.json()['batch_number'], '2610002')
++
++    def test_pending_operation_blocks_new_count_preview(self):
++        _, payload = self.prepare(5)
++        DB.store.stock_control.insert_one({'_id': 'inventory', 'owner': 'another-process', 'revision': 0})
++        response = self.client.post('/api/raw-materials/base/physical-count/preview', json={'counted_stock': 5})
++        self.assertEqual(response.status_code, 409, response.text)
++        self.assertEqual(self.confirm(payload).status_code, 409)
++        self.assertEqual(self.stock(), 10)
++
++    def test_count_can_establish_balance_when_old_total_has_no_lots(self):
++        DB.store.raw_material_batches.delete_many({})
++        DB.store.raw_materials.update_one({'id': 'base'}, {'$set': {'total_stock': 4000}})
++        preview, payload = self.prepare(100)
++        self.assertEqual(preview['lot_changes'], [])
++        self.assertEqual(self.confirm(payload).status_code, 200)
++        self.make_product_batch(200)
++        self.assertEqual(self.stock(), 91)
++
++    def test_receipt_after_count_can_be_deleted_and_restored(self):
++        _, payload = self.prepare(100)
++        self.assertEqual(self.confirm(payload).status_code, 200)
++        receipt = self.client.post('/api/raw-material-batches', json={'raw_material_id': 'base', 'date': '2026-10-27', 'quantity': 3})
++        self.assertEqual(receipt.status_code, 200)
++        self.assertEqual(self.client.delete('/api/raw-material-batches/' + receipt.json()['id']).status_code, 200)
++        self.assertEqual(self.stock(), 100)
++        trash = DB.store.trash.find_one({'item_type': 'raw_material_batch'})
++        self.assertEqual(self.client.post('/api/trash/restore/' + trash['id']).status_code, 200)
++        self.assertEqual(self.stock(), 103)
++
++
 +if __name__ == '__main__':
 +    unittest.main()
 diff --git a/frontend/src/App.js b/frontend/src/App.js
@@ -1950,6 +2563,155 @@ index 9ef36e868d362d65a99ef83e62fee564232a8ee5..9072715fd390892241ae13c2990987f1
      if (!item.roles.includes(role || 'producao')) return false;
      if (item.emailOnly && user?.email !== item.emailOnly) return false;
      if (item.emailAllowlist && !item.emailAllowlist.some((e) => e.toLowerCase() === (user?.email || '').toLowerCase())) return false;
+diff --git a/frontend/src/components/PhysicalStockCountDialog.js b/frontend/src/components/PhysicalStockCountDialog.js
+new file mode 100644
+index 0000000000000000000000000000000000000000..5e6d6af569fa9e02c06951b7dcd2839b8be5c7b6
+--- /dev/null
++++ b/frontend/src/components/PhysicalStockCountDialog.js
+@@ -0,0 +1,143 @@
++import React, { useEffect, useState } from 'react';
++import api from '../lib/api';
++import { Button } from './ui/button';
++import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
++import { Input } from './ui/input';
++import { Label } from './ui/label';
++import { Checkbox } from './ui/checkbox';
++import { Combobox } from './ui/combobox';
++import { toast } from 'sonner';
++
++const format = (value) => Number(value || 0).toLocaleString('pt-BR', { maximumFractionDigits: 6 });
++const errorMessage = (error) => typeof error.response?.data?.detail === 'string'
++  ? error.response.data.detail : 'Não foi possível concluir a contagem. Confira os dados e tente novamente.';
++
++export function PhysicalStockCountDialog({ open, onOpenChange, materials, onSaved }) {
++  const [materialId, setMaterialId] = useState('');
++  const [counted, setCounted] = useState('');
++  const [reason, setReason] = useState('Contagem física inicial');
++  const [preview, setPreview] = useState(null);
++  const [lotCounts, setLotCounts] = useState([]);
++  const [requestId, setRequestId] = useState('');
++  const [confirmed, setConfirmed] = useState(false);
++  const [busy, setBusy] = useState(false);
++  const [history, setHistory] = useState([]);
++  const material = materials.find(item => item.id === materialId);
++
++  useEffect(() => {
++    if (!open) return;
++    setMaterialId(''); setCounted(''); setPreview(null); setLotCounts([]);
++    setConfirmed(false); setHistory([]); setReason('Contagem física inicial');
++  }, [open]);
++
++  useEffect(() => {
++    setHistory([]);
++    if (!open || !materialId) return;
++    let active = true;
++    api.get(`/raw-materials/${materialId}/stock-counts`).then(response => {
++      if (active) setHistory(response.data);
++    }).catch(() => { if (active) toast.error('Não foi possível carregar o histórico de contagens'); });
++    return () => { active = false; };
++  }, [open, materialId]);
++
++  const clearPreview = () => { setPreview(null); setLotCounts([]); setConfirmed(false); };
++  const numericCount = counted === '' ? NaN : Number(counted);
++  const validCount = Number.isFinite(numericCount) && numericCount >= 0;
++  const allocated = lotCounts.reduce((sum, row) => sum + Number(row.quantity || 0), 0);
++  const unassigned = preview ? Math.round((preview.counted_stock - allocated) * 1e6) / 1e6 : 0;
++  const validLots = lotCounts.every(row => row.quantity !== '' && Number.isFinite(Number(row.quantity)) && Number(row.quantity) >= 0);
++
++  const prepare = async (event) => {
++    event.preventDefault();
++    if (!material || !validCount || reason.trim().length < 3 || busy) return;
++    setBusy(true); clearPreview();
++    try {
++      const response = await api.post(`/raw-materials/${materialId}/physical-count/preview`, { counted_stock: numericCount });
++      setPreview(response.data);
++      setLotCounts(response.data.lot_changes.map(row => ({ batch_id: row.batch_id, quantity: String(row.after) })));
++      setRequestId(crypto.randomUUID());
++    } catch (error) { toast.error(errorMessage(error)); }
++    finally { setBusy(false); }
++  };
++
++  const save = async () => {
++    if (busy || !confirmed || !preview || !validLots || unassigned < 0) return;
++    setBusy(true);
++    try {
++      const response = await api.post(`/raw-materials/${materialId}/physical-count`, {
++        counted_stock: preview.counted_stock, reason: reason.trim(),
++        expected_version: preview.expected_version, request_id: requestId,
++        lot_counts: lotCounts.map(row => ({ batch_id: row.batch_id, quantity: Number(row.quantity) })),
++        confirmed: true,
++      });
++      setHistory(previous => [response.data, ...previous.filter(item => item.id !== response.data.id)]);
++      clearPreview(); setCounted('');
++      toast.success(`Contagem registrada: ${format(response.data.counted_stock)} ${response.data.unit}`);
++      await onSaved();
++    } catch (error) {
++      toast.error(errorMessage(error));
++      if ([400, 409].includes(error.response?.status)) clearPreview();
++      if (error.response?.status === 409) { setCounted(''); await onSaved(); }
++      // Em erro de rede, manter a mesma chave de confirmação para que uma
++      // repetição consulte o ajuste já salvo em vez de gravá-lo de novo.
++    } finally { setBusy(false); }
++  };
++
++  return <Dialog open={open} onOpenChange={next => { if (!busy) onOpenChange(next); }}>
++    <DialogContent className="bg-card border-border max-w-3xl max-h-[90vh] overflow-y-auto" data-testid="physical-stock-count-dialog">
++      <DialogHeader><DialogTitle>Contagem física de matéria-prima</DialogTitle></DialogHeader>
++      <p className="text-sm text-muted-foreground">Informe o saldo disponível que você contou. Esta é uma correção do saldo atual, não um novo recebimento. Combine uma pausa nos lançamentos de entrada e produção enquanto conta; retome depois de confirmar o ajuste.</p>
++      <form onSubmit={prepare} className="space-y-4">
++        <fieldset disabled={busy} className="space-y-4">
++          <div><Label>Matéria-prima</Label>
++            <Combobox options={materials.map(item => ({ value: item.id, label: `${item.name} (${item.type})` }))}
++              value={materialId} onChange={value => { setMaterialId(value); setCounted(''); clearPreview(); }} placeholder="Selecione a matéria-prima" searchPlaceholder="Pesquisar matéria-prima" />
++          </div>
++          {material && <p className="text-sm">Saldo cadastrado: <strong>{format(material.total_stock)} {material.type}</strong></p>}
++          <div><Label htmlFor="physical-count-value">Saldo contado {material ? `(${material.type})` : ''}</Label>
++            <Input id="physical-count-value" type="number" min="0" step="0.000001" required value={counted}
++              onChange={event => { setCounted(event.target.value); clearPreview(); }} placeholder="Ex.: 100" />
++          </div>
++          <div><Label htmlFor="physical-count-reason">Motivo</Label>
++            <Input id="physical-count-reason" value={reason} minLength={3} maxLength={500} required
++              onChange={event => { setReason(event.target.value); setConfirmed(false); }} />
++          </div>
++          <Button type="submit" disabled={busy || !material || !validCount || reason.trim().length < 3}>{busy ? 'Aguarde...' : 'Conferir ajuste'}</Button>
++        </fieldset>
++      </form>
++      {preview && <div className="space-y-4 border-t border-border pt-4" data-testid="physical-count-preview">
++        <div className="grid grid-cols-3 gap-3 text-sm">
++          <div>Cadastrado<strong className="block">{format(preview.before_total)} {preview.unit}</strong></div>
++          <div>Nos lotes<strong className="block">{format(preview.before_lots_total)} {preview.unit}</strong></div>
++          <div>Após confirmar<strong className="block">{format(preview.counted_stock)} {preview.unit}</strong></div>
++        </div>
++        <p className="text-sm text-muted-foreground">Confira como o saldo ficará distribuído entre os lotes. Você pode corrigir cada quantidade abaixo. A sugestão reduz os lotes mais recentes primeiro; confirme conforme o que você encontrou fisicamente.</p>
++        {preview.lot_changes.length > 0 && <div className="overflow-x-auto max-h-64"><table className="w-full text-sm text-left">
++          <thead><tr><th className="p-2">Lote interno / fornecedor</th><th className="p-2">Antes</th><th className="p-2">Contado no lote</th></tr></thead>
++          <tbody>{preview.lot_changes.map((lot, index) => <tr key={lot.batch_id} className="border-t border-border">
++            <td className="p-2">{lot.batch_number}{lot.supplier_batch_number && <span className="block text-xs text-muted-foreground">{lot.supplier_batch_number}</span>}</td>
++            <td className="p-2">{format(lot.before)} {preview.unit}</td>
++            <td className="p-2"><Input type="number" min="0" step="0.000001" disabled={busy} aria-label={`Saldo contado do lote ${lot.batch_number}`}
++              value={lotCounts[index]?.quantity ?? ''} onChange={event => {
++                setLotCounts(previous => previous.map((row, rowIndex) => rowIndex === index ? { ...row, quantity: event.target.value } : row)); setConfirmed(false);
++              }} /></td>
++          </tr>)}</tbody>
++        </table></div>}
++        {unassigned > 0 && <p className="text-sm">{format(unassigned)} {preview.unit} ficarão identificados em um lote de ajuste por contagem, sem fornecedor atribuído. Se souber a quais lotes esse saldo pertence, ajuste as linhas acima.</p>}
++        {(unassigned < 0 || !validLots) && <p role="alert" className="text-sm text-red-600">As quantidades por lote precisam ser válidas e não podem somar mais que o saldo contado.</p>}
++        <div className="flex items-start gap-2">
++          <Checkbox id="physical-count-confirm" checked={confirmed} disabled={busy} onCheckedChange={value => setConfirmed(value === true)} />
++          <Label htmlFor="physical-count-confirm" className="text-sm leading-relaxed">Conferi o saldo de {format(preview.counted_stock)} {preview.unit} e sua distribuição nos lotes. Quero registrar esse ajuste, preservando os valores anteriores no histórico.</Label>
++        </div>
++        <Button type="button" onClick={save} disabled={busy || !confirmed || !validLots || unassigned < 0}>{busy ? 'Registrando...' : 'Confirmar contagem física'}</Button>
++      </div>}
++      {history.length > 0 && <section className="border-t border-border pt-4 space-y-2">
++        <h3 className="font-semibold">Últimas contagens</h3>
++        {history.map(item => <div key={item.id} className="text-sm border border-border rounded-md p-3">
++          <p>{format(item.before_total)} → <strong>{format(item.counted_stock)} {item.unit}</strong> · {item.status === 'applied' ? 'Registrada' : item.status === 'failed' ? 'Não aplicada' : 'Pendente de conferência'}</p>
++          <p className="text-muted-foreground">{item.reason} · {item.created_by_name || item.created_by_email} · {new Date(item.created_at).toLocaleString('pt-BR')}</p>
++        </div>)}
++      </section>}
++    </DialogContent>
++  </Dialog>;
++}
 diff --git a/frontend/src/context/AuthContext.js b/frontend/src/context/AuthContext.js
 index d76a81b9a9d571559832c2436ed632ac6be3d983..dff0a9969cf0d0456b07a6559587e2ae7cf5ceb9 100644
 --- a/frontend/src/context/AuthContext.js
@@ -2099,19 +2861,28 @@ index 3409f26226f5883613452820ce8ce6cb1c023bd8..a95b7353042657970c73a3778d157fb6
      } finally {
        if (isMountedRef.current) {
 diff --git a/frontend/src/pages/RawMaterials.js b/frontend/src/pages/RawMaterials.js
-index f5b1dde4350438634a14c0e46554243820482625..b4807ee29b6173fde8009f325f208c2e0e6bf314 100644
+index f5b1dde4350438634a14c0e46554243820482625..66d59d17393651d5e6ec9fa0650cacca74864266 100644
 --- a/frontend/src/pages/RawMaterials.js
 +++ b/frontend/src/pages/RawMaterials.js
-@@ -58,6 +58,8 @@ export const RawMaterials = () => {
+@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
+ import { Combobox } from '../components/ui/combobox';
+ import { Checkbox } from '../components/ui/checkbox';
+ import { toast } from 'sonner';
++import { PhysicalStockCountDialog } from '../components/PhysicalStockCountDialog';
+ import { Plus, Edit, Trash2, Boxes, Package, Search, Printer, RefreshCw, AlertTriangle, ShieldCheck } from 'lucide-react';
+ 
+ export const RawMaterials = () => {
+@@ -58,6 +59,9 @@ export const RawMaterials = () => {
    const [nextBatchNumber, setNextBatchNumber] = useState('');
    const [editingBatchNumber, setEditingBatchNumber] = useState(false);
    const [recalculating, setRecalculating] = useState(false);
 +  const [stockAuditOpen, setStockAuditOpen] = useState(false);
 +  const [stockAudit, setStockAudit] = useState(null);
++  const [physicalCountOpen, setPhysicalCountOpen] = useState(false);
  
    useEffect(() => {
      isMountedRef.current = true;
-@@ -158,13 +160,13 @@ export const RawMaterials = () => {
+@@ -158,13 +162,13 @@ export const RawMaterials = () => {
      try {
        if (selectedMaterial) {
          await api.put(`/raw-materials/${selectedMaterial.id}`, {
@@ -2128,7 +2899,7 @@ index f5b1dde4350438634a14c0e46554243820482625..b4807ee29b6173fde8009f325f208c2e
          });
        }
        
-@@ -177,7 +179,7 @@ export const RawMaterials = () => {
+@@ -177,7 +181,7 @@ export const RawMaterials = () => {
        }
      } catch (error) {
        if (isMountedRef.current) {
@@ -2137,7 +2908,7 @@ index f5b1dde4350438634a14c0e46554243820482625..b4807ee29b6173fde8009f325f208c2e
        }
      } finally {
        if (isMountedRef.current) {
-@@ -219,7 +221,7 @@ export const RawMaterials = () => {
+@@ -219,7 +223,7 @@ export const RawMaterials = () => {
        }
      } catch (error) {
        if (isMountedRef.current) {
@@ -2146,7 +2917,7 @@ index f5b1dde4350438634a14c0e46554243820482625..b4807ee29b6173fde8009f325f208c2e
        }
      } finally {
        if (isMountedRef.current) {
-@@ -413,20 +415,11 @@ export const RawMaterials = () => {
+@@ -413,20 +417,11 @@ export const RawMaterials = () => {
    const handleRecalculateStock = async () => {
      setRecalculating(true);
      try {
@@ -2171,7 +2942,17 @@ index f5b1dde4350438634a14c0e46554243820482625..b4807ee29b6173fde8009f325f208c2e
      } finally {
        setRecalculating(false);
      }
-@@ -472,7 +465,7 @@ export const RawMaterials = () => {
+@@ -453,6 +448,9 @@ export const RawMaterials = () => {
+           <p className="text-lg text-muted-foreground">Gerencie o estoque de matérias-primas</p>
+         </div>
+         <div className="flex flex-wrap gap-3">
++          <Button variant="outline" onClick={() => setPhysicalCountOpen(true)} data-testid="physical-stock-count-button">
++            Contagem física
++          </Button>
+           {/* Botão Auditoria de Receitas */}
+           <Button 
+             variant="outline"
+@@ -472,7 +470,7 @@ export const RawMaterials = () => {
              data-testid="recalculate-stock-button"
            >
              <RefreshCw className={`w-4 h-4 mr-2 ${recalculating ? 'animate-spin' : ''}`} />
@@ -2180,7 +2961,7 @@ index f5b1dde4350438634a14c0e46554243820482625..b4807ee29b6173fde8009f325f208c2e
            </Button>
            {/* Botão Imprimir Etiquetas */}
            <Dialog open={printDialogOpen} onOpenChange={setPrintDialogOpen}>
-@@ -748,7 +741,8 @@ export const RawMaterials = () => {
+@@ -748,7 +746,8 @@ export const RawMaterials = () => {
                    </div>
                    <div>
                      <Label className="text-foreground">Estoque Total</Label>
@@ -2190,10 +2971,12 @@ index f5b1dde4350438634a14c0e46554243820482625..b4807ee29b6173fde8009f325f208c2e
                    </div>
                  </div>
                  <div>
-@@ -832,6 +826,29 @@ export const RawMaterials = () => {
+@@ -832,6 +831,31 @@ export const RawMaterials = () => {
        )}
  
        {/* Dialog: Auditoria de Receitas */}
++      <PhysicalStockCountDialog open={physicalCountOpen} onOpenChange={setPhysicalCountOpen} materials={materials}
++        onSaved={async () => { await Promise.all([fetchMaterials(), fetchBatches()]); setStockAudit(null); }} />
 +      <Dialog open={stockAuditOpen} onOpenChange={setStockAuditOpen}>
 +        <DialogContent className="bg-card border-border max-w-3xl max-h-[85vh] overflow-y-auto">
 +          <DialogHeader><DialogTitle>Conferência de estoque</DialogTitle></DialogHeader>
@@ -2220,7 +3003,7 @@ index f5b1dde4350438634a14c0e46554243820482625..b4807ee29b6173fde8009f325f208c2e
        <Dialog open={auditOpen} onOpenChange={setAuditOpen}>
          <DialogContent className="bg-card border-border max-w-3xl max-h-[85vh] overflow-y-auto">
            <DialogHeader>
-@@ -865,7 +882,7 @@ export const RawMaterials = () => {
+@@ -865,7 +889,7 @@ export const RawMaterials = () => {
                  <div className="py-8 text-center">
                    <ShieldCheck className="w-12 h-12 text-green-500 mx-auto mb-2" />
                    <p className="text-foreground font-semibold">Tudo certo!</p>
@@ -2229,3 +3012,10 @@ index f5b1dde4350438634a14c0e46554243820482625..b4807ee29b6173fde8009f325f208c2e
                  </div>
                ) : (
                  <>
+@@ -904,4 +928,4 @@ export const RawMaterials = () => {
+       </Dialog>
+     </div>
+   );
+-};
+\ No newline at end of file
++};
