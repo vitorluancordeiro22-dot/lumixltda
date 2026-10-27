@@ -13,6 +13,10 @@ substituir a aplicação por uma cópia antiga do GitHub.
 A melhoria da tela de pedidos no celular está em um
 [complemento separado](README-pedidos-mobile.md), aplicável antes da mesma republicação.
 
+**Se o lote foi bloqueado por “converter Kg para Litros”, aplique somente o
+[complemento da regra da receita](README-regra-receita.md).** O pacote completo
+abaixo já inclui essa regra para instalações novas.
+
 ## Escolha o pacote correto
 
 **Se já aplicou a correção de estoque e a liberação para todos, use somente o
@@ -58,7 +62,7 @@ status e os dados da liberação; não faz outra baixa de matéria-prima.
 
 - Novo lote de MP soma a quantidade recebida uma vez. Seu saldo restante fica no lote.
 - Novo lote de produto baixa a receita proporcional ao rendimento e combina itens repetidos.
-- Gramas/mL são convertidos para a unidade de estoque. Conversões entre massa e volume são rejeitadas sem densidade.
+- Gramas/mL mantêm as conversões de escala. Quando o rótulo legado do estoque diverge entre massa e volume, a baixa segue a base numérica da receita conforme a regra solicitada pela Lumix; confira os detalhes em [regra da receita](README-regra-receita.md).
 - A receita inteira é conferida antes da baixa. Falta de estoque em um ingrediente não deixa os outros parcialmente consumidos.
 - Baixas usam atualização condicional de saldo, evitando que requisições concorrentes sobrescrevam o consumo uma da outra.
 - Uma ordem de produção vinculada a um lote existente registra o trabalho, sem descontar novamente.
@@ -102,7 +106,7 @@ MongoDB standalone. Não limpar bloqueios automaticamente sem conferir o estado.
 
 ## Verificação realizada
 
-- 50 testes offline passaram, usando banco em memória e driver substituído antes de importar a aplicação.
+- 54 testes offline passaram, usando banco em memória e driver substituído antes de importar a aplicação.
 - Cobertura: entrada → produção → ordem sem segunda baixa; falta de ingrediente; cancelamento concorrente/repetido; restauração; edições; arquivo; recebimento duplicado; falhas de gravação; unidades; decimais; conferência sem escrita; contagem física com prévia, histórico, saldo por lote, confirmação repetida, falha compensada e bloqueio de devolução antiga; liberação por usuários fora da lista antiga com JWT real, bloqueio sem login e liberação concorrente.
 - Build de produção da interface concluído com sucesso.
 - O patch foi aplicado em uma cópia limpa da exportação e os quinze arquivos resultantes foram comparados byte a byte.
@@ -118,5 +122,5 @@ PYTHONPATH=backend python -m unittest discover -s backend/unit_tests -v
 SHA-256 de `lumix-stock-fix.patch`:
 
 ```text
-4a7e5e155130569b59d30667c8087709459e987cf0510b039270dd3e18255f27
+2d8be9eb7de9cf67721f85e120d94fb3a9dfb9729eb28660f2594c468903f7a5
 ```

@@ -1,0 +1,131 @@
+--- a/backend/stock.py
++++ b/backend/stock.py
+@@ -70,13 +70,31 @@
+ 
+ 
+ async def product_requirements(db, product, planned_quantity):
++    """Escala a receita; a unidade final do produto não participa da baixa.
++
++    Cadastros legados da Lumix têm rótulos de estoque em Litros para insumos
++    pesados em Kg. Por regra operacional, nesses casos o saldo numérico é
++    tratado na unidade-base da receita, sem conversão física massa/volume e
++    sem alterar o cadastro ou regravar saldos históricos.
++    """
+     rows = calculate_recipe_requirements(product, planned_quantity)
+     for row in rows:
+         material = await db.raw_materials.find_one({'id': row['raw_material_id'], 'deleted': {'$ne': True}}, {'_id': 0})
+         if not material:
+             raise ValueError(f'Matéria-prima {row["raw_material_id"]} inexistente ou excluída')
+-        row['quantity'] = convert_quantity(row['quantity'], row['unit'], material['type'])
+-        row['unit'] = material['type']
++        recipe_kind, _ = unit_info(row['unit'])
++        stock_kind, _ = unit_info(material['type'])
++        if recipe_kind == stock_kind:
++            row['quantity'] = convert_quantity(row['quantity'], row['unit'], material['type'])
++            row['unit'] = material['type']
++        else:
++            # O número disponível segue a receita; o rótulo antigo não obriga
++            # uma conversão Kg/L. g e ml continuam sendo escalas de Kg e L.
++            base_unit = 'Kg' if recipe_kind == 'mass' else 'Litros'
++            row['quantity'] = convert_quantity(row['quantity'], row['unit'], base_unit)
++            row['unit'] = base_unit
++            row['stock_quantity_basis'] = 'recipe'
++            row['stock_unit_label'] = material['type']
+         row['raw_material_name'] = material.get('name', '')
+     return rows
+ 
+@@ -119,6 +137,8 @@
+             'raw_material_id': row['raw_material_id'], 'raw_material_name': material.get('name', ''),
+             'quantity_needed': needed, 'unit': row['unit'], 'batches_consumed': allocations,
+         })
++        if row.get('stock_quantity_basis') == 'recipe':
++            plans[-1].update(stock_quantity_basis='recipe', stock_unit_label=row['stock_unit_label'])
+ 
+     applied, totals = [], []
+     try:
+--- a/backend/unit_tests/test_stock.py
++++ b/backend/unit_tests/test_stock.py
+@@ -161,14 +161,36 @@
+         self.assertEqual(self.db.store.raw_material_batches.find_one({'id': 'input'})['quantity'], 0)
+         self.assertAlmostEqual(self.db.store.raw_materials.find_one({'id': 'base'})['total_stock'], 0)
+ 
+-    async def test_ml_are_converted_to_liters_not_kilograms(self):
++    async def test_ml_scale_to_liters_even_with_legacy_stock_label(self):
+         product = {'expected_liters': 100, 'recipes': [{'raw_material_id': 'base', 'quantity_per_liter': 250, 'unit': 'ml'}]}
+         self.db.store.raw_materials.update_one({'id': 'base'}, {'$set': {'type': 'Litros'}})
+         rows = await product_requirements(self.db, product, 200)
+         self.assertEqual(rows[0]['quantity'], 0.5)
+         self.db.store.raw_materials.update_one({'id': 'base'}, {'$set': {'type': 'Kg'}})
+-        with self.assertRaisesRegex(ValueError, 'densidade'):
+-            await product_requirements(self.db, product, 200)
++        rows = await product_requirements(self.db, product, 200)
++        self.assertEqual(rows[0]['quantity'], 0.5)
++        self.assertEqual(rows[0]['unit'], 'Litros')
++        self.assertEqual(rows[0]['stock_quantity_basis'], 'recipe')
++        self.assertEqual(rows[0]['stock_unit_label'], 'Kg')
++
++    async def test_recipe_weight_is_authoritative_over_legacy_liter_label(self):
++        self.db.store.raw_materials.update_one({'id': 'base'}, {'$set': {'type': 'Litros'}})
++        product = {'unit': 'Litros', 'expected_liters': 150,
++                   'recipes': [{'raw_material_id': 'base', 'quantity_per_liter': 0.3, 'unit': 'Kg'}]}
++        for planned, expected in [(75, 0.15), (150, 0.3), (300, 0.6), (450, 0.9)]:
++            rows = await product_requirements(self.db, product, planned)
++            self.assertEqual(rows[0]['quantity'], expected)
++            self.assertEqual(rows[0]['unit'], 'Kg')
++        self.assertEqual(self.db.writes, 0)
++        self.assertEqual(self.db.store.raw_materials.find_one({'id': 'base'})['type'], 'Litros')
++
++    async def test_grams_keep_their_scale_when_stock_label_is_liters(self):
++        self.db.store.raw_materials.update_one({'id': 'base'}, {'$set': {'type': 'Litros'}})
++        product = {'expected_liters': 150,
++                   'recipes': [{'raw_material_id': 'base', 'quantity_per_liter': 300, 'unit': 'g'}]}
++        rows = await product_requirements(self.db, product, 300)
++        self.assertEqual(rows[0]['quantity'], 0.6)
++        self.assertEqual(rows[0]['unit'], 'Kg')
+ 
+     async def test_return_to_archived_lot_preserves_history(self):
+         usage = await consume_requirements(self.db, [{'raw_material_id': 'base', 'quantity': 10, 'unit': 'Kg'}])
+@@ -243,6 +265,43 @@
+             'unit': 'Litros', 'planned_liters': size})
+         self.assertEqual(response.status_code, 200, response.text)
+         return response.json()
++
++    def test_actual_flor_de_ameixa_recipe_doubles_all_five_ingredients(self):
++        ingredients = [('preservative', 0.3, 0.6), ('brancol', 0.25, 0.5),
++                       ('essence', 0.3, 0.6), ('renex', 0.3, 0.6), ('water', 148, 296)]
++        recipes = []
++        for material_id, amount, expected in ingredients:
++            DB.store.raw_materials.insert_one({'id': material_id, 'name': material_id, 'type': 'Litros',
++                'total_stock': 1000, 'deleted': False})
++            DB.store.raw_material_batches.insert_one({'id': 'lot-' + material_id, 'raw_material_id': material_id,
++                'batch_number': material_id, 'quantity': 1000, 'status': 'em_aberto', 'deleted': False})
++            recipes.append({'raw_material_id': material_id, 'quantity_per_liter': amount, 'unit': 'Kg'})
++        DB.store.products.update_one({'id': 'soap'}, {'$set': {'name': 'Limpador Flor de Ameixa',
++            'expected_liters': 150, 'recipes': recipes}})
++        batch = self.make_product_batch(300)
++        usages = {row['raw_material_id']: row for row in batch['raw_materials_used']}
++        for material_id, amount, expected in ingredients:
++            self.assertEqual(usages[material_id]['quantity_needed'], expected)
++            self.assertEqual(usages[material_id]['unit'], 'Kg')
++            self.assertEqual(usages[material_id]['stock_unit_label'], 'Litros')
++            self.assertEqual(DB.store.raw_materials.find_one({'id': material_id})['total_stock'], 1000 - expected)
++            self.assertEqual(DB.store.raw_material_batches.find_one({'id': 'lot-' + material_id})['quantity'], 1000 - expected)
++        response = self.client.post('/api/production-orders', json={'product_id': 'soap', 'product_batch_id': batch['id'],
++            'date': '2026-10-27', 'weigher': 'Teste', 'production_size': 300, 'materials_used': []})
++        self.assertEqual(response.status_code, 200, response.text)
++        self.assertEqual(DB.store.raw_materials.find_one({'id': 'water'})['total_stock'], 704)
++        self.assertEqual(self.client.delete('/api/product-batches/' + batch['id']).status_code, 200)
++        self.assertEqual(DB.store.raw_materials.find_one({'id': 'water'})['total_stock'], 1000)
++
++    def test_legacy_unit_label_keeps_resize_and_cancellation_exact(self):
++        DB.store.raw_materials.update_one({'id': 'base'}, {'$set': {'type': 'Litros'}})
++        batch = self.make_product_batch(100)
++        self.assertEqual(self.stock(), 5.5)
++        response = self.client.put('/api/product-batches/' + batch['id'], json={'planned_liters': 200})
++        self.assertEqual(response.status_code, 200, response.text)
++        self.assertEqual(self.stock(), 1)
++        self.assertEqual(self.client.delete('/api/product-batches/' + batch['id']).status_code, 200)
++        self.assertEqual(self.stock(), 10)
+ 
+     def test_receipt_then_production_then_order_debits_only_once(self):
+         response = self.client.post('/api/raw-material-batches', json={'raw_material_id': 'base', 'date': '2026-10-27', 'quantity': 20})
