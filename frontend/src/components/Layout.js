@@ -46,7 +46,7 @@ const menuCategories = [
     title: 'PRODUÇÃO',
     items: [
       { path: '/fichas-analise', icon: ClipboardCheck, label: 'Ordem de Produção', roles: ['laboratorio'], emailOnly: LAB_EMAIL },
-      { path: '/in-production', icon: Factory, label: 'Em Produção', roles: ['laboratorio', 'producao'] },
+      { path: '/in-production', icon: Factory, label: 'Em Produção', allAuthenticated: true },
       { path: '/batch-management', icon: ListChecks, label: 'Gerenciar Lotes', roles: ['laboratorio'] },
       { path: '/impressao', icon: Printer, label: 'Impressão', roles: ['laboratorio'] },
     ],
@@ -86,6 +86,7 @@ const Sidebar = ({ onItemClick }) => {
   const { user, role, logout } = useAuth();
 
   const isVisible = (item) => {
+    if (item.allAuthenticated) return Boolean(user);
     if (!item.roles.includes(role || 'producao')) return false;
     if (item.emailOnly && user?.email !== item.emailOnly) return false;
     if (item.emailAllowlist && !item.emailAllowlist.some((e) => e.toLowerCase() === (user?.email || '').toLowerCase())) return false;

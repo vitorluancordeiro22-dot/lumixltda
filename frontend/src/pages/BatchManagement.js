@@ -197,7 +197,7 @@ export const BatchManagement = () => {
   };
 
   const handleFinalizeRmBatch = async (batch) => {
-    if (!window.confirm(`Finalizar o lote ${batch.batch_number}? Isso permitirá arquivá-lo.`)) {
+    if (!window.confirm(`Encerrar o lote ${batch.batch_number}? O saldo restante de ${batch.quantity} será retirado do estoque disponível. Confirme apenas se esse saldo não está mais disponível fisicamente.`)) {
       return;
     }
 

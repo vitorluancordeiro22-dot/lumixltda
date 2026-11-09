@@ -76,6 +76,7 @@ export const AuthProvider = ({ children }) => {
 
   // Verifica se o usuário tem acesso a determinada rota
   const hasAccess = (path) => {
+    if (path === '/in-production') return Boolean(user);
     if (role === 'laboratorio') return true;
     // Rotas permitidas para produção
     const producaoRoutes = ['/counting', '/samples', '/archives', '/dashboard'];

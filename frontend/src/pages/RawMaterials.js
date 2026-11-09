@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Combobox } from '../components/ui/combobox';
 import { Checkbox } from '../components/ui/checkbox';
 import { toast } from 'sonner';
+import { PhysicalStockCountDialog } from '../components/PhysicalStockCountDialog';
 import { Plus, Edit, Trash2, Boxes, Package, Search, Printer, RefreshCw, AlertTriangle, ShieldCheck } from 'lucide-react';
 
 export const RawMaterials = () => {
@@ -58,6 +59,9 @@ export const RawMaterials = () => {
   const [nextBatchNumber, setNextBatchNumber] = useState('');
   const [editingBatchNumber, setEditingBatchNumber] = useState(false);
   const [recalculating, setRecalculating] = useState(false);
+  const [stockAuditOpen, setStockAuditOpen] = useState(false);
+  const [stockAudit, setStockAudit] = useState(null);
+  const [physicalCountOpen, setPhysicalCountOpen] = useState(false);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -158,13 +162,13 @@ export const RawMaterials = () => {
     try {
       if (selectedMaterial) {
         await api.put(`/raw-materials/${selectedMaterial.id}`, {
-          ...formData,
-          total_stock: parseFloat(formData.total_stock)
+          name: formData.name, type: formData.type,
+          supplier_id: formData.supplier_id, received_date: formData.received_date
         });
       } else {
         await api.post('/raw-materials', {
           ...formData,
-          total_stock: parseFloat(formData.total_stock)
+          total_stock: 0
         });
       }
       
@@ -177,7 +181,7 @@ export const RawMaterials = () => {
       }
     } catch (error) {
       if (isMountedRef.current) {
-        toast.error('Erro ao salvar matéria-prima');
+        toast.error(error.response?.data?.detail || 'Erro ao salvar matéria-prima');
       }
     } finally {
       if (isMountedRef.current) {
@@ -219,7 +223,7 @@ export const RawMaterials = () => {
       }
     } catch (error) {
       if (isMountedRef.current) {
-        toast.error('Erro ao criar lote');
+        toast.error(error.response?.data?.detail || 'Erro ao criar lote');
       }
     } finally {
       if (isMountedRef.current) {
@@ -413,20 +417,11 @@ export const RawMaterials = () => {
   const handleRecalculateStock = async () => {
     setRecalculating(true);
     try {
-      const response = await api.post('/raw-materials/recalculate-stock');
-      const data = response.data;
-      const corrections = data.corrections || [];
-      const finalized = data.batches_finalized || 0;
-      
-      if (corrections.length > 0 || finalized > 0) {
-        toast.success(`Estoque recalculado! ${corrections.length} correção(ões), ${finalized} lote(s) finalizado(s)`);
-      } else {
-        toast.info('Estoque já está correto. Nenhuma correção necessária.');
-      }
-      
-      fetchData();
+      const response = await api.get('/raw-materials/stock-audit');
+      setStockAudit(response.data);
+      setStockAuditOpen(true);
     } catch (err) {
-      toast.error('Erro ao recalcular estoque');
+      toast.error('Erro ao conferir estoque');
     } finally {
       setRecalculating(false);
     }
@@ -453,6 +448,9 @@ export const RawMaterials = () => {
           <p className="text-lg text-muted-foreground">Gerencie o estoque de matérias-primas</p>
         </div>
         <div className="flex flex-wrap gap-3">
+          <Button variant="outline" onClick={() => setPhysicalCountOpen(true)} data-testid="physical-stock-count-button">
+            Contagem física
+          </Button>
           {/* Botão Auditoria de Receitas */}
           <Button 
             variant="outline"
@@ -472,7 +470,7 @@ export const RawMaterials = () => {
             data-testid="recalculate-stock-button"
           >
             <RefreshCw className={`w-4 h-4 mr-2 ${recalculating ? 'animate-spin' : ''}`} />
-            {recalculating ? 'Recalculando...' : 'Recalcular Estoque'}
+            {recalculating ? 'Conferindo...' : 'Conferir Estoque'}
           </Button>
           {/* Botão Imprimir Etiquetas */}
           <Dialog open={printDialogOpen} onOpenChange={setPrintDialogOpen}>
@@ -748,7 +746,8 @@ export const RawMaterials = () => {
                   </div>
                   <div>
                     <Label className="text-foreground">Estoque Total</Label>
-                    <Input type="number" step="0.01" value={formData.total_stock} onChange={(e) => setFormData({...formData, total_stock: e.target.value})} className="bg-input border-border text-foreground" />
+                    <Input type="number" value={selectedMaterial ? formData.total_stock : 0} readOnly className="bg-input border-border text-foreground" />
+                    <p className="text-xs text-muted-foreground mt-1">Calculado pelos lotes recebidos e pela produção. Registre entradas em Novo Lote.</p>
                   </div>
                 </div>
                 <div>
@@ -832,6 +831,31 @@ export const RawMaterials = () => {
       )}
 
       {/* Dialog: Auditoria de Receitas */}
+      <PhysicalStockCountDialog open={physicalCountOpen} onOpenChange={setPhysicalCountOpen} materials={materials}
+        onSaved={async () => { await Promise.all([fetchMaterials(), fetchBatches()]); setStockAudit(null); }} />
+      <Dialog open={stockAuditOpen} onOpenChange={setStockAuditOpen}>
+        <DialogContent className="bg-card border-border max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>Conferência de estoque</DialogTitle></DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Nenhum saldo foi alterado. Compare o saldo cadastrado com o restante dos lotes.
+            Diferenças antigas precisam ser conferidas com as movimentações ou com uma contagem física.
+          </p>
+          {stockAudit && <>
+            <p className="text-sm">{stockAudit.total_with_issues} matéria(s)-prima(s) com divergências em {stockAudit.total_materials_checked} conferidas.</p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left">
+                <thead><tr className="border-b border-border"><th className="p-2">Matéria-prima</th><th className="p-2">Cadastrado</th><th className="p-2">Nos lotes</th><th className="p-2">Diferença</th></tr></thead>
+                <tbody>{stockAudit.materials.map(material => <tr key={material.raw_material_id} className="border-b border-border align-top">
+                  <td className="p-2"><strong>{material.name}</strong>{material.issues.map(issue => <p key={issue} className="text-xs text-amber-600 mt-1">{issue}</p>)}</td>
+                  <td className="p-2 whitespace-nowrap">{material.recorded_stock.toLocaleString('pt-BR')} {material.unit}</td>
+                  <td className="p-2 whitespace-nowrap">{material.batch_stock.toLocaleString('pt-BR')} {material.unit}</td>
+                  <td className="p-2 whitespace-nowrap">{material.difference.toLocaleString('pt-BR')} {material.unit}</td>
+                </tr>)}</tbody>
+              </table>
+            </div>
+          </>}
+        </DialogContent>
+      </Dialog>
       <Dialog open={auditOpen} onOpenChange={setAuditOpen}>
         <DialogContent className="bg-card border-border max-w-3xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
@@ -865,7 +889,7 @@ export const RawMaterials = () => {
                 <div className="py-8 text-center">
                   <ShieldCheck className="w-12 h-12 text-green-500 mx-auto mb-2" />
                   <p className="text-foreground font-semibold">Tudo certo!</p>
-                  <p className="text-sm text-muted-foreground">Todos os produtos têm receita válida — a MP será descontada corretamente.</p>
+                  <p className="text-sm text-muted-foreground">As receitas passaram pelas verificações básicas. Confira também os saldos e as unidades de medida.</p>
                 </div>
               ) : (
                 <>

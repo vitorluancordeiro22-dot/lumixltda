@@ -2,6 +2,9 @@
 Rotas e Endpoints para Sistema de OP Industrial
 """
 
+from stock import product_requirements, consume_requirements, restore_usages
+from stock_control import serialized_stock_write
+
 from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, status as http_status
 from fastapi.responses import StreamingResponse
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorGridFSBucket
@@ -172,6 +175,7 @@ def setup_industrial_op_routes(api_router: APIRouter, db, fs, get_current_user, 
     # ========== CRUD DE ORDENS DE PRODUÇÃO ==========
     
     @api_router.post('/industrial-ops', response_model=IndustrialOP)
+    @serialized_stock_write(lambda: db)
     async def create_industrial_op(
         op_data: IndustrialOPCreate,
         current_user = Depends(get_current_user)
@@ -202,52 +206,13 @@ def setup_industrial_op_routes(api_router: APIRouter, db, fs, get_current_user, 
         date_str = now.isoformat()
         batch_number = await generate_batch_number_fn(date_str)
         
-        # Auto-selecionar matérias-primas (LIFO - mais recentes com estoque)
+        try:
+            requirements = await product_requirements(db, product, op_data.planned_quantity)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+
         raw_materials_usage = []
-        recipes = product.get('recipes', [])
-        
-        if not recipes:
-            raise HTTPException(
-                status_code=400,
-                detail='Produto não possui receita cadastrada'
-            )
-        
-        for recipe in recipes:
-            rm_id = recipe['raw_material_id']
-            quantity_per_unit = recipe['quantity_per_liter']
-            unit = recipe.get('unit', 'L')
-            
-            # Buscar matéria-prima
-            rm = await db.raw_materials.find_one(
-                {'id': rm_id, 'deleted': False},
-                {'_id': 0}
-            )
-            if not rm:
-                continue
-            
-            # Buscar lotes com estoque (LIFO)
-            batches = await get_latest_raw_material_batches_with_stock(db, rm_id)
-            
-            if not batches:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f'Matéria-prima {rm["name"]} sem estoque disponível'
-                )
-            
-            # Usar o lote mais recente (primeiro da lista LIFO)
-            latest_batch = batches[0]
-            quantity_needed = quantity_per_unit * op_data.planned_quantity
-            
-            raw_materials_usage.append(RawMaterialUsage(
-                raw_material_id=rm_id,
-                raw_material_name=rm['name'],
-                batch_id=latest_batch['id'],
-                batch_number=latest_batch['batch_number'],
-                quantity_used=quantity_needed,
-                unit=unit,
-                selected_at=now.isoformat()
-            ))
-        
+
         # Criar snapshot dos modelos (versionamento)
         op_model_snapshot = file_models.get('op_model')
         ficha_analise_snapshot = file_models.get('ficha_analise')
@@ -295,9 +260,26 @@ def setup_industrial_op_routes(api_router: APIRouter, db, fs, get_current_user, 
             history=[h.dict() for h in history]
         )
         
-        # Salvar no banco
-        await db.industrial_ops.insert_one(op.dict())
-        
+        # Esta OP cria seu próprio lote de produção: baixa uma vez, com a
+        # mesma proporção usada pelos lotes normais (não na troca de status).
+        try:
+            usages = await consume_requirements(db, requirements)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+        op.raw_materials = [RawMaterialUsage(
+            raw_material_id=u['raw_material_id'], raw_material_name=u['raw_material_name'],
+            batch_id=a['batch_id'], batch_number=a['batch_number'],
+            quantity_used=a['quantity_used'], unit=u['unit'], selected_at=now.isoformat(),
+        ) for u in usages for a in u['batches_consumed']]
+        document = op.dict()
+        document['inventory_deducted'] = True
+        document['raw_materials_used'] = usages
+        try:
+            await db.industrial_ops.insert_one(document)
+        except Exception:
+            await restore_usages(db, usages)
+            raise
+
         return op
     
     @api_router.get('/industrial-ops', response_model=List[IndustrialOP])

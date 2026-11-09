@@ -104,7 +104,10 @@ export const ProductionOrders = () => {
     if (product && size) {
       const materials = product.recipes.map(r => ({
         raw_material_id: r.raw_material_id,
-        quantity: parseFloat((r.quantity_per_liter * parseFloat(size)).toFixed(3))
+        quantity: product.expected_liters > 0
+          ? Number(((r.quantity_per_liter / product.expected_liters) * Number(size)).toFixed(6))
+          : 0,
+        unit: r.unit
       }));
       setFormData({
         ...formData,
@@ -131,11 +134,11 @@ export const ProductionOrders = () => {
         setDialogOpen(false);
         resetForm();
         await fetchOrders();
-        toast.success('Ordem criada e estoque descontado!');
+        toast.success('Ordem registrada! A matéria-prima já foi descontada pelo lote.');
       }
     } catch (error) {
       if (isMountedRef.current) {
-        toast.error('Erro ao criar ordem');
+        toast.error(error.response?.data?.detail || 'Erro ao criar ordem');
       }
     } finally {
       if (isMountedRef.current) {
@@ -247,7 +250,7 @@ export const ProductionOrders = () => {
                   <div className="space-y-2 p-4 rounded-lg bg-input border border-border">
                     {formData.materials_used.map((material, idx) => (
                       <div key={idx} className="text-sm text-muted-foreground">
-                        Material {idx + 1}: {material.quantity.toFixed(3)} unidades
+                        Material {idx + 1}: {material.quantity.toFixed(3)} {material.unit}
                       </div>
                     ))}
                   </div>

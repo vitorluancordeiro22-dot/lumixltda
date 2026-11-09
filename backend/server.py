@@ -12,12 +12,19 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime, timezone, timedelta
 import bcrypt
 import jwt
-from uuid import uuid4
+from uuid import uuid4, UUID
 import uuid
 import io
 import re
 import json
 import asyncio
+from contextlib import asynccontextmanager
+from stock import (
+    quantity as stock_quantity, product_requirements, consume_requirements,
+    batch_usages, restore_usages, receive_batch, stock_audit, resize_usages,
+)
+from stock_control import serialized_stock_write
+from stock_counts import preview_count, apply_count, public_count
 from bson import ObjectId
 
 # Industrial OP imports
@@ -79,7 +86,7 @@ class TokenResponse(BaseModel):
 
 class ProductRecipe(BaseModel):
     raw_material_id: str
-    quantity_per_liter: float
+    quantity_per_liter: float = Field(ge=0, allow_inf_nan=False)
     unit: str = 'L'  # L (Litros) ou Kg
 
 class Product(BaseModel):
@@ -95,7 +102,7 @@ class Product(BaseModel):
 class ProductCreate(BaseModel):
     name: str
     unit: str
-    expected_liters: float
+    expected_liters: float = Field(gt=0, allow_inf_nan=False)
     recipes: List[ProductRecipe]
 
 class RawMaterial(BaseModel):
@@ -111,7 +118,7 @@ class RawMaterial(BaseModel):
 class RawMaterialCreate(BaseModel):
     name: str
     type: str
-    total_stock: float = 0.0
+    total_stock: float = Field(default=0.0, ge=0, allow_inf_nan=False)
     supplier_id: str = ''
     received_date: str = ''
 
@@ -133,14 +140,14 @@ class ProductBatchCreate(BaseModel):
     product_id: str
     date: str
     unit: str
-    planned_liters: float
+    planned_liters: float = Field(gt=0, allow_inf_nan=False)
     custom_batch_number: Optional[str] = None  # Número de lote customizado
 
 class ProductBatchUpdate(BaseModel):
     batch_number: Optional[str] = None
     date: Optional[str] = None
     unit: Optional[str] = None
-    planned_liters: Optional[float] = None
+    planned_liters: Optional[float] = Field(default=None, gt=0, allow_inf_nan=False)
 
 class RawMaterialBatch(BaseModel):
     id: str
@@ -157,7 +164,7 @@ class RawMaterialBatch(BaseModel):
 class RawMaterialBatchCreate(BaseModel):
     raw_material_id: str
     date: str
-    quantity: float
+    quantity: float = Field(gt=0, allow_inf_nan=False)
     supplier_batch_number: str = ''
     expiry_date: str = ''
     custom_batch_number: Optional[str] = None  # Número de lote customizado
@@ -165,7 +172,7 @@ class RawMaterialBatchCreate(BaseModel):
 class RawMaterialBatchUpdate(BaseModel):
     batch_number: Optional[str] = None
     date: Optional[str] = None
-    quantity: Optional[float] = None
+    quantity: Optional[float] = Field(default=None, ge=0, allow_inf_nan=False)
     supplier_batch_number: Optional[str] = None
     expiry_date: Optional[str] = None
 
@@ -190,7 +197,7 @@ class ProductionOrderCreate(BaseModel):
     product_batch_id: str
     date: str
     weigher: str
-    production_size: float
+    production_size: float = Field(gt=0, allow_inf_nan=False)
     materials_used: List[MaterialUsed]
 
 class Counting(BaseModel):
@@ -338,156 +345,37 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
 
 # ========== RAW MATERIAL DEDUCTION LOGIC ==========
 
-async def deduct_from_raw_material_batches(raw_material_id: str, needed_qty: float) -> list:
-    """
-    Desconta needed_qty dos lotes mais recentes de uma matéria-prima.
-    Usa LIFO: lote mais recente primeiro.
-    Auto-finaliza lotes que chegam a 0.
-    Retorna lista de lotes usados com quantidades consumidas.
-    """
-    used_batches = []
-    remaining = needed_qty
-
-    # Buscar lotes em aberto, mais recente primeiro
-    batches = await db.raw_material_batches.find({
-        'raw_material_id': raw_material_id,
-        'status': 'em_aberto',
-        'deleted': {'$ne': True},
-        'quantity': {'$gt': 0}
-    }).sort('date', -1).to_list(100)
-
-    for batch in batches:
-        if remaining <= 0:
-            break
-
-        available = batch['quantity']
-        to_deduct = min(available, remaining)
-        new_qty = round(available - to_deduct, 4)
-
-        update_fields = {'quantity': new_qty}
-        if new_qty <= 0:
-            update_fields['status'] = 'finalizado'
-
-        await db.raw_material_batches.update_one(
-            {'id': batch['id']},
-            {'$set': update_fields}
-        )
-
-        used_batches.append({
-            'batch_id': batch['id'],
-            'batch_number': batch.get('batch_number', ''),
-            'supplier_batch_number': batch.get('supplier_batch_number', ''),
-            'expiry_date': batch.get('expiry_date', ''),
-            'quantity_used': to_deduct,
-            'remaining_after': new_qty
-        })
-
-        remaining = round(remaining - to_deduct, 4)
-
-    # Atualizar estoque total da matéria-prima
-    actually_deducted = needed_qty - remaining
-    if actually_deducted > 0:
-        await db.raw_materials.update_one(
-            {'id': raw_material_id},
-            {'$inc': {'total_stock': -actually_deducted}}
-        )
-
-    return used_batches
+@asynccontextmanager
+async def stock_operation(collection, item_id, *, deleted=False):
+    """Uma edição/cancelamento por lote; requisições repetidas não devolvem duas vezes."""
+    item = await collection.find_one({'id': item_id, 'deleted': deleted}, {'_id': 0})
+    if not item:
+        raise HTTPException(status_code=404, detail='Lote não encontrado')
+    token = str(uuid4())
+    claimed = await collection.update_one(
+        {'id': item_id, 'deleted': deleted, '_stock_operation': None},
+        {'$set': {'_stock_operation': token}},
+    )
+    if claimed.matched_count != 1:
+        raise HTTPException(status_code=409, detail='Este lote está sendo atualizado. Aguarde e tente novamente')
+    try:
+        yield item
+    finally:
+        await collection.update_one({'id': item_id, '_stock_operation': token}, {'$unset': {'_stock_operation': ''}})
 
 
 async def auto_finalize_zero_batches():
-    """
-    Finaliza automaticamente todos os lotes de MP com quantidade <= 0 que ainda estão em_aberto.
-    """
     result = await db.raw_material_batches.update_many(
-        {
-            'status': 'em_aberto',
-            'deleted': {'$ne': True},
-            'quantity': {'$lte': 0}
-        },
-        {'$set': {'status': 'finalizado'}}
+        {'status': 'em_aberto', 'deleted': {'$ne': True}, 'quantity': {'$lte': 0}, '_stock_operation': None},
+        {'$set': {'status': 'finalizado'}},
     )
     return result.modified_count
 
 
-async def restore_raw_materials_for_batch(batch_doc: dict) -> dict:
-    """
-    Devolve para o estoque a matéria-prima que foi descontada por um lote de produto.
-    Lê batch_doc['raw_materials_used'] e:
-      - Soma a quantidade de volta nos lotes específicos de MP usados
-      - Reabre lotes de MP que estavam finalizados por terem zerado
-      - Atualiza total_stock da MP
-    Retorna um resumo do que foi devolvido.
-    """
-    summary = []
-    for mat_used in (batch_doc.get('raw_materials_used') or []):
-        rm_id = mat_used.get('raw_material_id')
-        if not rm_id:
-            continue
-        total_restored = 0.0
-        for b in (mat_used.get('batches_consumed') or []):
-            qty = float(b.get('quantity_used') or 0)
-            if qty <= 0 or not b.get('batch_id'):
-                continue
-            await db.raw_material_batches.update_one(
-                {'id': b['batch_id']},
-                {
-                    '$inc': {'quantity': qty},
-                    '$set': {'status': 'em_aberto'}  # reabre se tinha finalizado por zerar
-                }
-            )
-            total_restored = round(total_restored + qty, 4)
-        if total_restored > 0:
-            await db.raw_materials.update_one(
-                {'id': rm_id},
-                {'$inc': {'total_stock': total_restored}}
-            )
-            summary.append({
-                'raw_material_id': rm_id,
-                'raw_material_name': mat_used.get('raw_material_name', ''),
-                'restored': total_restored
-            })
-    return {'restored': summary}
-
-
 async def compute_and_deduct_for_batch(product: dict, planned_liters: float) -> list:
-    """
-    Calcula a MP necessária para `planned_liters` litros de `product` e desconta via LIFO.
-    Retorna a lista `raw_materials_used` no mesmo formato salvo em product_batches.
-    """
-    all_materials_used = []
-    if not product or not product.get('recipes'):
-        return all_materials_used
+    requirements = await product_requirements(db, product, planned_liters)
+    return await consume_requirements(db, requirements)
 
-    expected_liters = product.get('expected_liters', 0) or 0
-    for recipe in product['recipes']:
-        rm_id = recipe.get('raw_material_id')
-        qty_total = recipe.get('quantity_per_liter', 0) or 0
-        if not rm_id or qty_total <= 0:
-            continue
-
-        if expected_liters > 0:
-            needed = qty_total * (planned_liters / expected_liters)
-        else:
-            needed = qty_total
-        needed = round(needed, 4)
-        if needed <= 0:
-            continue
-
-        used_batches = await deduct_from_raw_material_batches(rm_id, needed)
-
-        rm_doc = await db.raw_materials.find_one({'id': rm_id}, {'_id': 0})
-        rm_name = rm_doc['name'] if rm_doc else rm_id
-
-        all_materials_used.append({
-            'raw_material_id': rm_id,
-            'raw_material_name': rm_name,
-            'quantity_needed': needed,
-            'unit': recipe.get('unit', 'Kg'),
-            'batches_consumed': used_batches
-        })
-
-    return all_materials_used
 
 # ========== AUTH ENDPOINTS ==========
 
@@ -617,7 +505,7 @@ async def generate_batch_number(date_str: str) -> str:
     
     # Buscar o ÚLTIMO lote criado (mais recente) de matérias-primas
     last_rm_batch = await db.raw_material_batches.find_one(
-        {'deleted': False},
+        {'deleted': False, 'is_inventory_adjustment': {'$ne': True}},
         {'_id': 0, 'batch_number': 1, 'created_at': 1},
         sort=[('created_at', -1)]
     )
@@ -666,6 +554,7 @@ async def get_product_batches(current_user = Depends(get_current_user)):
     return batches
 
 @api_router.post('/product-batches', response_model=ProductBatch)
+@serialized_stock_write(lambda: db)
 async def create_product_batch(data: ProductBatchCreate, current_user = Depends(get_current_user)):
     import uuid
     batch_id = str(uuid.uuid4())
@@ -708,138 +597,151 @@ async def create_product_batch(data: ProductBatchCreate, current_user = Depends(
         'raw_materials_used': []  # Rastreabilidade de MP usadas
     }
     
-    # === DESCONTO DE MATÉRIAS-PRIMAS ===
+    # O lote é o único responsável pela baixa da sua receita.
     product = await db.products.find_one({'id': data.product_id, 'deleted': False}, {'_id': 0})
-    if product and product.get('recipes'):
+    if not product:
+        raise HTTPException(status_code=404, detail='Produto não encontrado')
+    try:
+        datetime.fromisoformat(data.date)  # validar antes de movimentar estoque
         batch_doc['raw_materials_used'] = await compute_and_deduct_for_batch(product, data.planned_liters)
-    
-    await db.product_batches.insert_one(batch_doc)
-    
-    # Auto-finalizar lotes de MP que chegaram a 0
-    await auto_finalize_zero_batches()
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    batch_doc['inventory_deducted'] = True
+    try:
+        await db.product_batches.insert_one(batch_doc)
+    except Exception:
+        await restore_usages(db, batch_doc['raw_materials_used'])
+        raise
     
     # Remover _id para retorno (insert_one adiciona _id ao dict)
     batch_doc.pop('_id', None)
     
-    # Verificar se precisa criar amostra (primeiro lote do produto no mês)
-    batch_date = datetime.fromisoformat(data.date)
-    existing_sample = await db.samples.find_one({
-        'product_id': data.product_id,
-        'month': batch_date.month,
-        'year': batch_date.year,
-        'deleted': {'$ne': True}
-    })
-    
-    if not existing_sample:
-        sample_doc = {
-            'id': str(uuid.uuid4()),
+    try:
+        # A baixa e o lote já estão gravados. Falhas em tarefas auxiliares
+        # não devem devolver HTTP 500 e incentivar uma nova baixa no navegador.
+        await auto_finalize_zero_batches()
+        # Verificar se precisa criar amostra (primeiro lote do produto no mês)
+        batch_date = datetime.fromisoformat(data.date)
+        existing_sample = await db.samples.find_one({
             'product_id': data.product_id,
-            'product_batch_id': batch_id,
             'month': batch_date.month,
             'year': batch_date.year,
-            'status': 'pendente',
-            'requested_at': datetime.now(timezone.utc).isoformat(),
-            'collected_by': None,
-            'collected_at': None
-        }
-        await db.samples.insert_one(sample_doc)
-    
-    # === FICHA DE ANÁLISE / ORDEM DE PRODUÇÃO ===
-    # Cria uma ficha para CADA lote (não mais "uma por mês"). Cada lote vira uma
-    # entrada na aba "Ordem de Produção" e fica visível até ser fechada.
-    if product:
-        # Numeração OP do dia (sequencial por dia, todos os produtos)
-        op_count_today = await db.fichas_analise.count_documents({
-            'date': data.date,
             'deleted': {'$ne': True}
         })
-        op_number = op_count_today + 1
 
-        ficha_doc = {
-            'id': str(uuid.uuid4()),
-            'product_id': data.product_id,
-            'product_name': product.get('name', ''),
-            'product_batch_id': batch_id,
-            'batch_number': batch_number,
-            'month': batch_date.month,
-            'year': batch_date.year,
-            'date': data.date,
-            'op_number': op_number,
-            'planned_liters': data.planned_liters,
-            'unit': data.unit,
-            'expected_liters': product.get('expected_liters', 0),
-            'recipes': [],
-            'status': 'aberta',
-            'created_at': datetime.now(timezone.utc).isoformat(),
-            'deleted': False
-        }
-
-        # Preencher receita com dados detalhados de MP
-        for mat_used in batch_doc.get('raw_materials_used', []):
-            recipe_entry = {
-                'raw_material_id': mat_used['raw_material_id'],
-                'raw_material_name': mat_used['raw_material_name'],
-                'quantity_needed': mat_used['quantity_needed'],
-                'unit': mat_used.get('unit', ''),
-                'batches_consumed': mat_used.get('batches_consumed', [])
+        if not existing_sample:
+            sample_doc = {
+                'id': str(uuid.uuid4()),
+                'product_id': data.product_id,
+                'product_batch_id': batch_id,
+                'month': batch_date.month,
+                'year': batch_date.year,
+                'status': 'pendente',
+                'requested_at': datetime.now(timezone.utc).isoformat(),
+                'collected_by': None,
+                'collected_at': None
             }
-            ficha_doc['recipes'].append(recipe_entry)
+            await db.samples.insert_one(sample_doc)
 
-        await db.fichas_analise.insert_one(ficha_doc)
+        # === FICHA DE ANÁLISE / ORDEM DE PRODUÇÃO ===
+        # Cria uma ficha para CADA lote (não mais "uma por mês"). Cada lote vira uma
+        # entrada na aba "Ordem de Produção" e fica visível até ser fechada.
+        if product:
+            # Numeração OP do dia (sequencial por dia, todos os produtos)
+            op_count_today = await db.fichas_analise.count_documents({
+                'date': data.date,
+                'deleted': {'$ne': True}
+            })
+            op_number = op_count_today + 1
+
+            ficha_doc = {
+                'id': str(uuid.uuid4()),
+                'product_id': data.product_id,
+                'product_name': product.get('name', ''),
+                'product_batch_id': batch_id,
+                'batch_number': batch_number,
+                'month': batch_date.month,
+                'year': batch_date.year,
+                'date': data.date,
+                'op_number': op_number,
+                'planned_liters': data.planned_liters,
+                'unit': data.unit,
+                'expected_liters': product.get('expected_liters', 0),
+                'recipes': [],
+                'status': 'aberta',
+                'created_at': datetime.now(timezone.utc).isoformat(),
+                'deleted': False
+            }
+
+            # Preencher receita com dados detalhados de MP
+            for mat_used in batch_doc.get('raw_materials_used', []):
+                recipe_entry = {
+                    'raw_material_id': mat_used['raw_material_id'],
+                    'raw_material_name': mat_used['raw_material_name'],
+                    'quantity_needed': mat_used['quantity_needed'],
+                    'unit': mat_used.get('unit', ''),
+                    'batches_consumed': mat_used.get('batches_consumed', [])
+                }
+                ficha_doc['recipes'].append(recipe_entry)
+
+            await db.fichas_analise.insert_one(ficha_doc)
+
+    except Exception:
+        logger.exception('Lote %s criado com estoque baixado; documentos auxiliares pendentes', batch_id)
+        batch_doc['documentation_pending'] = True
+        try:
+            await db.product_batches.update_one({'id': batch_id}, {'$set': {'documentation_pending': True}})
+        except Exception:
+            logger.exception('Não foi possível marcar documentos pendentes do lote %s', batch_id)
 
     return ProductBatch(**batch_doc)
 
 @api_router.put('/product-batches/{batch_id}', response_model=ProductBatch)
+@serialized_stock_write(lambda: db)
 async def update_product_batch(batch_id: str, data: ProductBatchUpdate, current_user = Depends(get_current_user)):
-    batch = await db.product_batches.find_one({'id': batch_id}, {'_id': 0})
-    if not batch:
-        raise HTTPException(status_code=404, detail='Batch not found')
-    
-    # Preparar campos para atualização
-    update_fields = {}
-    
-    if data.batch_number is not None:
-        # Verificar se o novo número já existe (exceto no lote atual)
-        existing = await db.product_batches.find_one({
-            'batch_number': data.batch_number,
-            'id': {'$ne': batch_id},
-            'deleted': False
-        })
-        existing_rm = await db.raw_material_batches.find_one({
-            'batch_number': data.batch_number,
-            'deleted': False
-        })
-        if existing or existing_rm:
-            raise HTTPException(status_code=400, detail='Batch number already exists')
-        update_fields['batch_number'] = data.batch_number
-    
-    if data.date is not None:
-        update_fields['date'] = data.date
-    if data.unit is not None:
-        update_fields['unit'] = data.unit
-    if data.planned_liters is not None:
-        update_fields['planned_liters'] = data.planned_liters
-
-    # === RECÁLCULO DE MP NA EDIÇÃO DE planned_liters ===
-    # Se a litragem planejada mudou, devolvemos a MP antes e descontamos baseado na nova.
-    new_materials_used = None
-    if data.planned_liters is not None and float(data.planned_liters) != float(batch.get('planned_liters') or 0):
-        # 1) Devolve a MP que foi descontada (usando o que estava em raw_materials_used)
-        await restore_raw_materials_for_batch(batch)
-        # 2) Desconta de novo com base na nova litragem planejada
-        product = await db.products.find_one({'id': batch.get('product_id'), 'deleted': False}, {'_id': 0})
-        new_materials_used = await compute_and_deduct_for_batch(product or {}, float(data.planned_liters))
-        update_fields['raw_materials_used'] = new_materials_used
-        await auto_finalize_zero_batches()
-
-    if update_fields:
-        await db.product_batches.update_one(
-            {'id': batch_id},
-            {'$set': update_fields}
-        )
-    
-    updated = await db.product_batches.find_one({'id': batch_id}, {'_id': 0})
-    return ProductBatch(**updated)
+    async with stock_operation(db.product_batches, batch_id) as batch:
+        fields = data.model_dump(exclude_none=True)
+        if data.batch_number is not None and data.batch_number != batch.get('batch_number'):
+            if not data.batch_number.isdigit():
+                raise HTTPException(status_code=400, detail='Número de lote deve conter apenas dígitos')
+            for collection in (db.product_batches, db.raw_material_batches):
+                existing = await collection.find_one({'batch_number': data.batch_number, 'deleted': False, 'id': {'$ne': batch_id}})
+                if existing:
+                    raise HTTPException(status_code=400, detail='Número de lote já existe')
+        if data.date:
+            try:
+                datetime.fromisoformat(data.date)
+            except ValueError:
+                raise HTTPException(status_code=400, detail='Data inválida')
+        resized = False
+        old_usage = batch_usages(batch)
+        if data.planned_liters is not None and data.planned_liters != batch.get('planned_liters'):
+            if batch.get('status') == 'finalizado' or batch.get('total_bottled', 0) > 0:
+                raise HTTPException(status_code=409, detail='Lote já produzido: a alteração de quantidade exige conferência de estoque')
+            if 'raw_materials_used' not in batch and not batch.get('inventory_deducted'):
+                raise HTTPException(status_code=409, detail='Lote antigo sem rastreabilidade de baixa. Confira o estoque antes de alterar a quantidade')
+            product = await db.products.find_one({'id': batch['product_id'], 'deleted': False}, {'_id': 0})
+            if not product:
+                raise HTTPException(status_code=404, detail='Produto não encontrado')
+            try:
+                requirements = await product_requirements(db, product, data.planned_liters)
+                fields['raw_materials_used'] = await resize_usages(db, old_usage, requirements)
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=str(exc))
+            resized = True
+        try:
+            if fields:
+                await db.product_batches.update_one({'id': batch_id}, {'$set': fields})
+        except Exception:
+            if resized:
+                original_requirements = [{
+                    'raw_material_id': u['raw_material_id'], 'unit': u.get('unit', ''),
+                    'quantity': sum(a['quantity_used'] for a in u.get('batches_consumed', [])),
+                } for u in old_usage]
+                recovered = await resize_usages(db, fields['raw_materials_used'], original_requirements)
+                await db.product_batches.update_one({'id': batch_id}, {'$set': {'raw_materials_used': recovered}})
+            raise
+    return ProductBatch(**await db.product_batches.find_one({'id': batch_id}, {'_id': 0}))
 
 @api_router.get('/product-batches/check-open/{product_id}')
 async def check_open_batch(product_id: str, current_user = Depends(get_current_user)):
@@ -865,28 +767,30 @@ async def check_open_batch(product_id: str, current_user = Depends(get_current_u
     }
 
 @api_router.delete('/product-batches/{batch_id}')
+@serialized_stock_write(lambda: db)
 async def delete_product_batch(batch_id: str, current_user = Depends(get_current_user)):
-    batch = await db.product_batches.find_one({'id': batch_id}, {'_id': 0})
-    if not batch:
-        raise HTTPException(status_code=404, detail='Batch not found')
-
-    # Devolve MP que estava reservada para este lote (em qualquer status, pois o lote
-    # vai para a lixeira — se for restaurado, o cálculo terá que ser refeito).
-    mp_summary = await restore_raw_materials_for_batch(batch)
-
-    await db.trash.insert_one({
-        'id': str(__import__('uuid').uuid4()),
-        'item_type': 'product_batch',
-        'item_data': batch,
-        'deleted_at': datetime.now(timezone.utc).isoformat()
-    })
-    await db.product_batches.update_one({'id': batch_id}, {'$set': {'deleted': True}})
-    return {
-        'message': 'Batch moved to trash',
-        'raw_materials_restored': mp_summary.get('restored', [])
-    }
+    async with stock_operation(db.product_batches, batch_id) as batch:
+        if batch.get('total_bottled', 0) > 0 or batch.get('status') == 'finalizado':
+            raise HTTPException(status_code=409, detail='Lote já produzido: arquive o histórico em vez de devolver matéria-prima ao estoque')
+        usage = batch_usages(batch)
+        await db.product_batches.update_one({'id': batch_id}, {'$set': {'deleted': True, 'inventory_return_pending': True}})
+        try:
+            await restore_usages(db, usage)
+        except Exception as exc:
+            await db.product_batches.update_one({'id': batch_id}, {'$set': {'deleted': False, 'inventory_return_pending': False}})
+            if isinstance(exc, ValueError):
+                raise HTTPException(status_code=409, detail=str(exc))
+            raise
+        trash = {'id': str(uuid4()), 'item_type': 'product_batch', 'item_data': batch,
+                 'deleted_at': datetime.now(timezone.utc).isoformat()}
+        await db.product_batches.update_one({'id': batch_id}, {'$set': {
+            'deleted': True, 'inventory_deducted': False, 'inventory_returned': True, 'inventory_return_pending': False,
+        }})
+        await db.trash.insert_one(trash)
+    return {'message': 'Batch moved to trash', 'raw_materials_restored': usage}
 
 @api_router.post('/product-batches/{batch_id}/finalize')
+@serialized_stock_write(lambda: db)
 async def finalize_product_batch(batch_id: str, current_user = Depends(get_current_user)):
     """
     Finaliza um lote de produto mesmo que não tenha atingido a meta de litragem.
@@ -912,6 +816,7 @@ async def finalize_product_batch(batch_id: str, current_user = Depends(get_curre
     }
 
 @api_router.post('/product-batches/{batch_id}/reopen')
+@serialized_stock_write(lambda: db)
 async def reopen_product_batch(batch_id: str, current_user = Depends(get_current_user)):
     """
     Reabre um lote finalizado (não arquivado), mudando o status de volta para 'em_aberto'.
@@ -934,16 +839,12 @@ async def reopen_product_batch(batch_id: str, current_user = Depends(get_current
     }
 
 @api_router.post('/product-batches/{batch_id}/ready-for-bottling')
+@serialized_stock_write(lambda: db)
 async def mark_ready_for_bottling(batch_id: str, current_user = Depends(get_current_user)):
     """
     Marca um lote como pronto para envase.
-    Apenas usuários autorizados (laboratoriolumix@outlook.com e luan_ssss@hotmail.com) podem executar.
+    Qualquer usuário autenticado pode liberar; o responsável fica registrado.
     """
-    # Verificar permissão
-    allowed_emails = ['laboratoriolumix@outlook.com', 'luan_ssss@hotmail.com']
-    if current_user.get('email') not in allowed_emails:
-        raise HTTPException(status_code=403, detail='Você não tem permissão para liberar lotes para envase')
-    
     batch = await db.product_batches.find_one({'id': batch_id, 'deleted': False}, {'_id': 0})
     if not batch:
         raise HTTPException(status_code=404, detail='Lote não encontrado')
@@ -951,14 +852,16 @@ async def mark_ready_for_bottling(batch_id: str, current_user = Depends(get_curr
     if batch.get('status') != 'em_producao':
         raise HTTPException(status_code=400, detail='Apenas lotes em produção podem ser liberados para envase')
     
-    await db.product_batches.update_one(
-        {'id': batch_id},
+    result = await db.product_batches.update_one(
+        {'id': batch_id, 'deleted': False, 'status': 'em_producao'},
         {'$set': {
             'status': 'em_aberto',
             'released_for_bottling_at': datetime.now(timezone.utc).isoformat(),
             'released_by': current_user.get('email')
         }}
     )
+    if result.modified_count != 1:
+        raise HTTPException(status_code=409, detail='Este lote já foi liberado ou atualizado por outro usuário')
     
     return {
         'message': 'Lote liberado para envase com sucesso',
@@ -977,6 +880,7 @@ async def get_batches_in_production(current_user = Depends(get_current_user)):
     return batches
 
 @api_router.post('/archive/reopen/{batch_id}')
+@serialized_stock_write(lambda: db)
 async def reopen_archived_batch(batch_id: str, current_user = Depends(get_current_user)):
     """
     Reabre um lote arquivado, movendo-o de volta para a coleção de lotes ativos.
@@ -1000,7 +904,9 @@ async def reopen_archived_batch(batch_id: str, current_user = Depends(get_curren
         'created_at': archived_batch.get('created_at', datetime.now(timezone.utc).isoformat()),
         'deleted': False,
         'reopened_at': datetime.now(timezone.utc).isoformat(),
-        'reopened_from_archive': True
+        'reopened_from_archive': True,
+        'raw_materials_used': batch_usages(archived_batch),
+        'inventory_deducted': archived_batch.get('inventory_deducted', bool(batch_usages(archived_batch))),
     }
     
     # Inserir de volta na coleção de lotes ativos
@@ -1030,7 +936,10 @@ async def get_raw_materials(current_user = Depends(get_current_user)):
     return materials
 
 @api_router.post('/raw-materials', response_model=RawMaterial)
+@serialized_stock_write(lambda: db)
 async def create_raw_material(data: RawMaterialCreate, current_user = Depends(get_current_user)):
+    if data.total_stock != 0:
+        raise HTTPException(status_code=400, detail='O estoque inicial deve ser registrado como um lote de matéria-prima')
     import uuid
     material_id = str(uuid.uuid4())
     material_doc = {
@@ -1047,13 +956,18 @@ async def create_raw_material(data: RawMaterialCreate, current_user = Depends(ge
     return RawMaterial(**material_doc)
 
 @api_router.put('/raw-materials/{material_id}', response_model=RawMaterial)
+@serialized_stock_write(lambda: db)
 async def update_raw_material(material_id: str, data: RawMaterialCreate, current_user = Depends(get_current_user)):
+    current = await db.raw_materials.find_one({'id': material_id, 'deleted': False}, {'_id': 0})
+    if not current:
+        raise HTTPException(status_code=404, detail='Material not found')
+    if data.type != current.get('type') and await db.raw_material_batches.find_one({'raw_material_id': material_id}):
+        raise HTTPException(status_code=409, detail='A unidade não pode ser alterada enquanto há lotes registrados. Confira as unidades antes de converter saldos')
     result = await db.raw_materials.update_one(
         {'id': material_id},
         {'$set': {
             'name': data.name,
             'type': data.type,
-            'total_stock': data.total_stock,
             'supplier_id': data.supplier_id,
             'received_date': data.received_date
         }}
@@ -1064,6 +978,7 @@ async def update_raw_material(material_id: str, data: RawMaterialCreate, current
     return RawMaterial(**material)
 
 @api_router.delete('/raw-materials/{material_id}')
+@serialized_stock_write(lambda: db)
 async def delete_raw_material(material_id: str, current_user = Depends(get_current_user)):
     material = await db.raw_materials.find_one({'id': material_id}, {'_id': 0})
     if not material:
@@ -1086,6 +1001,7 @@ async def get_raw_material_batches(current_user = Depends(get_current_user)):
     return batches
 
 @api_router.post('/raw-material-batches', response_model=RawMaterialBatch)
+@serialized_stock_write(lambda: db)
 async def create_raw_material_batch(data: RawMaterialBatchCreate, current_user = Depends(get_current_user)):
     import uuid
     batch_id = str(uuid.uuid4())
@@ -1126,153 +1042,140 @@ async def create_raw_material_batch(data: RawMaterialBatchCreate, current_user =
         'deleted': False,
         'is_custom': bool(data.custom_batch_number)
     }
-    await db.raw_material_batches.insert_one(batch_doc)
-    
-    # Update stock
-    await db.raw_materials.update_one(
-        {'id': data.raw_material_id},
-        {'$inc': {'total_stock': data.quantity}}
-    )
+    try:
+        await receive_batch(db, batch_doc)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
     
     return RawMaterialBatch(**batch_doc)
 
 @api_router.put('/raw-material-batches/{batch_id}', response_model=RawMaterialBatch)
+@serialized_stock_write(lambda: db)
 async def update_raw_material_batch(batch_id: str, data: RawMaterialBatchUpdate, current_user = Depends(get_current_user)):
-    batch = await db.raw_material_batches.find_one({'id': batch_id}, {'_id': 0})
-    if not batch:
-        raise HTTPException(status_code=404, detail='Batch not found')
+    async with stock_operation(db.raw_material_batches, batch_id) as batch:
+        fields = data.model_dump(exclude_none=True)
+        if data.batch_number is not None and data.batch_number != batch.get('batch_number'):
+            for collection in (db.raw_material_batches, db.product_batches):
+                if await collection.find_one({'batch_number': data.batch_number, 'id': {'$ne': batch_id}, 'deleted': False}):
+                    raise HTTPException(status_code=400, detail='Número de lote já existe')
+        delta = 0.0
+        if data.quantity is not None:
+            delta = round(data.quantity - batch.get('quantity', 0), 6)
+            fields['status'] = 'em_aberto' if data.quantity > 0 else 'finalizado'
+        if fields:
+            result = await db.raw_material_batches.update_one(
+                {'id': batch_id, 'quantity': batch.get('quantity', 0)}, {'$set': fields},
+            )
+            if result.matched_count != 1:
+                raise HTTPException(status_code=409, detail='O saldo do lote mudou. Atualize a tela')
+            try:
+                if delta:
+                    await db.raw_materials.update_one({'id': batch['raw_material_id']}, {'$inc': {'total_stock': delta}})
+            except Exception:
+                await db.raw_material_batches.update_one({'id': batch_id}, {'$set': {k: batch.get(k) for k in fields}})
+                raise
+    return RawMaterialBatch(**await db.raw_material_batches.find_one({'id': batch_id}, {'_id': 0}))
     
-    # Preparar campos para atualização
-    update_fields = {}
-    
-    if data.batch_number is not None:
-        # Verificar se o novo número já existe (exceto no lote atual)
-        existing = await db.raw_material_batches.find_one({
-            'batch_number': data.batch_number,
-            'id': {'$ne': batch_id},
-            'deleted': False
-        })
-        existing_prod = await db.product_batches.find_one({
-            'batch_number': data.batch_number,
-            'deleted': False
-        })
-        if existing or existing_prod:
-            raise HTTPException(status_code=400, detail='Batch number already exists')
-        update_fields['batch_number'] = data.batch_number
-    
-    if data.date is not None:
-        update_fields['date'] = data.date
-    
-    if data.supplier_batch_number is not None:
-        update_fields['supplier_batch_number'] = data.supplier_batch_number
-    
-    if data.expiry_date is not None:
-        update_fields['expiry_date'] = data.expiry_date
-    
-    # Se a quantidade mudou, ajustar o estoque
-    if data.quantity is not None and data.quantity != batch.get('quantity', 0):
-        old_quantity = batch.get('quantity', 0)
-        quantity_diff = data.quantity - old_quantity
-        await db.raw_materials.update_one(
-            {'id': batch['raw_material_id']},
-            {'$inc': {'total_stock': quantity_diff}}
-        )
-        update_fields['quantity'] = data.quantity
-    
-    if update_fields:
-        await db.raw_material_batches.update_one(
-            {'id': batch_id},
-            {'$set': update_fields}
-        )
-    
-    updated = await db.raw_material_batches.find_one({'id': batch_id}, {'_id': 0})
-    return RawMaterialBatch(**updated)
 
 @api_router.delete('/raw-material-batches/{batch_id}')
+@serialized_stock_write(lambda: db)
 async def delete_raw_material_batch(batch_id: str, current_user = Depends(get_current_user)):
-    batch = await db.raw_material_batches.find_one({'id': batch_id}, {'_id': 0})
-    if not batch:
-        raise HTTPException(status_code=404, detail='Batch not found')
-    
-    await db.trash.insert_one({
-        'id': str(__import__('uuid').uuid4()),
-        'item_type': 'raw_material_batch',
-        'item_data': batch,
-        'deleted_at': datetime.now(timezone.utc).isoformat()
-    })
-    await db.raw_material_batches.update_one({'id': batch_id}, {'$set': {'deleted': True}})
+    async with stock_operation(db.raw_material_batches, batch_id) as batch:
+        material = await db.raw_materials.find_one({'id': batch['raw_material_id']}, {'_id': 0})
+        remaining = stock_quantity(batch.get('quantity', 0))
+        await db.raw_material_batches.update_one({'id': batch_id}, {'$set': {'deleted': True, 'stock_removed_on_delete': True, 'stock_count_id_on_delete': (material or {}).get('last_physical_count_id')}})
+        try:
+            await db.raw_materials.update_one({'id': batch['raw_material_id']}, {'$inc': {'total_stock': -remaining}})
+        except Exception:
+            await db.raw_material_batches.update_one({'id': batch_id}, {'$set': {'deleted': False, 'stock_removed_on_delete': False}})
+            raise
+        await db.trash.insert_one({'id': str(uuid4()), 'item_type': 'raw_material_batch', 'item_data': batch,
+                                  'deleted_at': datetime.now(timezone.utc).isoformat()})
     return {'message': 'Batch moved to trash'}
 
+
 @api_router.post('/raw-material-batches/{batch_id}/finalize')
+@serialized_stock_write(lambda: db)
 async def finalize_raw_material_batch(batch_id: str, current_user = Depends(get_current_user)):
-    """Finaliza um lote de matéria-prima manualmente"""
-    batch = await db.raw_material_batches.find_one({'id': batch_id, 'deleted': False}, {'_id': 0})
-    if not batch:
-        raise HTTPException(status_code=404, detail='Lote não encontrado')
+    async with stock_operation(db.raw_material_batches, batch_id) as batch:
+        if batch.get('status') == 'finalizado':
+            raise HTTPException(status_code=400, detail='Lote já está finalizado')
+        remaining = stock_quantity(batch.get('quantity', 0))
+        await db.raw_material_batches.update_one({'id': batch_id}, {'$set': {
+            'status': 'finalizado', 'quantity': 0.0,
+            'closed_remaining_quantity': remaining,
+            'closed_at': datetime.now(timezone.utc).isoformat(),
+        }})
+        try:
+            await db.raw_materials.update_one({'id': batch['raw_material_id']}, {'$inc': {'total_stock': -remaining}})
+        except Exception:
+            await db.raw_material_batches.update_one({'id': batch_id}, {'$set': {'status': batch['status'], 'quantity': remaining}})
+            raise
+    return {'message': 'Lote encerrado; saldo restante retirado do disponível', 'remaining_removed': remaining}
     
-    if batch.get('status') == 'finalizado':
-        raise HTTPException(status_code=400, detail='Lote já está finalizado')
     
-    await db.raw_material_batches.update_one(
-        {'id': batch_id},
-        {'$set': {'status': 'finalizado'}}
-    )
-    
-    return {'message': 'Lote finalizado com sucesso'}
+def require_stock_count_access(current_user):
+    allowed = {'laboratoriolumix@outlook.com', 'leonicelaboratorio@lumix.com'}
+    if current_user.get('email', '').lower() not in allowed:
+        raise HTTPException(status_code=403, detail='A contagem física deve ser confirmada por um usuário do laboratório')
+
+
+class PhysicalCountPreview(BaseModel):
+    counted_stock: float = Field(ge=0, allow_inf_nan=False)
+
+
+class PhysicalLotCount(BaseModel):
+    batch_id: str
+    quantity: float = Field(ge=0, allow_inf_nan=False)
+
+
+class PhysicalCountConfirmation(PhysicalCountPreview):
+    expected_version: str = Field(pattern=r'^[a-f0-9]{64}$')
+    request_id: UUID
+    reason: str = Field(min_length=3, max_length=500)
+    lot_counts: List[PhysicalLotCount]
+    confirmed: bool = False
+
+
+@api_router.post('/raw-materials/{material_id}/physical-count/preview')
+async def preview_physical_count(material_id: str, data: PhysicalCountPreview, current_user = Depends(get_current_user)):
+    require_stock_count_access(current_user)
+    try:
+        return await preview_count(db, material_id, data.counted_stock)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@api_router.post('/raw-materials/{material_id}/physical-count')
+@serialized_stock_write(lambda: db)
+async def confirm_physical_count(material_id: str, data: PhysicalCountConfirmation, current_user = Depends(get_current_user)):
+    require_stock_count_access(current_user)
+    if not data.confirmed:
+        raise HTTPException(status_code=400, detail='Confirme a contagem e as quantidades por lote antes de salvar')
+    try:
+        return await apply_count(db, material_id, data.counted_stock, data.reason, data.expected_version,
+                                 str(data.request_id), [row.model_dump() for row in data.lot_counts], current_user)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@api_router.get('/raw-materials/{material_id}/stock-counts')
+async def get_physical_counts(material_id: str, current_user = Depends(get_current_user)):
+    require_stock_count_access(current_user)
+    records = await db.stock_counts.find({'raw_material_id': material_id}, {'_id': 0}).sort('created_at', -1).to_list(20)
+    return [public_count(record) for record in records]
+
+
+@api_router.get('/raw-materials/stock-audit')
+async def audit_stock_balances(current_user = Depends(get_current_user)):
+    return await stock_audit(db)
 
 
 @api_router.post('/raw-materials/recalculate-stock')
 async def recalculate_raw_material_stock(current_user = Depends(get_current_user)):
-    """
-    Recalcula o estoque total de todas as matérias-primas baseado nos lotes em aberto.
-    Auto-finaliza lotes com quantidade <= 0.
-    Corrige inconsistências no estoque.
-    """
-    # 1. Auto-finalizar lotes zerados
-    finalized_count = await auto_finalize_zero_batches()
-    
-    # 2. Recalcular total_stock para cada matéria-prima
-    materials = await db.raw_materials.find({'deleted': False}, {'_id': 0}).to_list(1000)
-    corrections = []
-    
-    for mat in materials:
-        # Somar quantidade de todos os lotes em_aberto
-        pipeline = [
-            {
-                '$match': {
-                    'raw_material_id': mat['id'],
-                    'status': 'em_aberto',
-                    'deleted': False
-                }
-            },
-            {
-                '$group': {
-                    '_id': None,
-                    'total': {'$sum': '$quantity'}
-                }
-            }
-        ]
-        result = await db.raw_material_batches.aggregate(pipeline).to_list(1)
-        real_stock = result[0]['total'] if result else 0
-        old_stock = mat.get('total_stock', 0)
-        
-        if round(real_stock, 2) != round(old_stock, 2):
-            await db.raw_materials.update_one(
-                {'id': mat['id']},
-                {'$set': {'total_stock': round(real_stock, 4)}}
-            )
-            corrections.append({
-                'name': mat['name'],
-                'old_stock': old_stock,
-                'new_stock': round(real_stock, 4)
-            })
-    
-    return {
-        'message': 'Estoque recalculado com sucesso',
-        'batches_finalized': finalized_count,
-        'corrections': corrections,
-        'total_materials_checked': len(materials)
-    }
+    # Compatibilidade com telas antigas: agora é uma conferência SEM gravação.
+    # Não inferir estoque físico a partir de um histórico que pode estar errado.
+    return await stock_audit(db)
 
 
 @api_router.get('/raw-materials/audit')
@@ -1590,14 +1493,16 @@ async def create_production_order(data: ProductionOrderCreate, current_user = De
     import uuid
     order_id = str(uuid.uuid4())
     
-    # Deduct stock for each material
-    for material in data.materials_used:
-        result = await db.raw_materials.update_one(
-            {'id': material.raw_material_id},
-            {'$inc': {'total_stock': -material.quantity}}
-        )
-        if result.matched_count == 0:
-            raise HTTPException(status_code=404, detail=f'Material {material.raw_material_id} not found')
+    batch = await db.product_batches.find_one({'id': data.product_batch_id, 'deleted': False}, {'_id': 0})
+    if not batch or batch.get('product_id') != data.product_id:
+        raise HTTPException(status_code=400, detail='Selecione um lote ativo do produto escolhido')
+    product = await db.products.find_one({'id': data.product_id, 'deleted': False}, {'_id': 0})
+    if not product:
+        raise HTTPException(status_code=404, detail='Produto não encontrado')
+    try:
+        requirements = await product_requirements(db, product, data.production_size)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
     
     order_doc = {
         'id': order_id,
@@ -1606,7 +1511,8 @@ async def create_production_order(data: ProductionOrderCreate, current_user = De
         'date': data.date,
         'weigher': data.weigher,
         'production_size': data.production_size,
-        'materials_used': [m.model_dump() for m in data.materials_used],
+        'materials_used': [{'raw_material_id': r['raw_material_id'], 'quantity': r['quantity']} for r in requirements],
+        'stock_managed_by_product_batch': True,
         'status': 'em_producao',
         'created_at': datetime.now(timezone.utc).isoformat(),
         'deleted': False
@@ -1637,6 +1543,7 @@ async def get_counting(batch_id: str, current_user = Depends(get_current_user)):
     return counts
 
 @api_router.post('/counting/{batch_id}', response_model=Counting)
+@serialized_stock_write(lambda: db)
 async def add_counting(batch_id: str, data: CountingCreate, current_user = Depends(get_current_user)):
     import uuid
     
@@ -2010,6 +1917,7 @@ async def get_trash(current_user = Depends(get_current_user)):
     return items
 
 @api_router.post('/trash/restore/{item_id}')
+@serialized_stock_write(lambda: db)
 async def restore_from_trash(item_id: str, current_user = Depends(get_current_user)):
     trash_item = await db.trash.find_one({'id': item_id}, {'_id': 0})
     if not trash_item:
@@ -2027,11 +1935,47 @@ async def restore_from_trash(item_id: str, current_user = Depends(get_current_us
         'team_member': 'team'
     }
     
+    if item_type in ('product_batch', 'raw_material_batch'):
+        collection = db[collection_map[item_type]]
+        async with stock_operation(collection, item_data['id'], deleted=True) as item:
+            if item_type == 'product_batch':
+                # Só refazer uma baixa que a exclusão comprovadamente devolveu.
+                if not item.get('inventory_returned'):
+                    raise HTTPException(status_code=409, detail='Exclusão antiga sem comprovante de devolução. Confira o estoque antes de restaurar')
+                product = await db.products.find_one({'id': item['product_id'], 'deleted': False}, {'_id': 0})
+                if not product:
+                    raise HTTPException(status_code=404, detail='Produto não encontrado')
+                try:
+                    usage = await compute_and_deduct_for_batch(product, item['planned_liters'])
+                except ValueError as exc:
+                    raise HTTPException(status_code=400, detail=str(exc))
+                fields = {'deleted': False, 'raw_materials_used': usage, 'inventory_deducted': True, 'inventory_returned': False}
+                try:
+                    await collection.update_one({'id': item['id']}, {'$set': fields})
+                except Exception:
+                    await restore_usages(db, usage)
+                    raise
+            else:
+                # Quantidade original recebida não deve ser somada novamente:
+                # só retorna o saldo restante que saiu com a exclusão.
+                if not item.get('stock_removed_on_delete'):
+                    raise HTTPException(status_code=409, detail='Exclusão antiga sem comprovante de baixa. Confira o estoque antes de restaurar')
+                material = await db.raw_materials.find_one({'id': item['raw_material_id']}, {'_id': 0})
+                if not material or material.get('deleted'):
+                    raise HTTPException(status_code=409, detail='Restaure o cadastro da matéria-prima antes do lote')
+                if material.get('last_physical_count_id') and item.get('stock_count_id_on_delete') != material['last_physical_count_id']:
+                    raise HTTPException(status_code=409, detail='Esta exclusão é anterior à última contagem física. Confira a movimentação antes de somar estoque antigo')
+                amount = stock_quantity(item.get('quantity', 0))
+                await db.raw_materials.update_one({'id': item['raw_material_id']}, {'$inc': {'total_stock': amount}})
+                try:
+                    await collection.update_one({'id': item['id']}, {'$set': {'deleted': False, 'stock_removed_on_delete': False}})
+                except Exception:
+                    await db.raw_materials.update_one({'id': item['raw_material_id']}, {'$inc': {'total_stock': -amount}})
+                    raise
+        await db.trash.delete_one({'id': item_id})
+        return {'message': 'Item restored'}
     if item_type in collection_map:
-        await db[collection_map[item_type]].update_one(
-            {'id': item_data['id']},
-            {'$set': {'deleted': False}}
-        )
+        await db[collection_map[item_type]].update_one({'id': item_data['id']}, {'$set': {'deleted': False}})
         await db.trash.delete_one({'id': item_id})
         return {'message': 'Item restored'}
     
@@ -2047,6 +1991,7 @@ async def delete_from_trash_permanently(item_id: str, current_user = Depends(get
 # ========== MONTHLY ARCHIVE ==========
 
 @api_router.post('/archive/auto-archive-month')
+@serialized_stock_write(lambda: db)
 async def auto_archive_finished_items(current_user = Depends(get_current_user)):
     """
     Arquiva automaticamente TODOS os itens finalizados, independente do mês.
@@ -2057,7 +2002,8 @@ async def auto_archive_finished_items(current_user = Depends(get_current_user)):
     # Mover lotes de produtos finalizados
     product_batches = await db.product_batches.find({
         'status': 'finalizado',
-        'deleted': False
+        'deleted': False,
+        '_stock_operation': None,
     }, {'_id': 0}).to_list(10000)
     
     archived_products = 0
@@ -2088,7 +2034,8 @@ async def auto_archive_finished_items(current_user = Depends(get_current_user)):
             {'status': 'finalizado'},
             {'quantity': {'$lte': 0}}  # Incluir lotes zerados
         ],
-        'deleted': False
+        'deleted': False,
+        '_stock_operation': None,
     }, {'_id': 0}).to_list(10000)
     
     archived_materials = 0
@@ -3772,7 +3719,7 @@ async def delete_purchase_order(order_id: str, current_user=Depends(get_current_
 
 class LoteEntry(BaseModel):
     raw_material_id: str
-    quantity: float
+    quantity: float = Field(gt=0, allow_inf_nan=False)
     supplier_batch_number: str = ''
     expiry_date: str = ''
 
@@ -3817,6 +3764,7 @@ async def lote_preview_from_order(order_id: str, current_user=Depends(get_curren
 
 
 @api_router.post('/purchase-orders/{order_id}/generate-batches')
+@serialized_stock_write(lambda: db)
 async def generate_batches_from_order(order_id: str, req: GenerateBatchesRequest, current_user=Depends(get_current_user)):
     """
     'Soltar lotes' de todas as matérias-primas do pedido de uma só vez.
@@ -3824,50 +3772,50 @@ async def generate_batches_from_order(order_id: str, req: GenerateBatchesRequest
     automático sequencial; o lote do fornecedor e a validade são informados manualmente.
     """
     require_pedidos_access(current_user)
-    order = await db.purchase_orders.find_one({'id': order_id}, {'_id': 0})
-    if not order:
-        raise HTTPException(status_code=404, detail='Pedido não encontrado')
     if not req.entries:
         raise HTTPException(status_code=400, detail='Nenhuma matéria-prima para lotear')
-
     date_str = req.date or datetime.now(timezone.utc).date().isoformat()
-    created = []
-    for e in req.entries:
-        rm = await db.raw_materials.find_one({'id': e.raw_material_id, 'deleted': False}, {'_id': 0})
+    try:
+        datetime.fromisoformat(date_str)
+    except ValueError:
+        raise HTTPException(status_code=400, detail='Data inválida')
+    # Validar todos os itens antes de somar qualquer quantidade.
+    materials = {}
+    for entry in req.entries:
+        rm = await db.raw_materials.find_one({'id': entry.raw_material_id, 'deleted': False}, {'_id': 0})
         if not rm:
-            continue
-        batch_number = await generate_batch_number(date_str)
-        batch_id = str(uuid.uuid4())
-        batch_doc = {
-            'id': batch_id,
-            'raw_material_id': e.raw_material_id,
-            'batch_number': batch_number,
-            'date': date_str,
-            'quantity': float(e.quantity or 0),
-            'supplier_batch_number': e.supplier_batch_number or '',
-            'expiry_date': e.expiry_date or '',
-            'status': 'em_aberto',
-            'created_at': datetime.now(timezone.utc).isoformat(),
-            'deleted': False,
-            'is_custom': False,
-            'source_order_id': order_id,
-        }
-        await db.raw_material_batches.insert_one(batch_doc)
-        await db.raw_materials.update_one(
-            {'id': e.raw_material_id},
-            {'$inc': {'total_stock': float(e.quantity or 0)}}
-        )
-        created.append({
-            'raw_material_name': rm.get('name', ''),
-            'batch_number': batch_number,
-            'quantity': float(e.quantity or 0),
-            'unit': rm.get('type', 'Kg'),
-        })
-
-    await db.purchase_orders.update_one(
-        {'id': order_id},
-        {'$set': {'batched': True, 'batched_at': datetime.now(timezone.utc).isoformat()}}
-    )
+            raise HTTPException(status_code=400, detail='Uma matéria-prima do pedido não existe mais')
+        materials[entry.raw_material_id] = rm
+    created, receipts = [], []
+    async with stock_operation(db.purchase_orders, order_id) as order:
+        if order.get('batched'):
+            raise HTTPException(status_code=409, detail='Os lotes deste pedido já foram recebidos. O estoque não foi somado novamente')
+        try:
+            for entry in req.entries:
+                rm = materials[entry.raw_material_id]
+                batch_number = await generate_batch_number(date_str)
+                batch_doc = {
+                    'id': str(uuid4()), 'raw_material_id': entry.raw_material_id,
+                    'batch_number': batch_number, 'date': date_str, 'quantity': entry.quantity,
+                    'supplier_batch_number': entry.supplier_batch_number, 'expiry_date': entry.expiry_date,
+                    'status': 'em_aberto', 'created_at': datetime.now(timezone.utc).isoformat(),
+                    'deleted': False, 'is_custom': False, 'source_order_id': order_id,
+                    '_stock_operation': order_id,  # liberar para consumo somente depois de completar o pedido
+                }
+                await receive_batch(db, batch_doc)
+                receipts.append(batch_doc)
+                created.append({'raw_material_name': rm.get('name', ''), 'batch_number': batch_number,
+                                'quantity': entry.quantity, 'unit': rm.get('type', 'Kg')})
+            await db.purchase_orders.update_one({'id': order_id}, {'$set': {
+                'batched': True, 'batched_at': datetime.now(timezone.utc).isoformat(),
+            }})
+        except Exception:
+            for receipt in reversed(receipts):
+                await db.raw_materials.update_one({'id': receipt['raw_material_id']}, {'$inc': {'total_stock': -receipt['quantity']}})
+                await db.raw_material_batches.delete_one({'id': receipt['id']})
+            raise
+        for receipt in receipts:
+            await db.raw_material_batches.update_one({'id': receipt['id']}, {'$unset': {'_stock_operation': ''}})
     return {'created': created, 'count': len(created)}
 
 

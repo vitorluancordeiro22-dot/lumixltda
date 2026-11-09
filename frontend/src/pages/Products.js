@@ -238,7 +238,7 @@ export const Products = () => {
       }
     } catch (error) {
       if (isMountedRef.current) {
-        toast.error('Erro ao criar lote');
+        toast.error(error.response?.data?.detail || 'Erro ao criar lote');
       }
     } finally {
       if (isMountedRef.current) {

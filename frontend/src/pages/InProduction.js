@@ -1,6 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
 import api from '../lib/api';
-import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
@@ -10,20 +9,12 @@ import { toast } from 'sonner';
 import { Factory, Package, Calendar, Search, CheckCircle, Clock } from 'lucide-react';
 
 export const InProduction = () => {
-  const { user } = useAuth();
   const [batches, setBatches] = useState([]);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [releasing, setReleasing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const isMountedRef = useRef(true);
-
-  // Emails autorizados para liberar lotes
-  const authorizedEmails = [
-  'laboratoriolumix@outlook.com',
-  'luan_ssss@hotmail.com'
-];
-  const canRelease = authorizedEmails.includes(user?.email);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -128,15 +119,6 @@ export const InProduction = () => {
         />
       </div>
 
-      {/* Info Card para usuários não autorizados */}
-      {!canRelease && (
-        <Card className="p-4 border-amber-300 bg-amber-50">
-          <p className="text-amber-800 text-sm">
-            <strong>Atenção:</strong> Apenas usuários autorizados podem liberar lotes para envase.
-          </p>
-        </Card>
-      )}
-
       {/* Lista de Lotes */}
       {filteredBatches.length === 0 ? (
         <Card className="p-12 border text-center">
@@ -183,7 +165,6 @@ export const InProduction = () => {
               </div>
 
               {/* Botão de Liberação */}
-              {canRelease ? (
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button 
@@ -227,13 +208,6 @@ export const InProduction = () => {
                     </AlertDialogFooter>
                   </AlertDialogContent>
                 </AlertDialog>
-              ) : (
-                <div className="p-3 rounded-lg bg-muted text-center">
-                  <p className="text-sm text-muted-foreground">
-                    Aguardando liberação pelo laboratório
-                  </p>
-                </div>
-              )}
             </Card>
           ))}
         </div>
