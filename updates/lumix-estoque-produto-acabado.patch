@@ -1,0 +1,2015 @@
+diff --git a/backend/finished_stock.py b/backend/finished_stock.py
+new file mode 100644
+index 0000000..ac0b4d2
+--- /dev/null
++++ b/backend/finished_stock.py
+@@ -0,0 +1,505 @@
++"""Estoque de produto acabado (garrafas prontas).
++
++Coleções novas, nenhuma coleção existente é alterada:
++  finished_stock_lots       saldo por produto + tamanho + lote
++  finished_stock_movements  histórico de entradas, saídas e estornos
++  finished_stock_lists      listas de gestão (estoque -> depósito)
++  finished_stock_locks      trava curta por produto durante uma movimentação
++  product_barcodes          código de barras -> produto + tamanho
++
++Nos produtos só são gravados dois campos opcionais novos:
++  stock_sizes     tamanhos que o produto possui (ex.: ['one_liter', 'five_liter'])
++  stock_minimums  quantidade mínima por tamanho (ex.: {'one_liter': 10})
++"""
++from contextlib import asynccontextmanager
++from datetime import datetime, timezone, timedelta
++from typing import Dict, List, Optional
++from uuid import uuid4
++
++from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
++from pydantic import BaseModel, Field
++from pymongo.errors import DuplicateKeyError
++
++# Mesmos campos usados pela Contagem, para casar com o que foi envasado.
++SIZES = {
++    'half_liter': {'label': '500ml', 'kind': 'L', 'order': 1},
++    'one_liter': {'label': '1L', 'kind': 'L', 'order': 2},
++    'two_liter': {'label': '2L', 'kind': 'L', 'order': 3},
++    'five_liter': {'label': '5L', 'kind': 'L', 'order': 4},
++    'three_thirty_gram': {'label': '330g', 'kind': 'Kg', 'order': 5},
++    'five_hundred_gram': {'label': '500g', 'kind': 'Kg', 'order': 6},
++    'one_kg': {'label': '1Kg', 'kind': 'Kg', 'order': 7},
++}
++MIXED = 'misturado'  # lote desconhecido / lotes misturados (inventário inicial)
++LOCK_TIMEOUT = timedelta(seconds=60)
++
++
++def now_iso():
++    return datetime.now(timezone.utc).isoformat()
++
++
++def product_kind(product):
++    unit = (product.get('unit') or 'L').lower()
++    return 'Kg' if ('kg' in unit or 'g' in unit or 'quilo' in unit) else 'L'
++
++
++def product_sizes(product):
++    """Tamanhos configurados; sem configuração, todos os do tipo do produto."""
++    kind = product_kind(product)
++    configured = [s for s in (product.get('stock_sizes') or []) if s in SIZES and SIZES[s]['kind'] == kind]
++    if configured:
++        return sorted(set(configured), key=lambda s: SIZES[s]['order'])
++    return [s for s in sorted(SIZES, key=lambda s: SIZES[s]['order']) if SIZES[s]['kind'] == kind]
++
++
++def counted_by_size(countings):
++    totals = {size: 0 for size in SIZES}
++    for count in countings or []:
++        for size in SIZES:
++            totals[size] += int(count.get(size) or 0)
++    return totals
++
++
++def plan_exit(lots, quantity):
++    """Retira primeiro do lote mais antigo; lotes misturados (inventário) saem antes."""
++    ordered = sorted(
++        (lot for lot in lots if lot.get('quantity', 0) > 0),
++        key=lambda lot: (lot.get('batch_id') is not None, lot.get('batch_date') or '', lot.get('batch_number') or ''),
++    )
++    remaining, allocations = quantity, []
++    for lot in ordered:
++        if remaining <= 0:
++            break
++        take = min(int(lot['quantity']), remaining)
++        allocations.append({'lot_id': lot['id'], 'batch_id': lot.get('batch_id'),
++                            'batch_number': lot.get('batch_number') or MIXED, 'quantity': take})
++        remaining -= take
++    if remaining > 0:
++        raise ValueError(f'Estoque insuficiente: disponível {quantity - remaining}, pedido {quantity}')
++    return allocations
++
++
++def low_stock_message(product_name, size, after, minimum):
++    label = SIZES[size]['label']
++    unidades = 'unidade' if after == 1 else 'unidades'
++    return (f'{product_name} {label}: apenas {after} {unidades} no estoque (mínimo {minimum}). '
++            'Necessita nova ordem de produção.')
++
++
++def should_notify(before, after, minimum):
++    return minimum > 0 and after <= minimum < before
++
++
++# ========== MODELOS ==========
++
++class EntryCreate(BaseModel):
++    product_id: str
++    size: str
++    quantity: int = Field(gt=0, le=1_000_000)
++    batch_id: Optional[str] = None
++    mode: str = 'normal'  # normal (limitado pela Contagem) | inventario (sem limite, lote opcional)
++    operator: str = ''
++    note: str = ''
++
++
++class ExitItem(BaseModel):
++    product_id: str
++    size: str
++    quantity: int = Field(gt=0, le=1_000_000)
++
++
++class ExitCreate(BaseModel):
++    items: List[ExitItem] = Field(min_length=1, max_length=200)
++    operator: str = ''
++    note: str = ''
++
++
++class ListCreate(BaseModel):
++    items: List[ExitItem] = Field(min_length=1, max_length=200)
++    note: str = ''
++
++
++class ListConfirm(BaseModel):
++    operator: str = ''
++
++
++class ProductStockConfig(BaseModel):
++    sizes: List[str] = Field(default_factory=list)
++    minimums: Dict[str, int] = Field(default_factory=dict)
++
++
++class BarcodeSet(BaseModel):
++    product_id: str
++    size: str
++    code: str = ''  # vazio remove
++
++
++def setup_finished_stock_routes(api_router: APIRouter, db, get_current_user, broadcast_push):
++    router = APIRouter(prefix='/finished-stock')
++
++    # ---------- utilidades ----------
++
++    @asynccontextmanager
++    async def product_lock(product_ids):
++        owner, held = str(uuid4()), []
++        try:
++            for pid in sorted(set(product_ids)):
++                for attempt in range(2):
++                    try:
++                        await db.finished_stock_locks.insert_one({'_id': pid, 'owner': owner, 'at': now_iso()})
++                        held.append(pid)
++                        break
++                    except DuplicateKeyError:
++                        current = await db.finished_stock_locks.find_one({'_id': pid}) or {}
++                        stale = current.get('at', '') < (datetime.now(timezone.utc) - LOCK_TIMEOUT).isoformat()
++                        if attempt == 0 and stale:
++                            await db.finished_stock_locks.delete_one({'_id': pid, 'owner': current.get('owner')})
++                            continue
++                        raise HTTPException(status_code=409, detail='Outra movimentação deste produto está em andamento. Tente novamente')
++            yield
++        finally:
++            for pid in held:
++                await db.finished_stock_locks.delete_one({'_id': pid, 'owner': owner})
++
++    async def get_product(product_id):
++        product = await db.products.find_one({'id': product_id, 'deleted': False}, {'_id': 0})
++        if not product:
++            raise HTTPException(status_code=404, detail='Produto não encontrado')
++        return product
++
++    def check_size(product, size):
++        if size not in SIZES:
++            raise HTTPException(status_code=400, detail='Tamanho inválido')
++        if size not in product_sizes(product):
++            raise HTTPException(status_code=400, detail=f"{product.get('name', 'Produto')} não possui o tamanho {SIZES[size]['label']}")
++
++    async def find_batch(product_id, batch_id):
++        """Lote ativo ou arquivado do produto, com as garrafas contadas por tamanho."""
++        batch = await db.product_batches.find_one({'id': batch_id, 'product_id': product_id, 'deleted': False}, {'_id': 0})
++        if batch:
++            countings = await db.counting.find({'product_batch_id': batch_id}, {'_id': 0}).to_list(None)
++            return batch, counted_by_size(countings), batch.get('status', '')
++        batch = await db.archived_product_batches.find_one({'id': batch_id, 'product_id': product_id}, {'_id': 0})
++        if batch:
++            return batch, counted_by_size(batch.get('countings_history')), 'arquivado'
++        return None, None, None
++
++    async def entered_normal(product_id, size, batch_id):
++        rows = await db.finished_stock_movements.find({
++            'type': 'entrada', 'mode': 'normal', 'cancelled': {'$ne': True},
++            'product_id': product_id, 'size': size, 'batch_id': batch_id,
++        }, {'_id': 0, 'quantity': 1}).to_list(None)
++        return sum(int(r.get('quantity', 0)) for r in rows)
++
++    async def size_total(product_id, size):
++        lots = await db.finished_stock_lots.find({'product_id': product_id, 'size': size}, {'_id': 0}).to_list(None)
++        return sum(int(lot.get('quantity', 0)) for lot in lots)
++
++    def operator_name(data_operator, user):
++        return (data_operator or '').strip() or user.get('name') or user.get('email', '')
++
++    async def notify_low(product, size, before, after, background):
++        minimum = int((product.get('stock_minimums') or {}).get(size, 0) or 0)
++        if not should_notify(before, after, minimum):
++            return None
++        doc = {
++            'id': str(uuid4()),
++            'product_name': f"{product.get('name', '')} {SIZES[size]['label']}",
++            'message': low_stock_message(product.get('name', ''), size, after, minimum),
++            'created_by': 'Estoque (automático)',
++            'created_at': now_iso(),
++            'deleted': False,
++            'source': 'finished_stock',
++        }
++        await db.notifications.insert_one(doc)
++        doc.pop('_id', None)
++        background.add_task(broadcast_push, 'Lumix — Estoque mínimo', doc['message'], '/notificar')
++        return doc
++
++    async def apply_exits(items, operator, note, user, background, list_id=None):
++        grouped = {}
++        for item in items:
++            key = (item.product_id, item.size)
++            grouped[key] = grouped.get(key, 0) + item.quantity
++        async with product_lock([pid for pid, _ in grouped]):
++            plans = []
++            for (pid, size), qty in grouped.items():
++                product = await get_product(pid)
++                check_size(product, size)
++                lots = await db.finished_stock_lots.find({'product_id': pid, 'size': size}, {'_id': 0}).to_list(None)
++                try:
++                    allocations = plan_exit(lots, qty)
++                except ValueError as exc:
++                    raise HTTPException(status_code=400, detail=f"{product.get('name')} {SIZES[size]['label']}: {exc}")
++                before = sum(int(lot.get('quantity', 0)) for lot in lots)
++                plans.append((product, size, qty, allocations, before))
++            # Tudo validado: só agora grava.
++            movements, notifications = [], []
++            for product, size, qty, allocations, before in plans:
++                for alloc in allocations:
++                    await db.finished_stock_lots.update_one(
++                        {'id': alloc['lot_id']}, {'$inc': {'quantity': -alloc['quantity']}, '$set': {'updated_at': now_iso()}})
++                movement = {
++                    'id': str(uuid4()), 'type': 'saida', 'mode': 'normal',
++                    'product_id': product['id'], 'product_name': product.get('name', ''),
++                    'size': size, 'size_label': SIZES[size]['label'], 'quantity': qty,
++                    'batch_id': None, 'batch_number': ', '.join(a['batch_number'] for a in allocations),
++                    'allocations': allocations, 'operator': operator, 'note': note.strip(),
++                    'list_id': list_id, 'created_by': user.get('name') or user.get('email', ''),
++                    'created_at': now_iso(), 'cancelled': False,
++                }
++                await db.finished_stock_movements.insert_one(movement)
++                movement.pop('_id', None)
++                movements.append(movement)
++                after = before - qty
++                notice = await notify_low(product, size, before, after, background)
++                if notice:
++                    notifications.append(notice)
++        return {'movements': movements, 'notifications': notifications}
++
++    # ---------- consulta ----------
++
++    @router.get('/overview')
++    async def overview(current_user=Depends(get_current_user)):
++        products = await db.products.find({'deleted': False}, {'_id': 0, 'recipes': 0, 'file_models': 0}).to_list(None)
++        lots = await db.finished_stock_lots.find({'quantity': {'$gt': 0}}, {'_id': 0}).to_list(None)
++        codes = await db.product_barcodes.find({}, {'_id': 1, 'product_id': 1, 'size': 1}).to_list(None)
++        by_key, code_map = {}, {}
++        for lot in lots:
++            by_key.setdefault((lot['product_id'], lot['size']), []).append(lot)
++        for c in codes:
++            code_map[(c['product_id'], c['size'])] = c['_id']
++        result = []
++        for product in sorted(products, key=lambda p: (p.get('name') or '').lower()):
++            minimums = product.get('stock_minimums') or {}
++            sizes = []
++            for size in product_sizes(product):
++                size_lots = sorted(by_key.get((product['id'], size), []),
++                                   key=lambda lot: (lot.get('batch_id') is not None, lot.get('batch_date') or ''))
++                total = sum(int(lot['quantity']) for lot in size_lots)
++                minimum = int(minimums.get(size, 0) or 0)
++                sizes.append({
++                    'size': size, 'label': SIZES[size]['label'], 'quantity': total, 'minimum': minimum,
++                    'low': minimum > 0 and total <= minimum,
++                    'barcode': code_map.get((product['id'], size), ''),
++                    'lots': [{'batch_id': lot.get('batch_id'), 'batch_number': lot.get('batch_number') or MIXED,
++                              'quantity': int(lot['quantity'])} for lot in size_lots],
++                })
++            result.append({'product_id': product['id'], 'name': product.get('name', ''),
++                           'kind': product_kind(product), 'configured': bool(product.get('stock_sizes')),
++                           'sizes': sizes})
++        return {'sizes': [{'size': k, **v} for k, v in sorted(SIZES.items(), key=lambda kv: kv[1]['order'])],
++                'products': result}
++
++    @router.get('/products/{product_id}/batches')
++    async def product_batches(product_id: str, size: Optional[str] = None, current_user=Depends(get_current_user)):
++        product = await get_product(product_id)
++        active = await db.product_batches.find({'product_id': product_id, 'deleted': False}, {'_id': 0}).to_list(None)
++        archived = await db.archived_product_batches.find({'product_id': product_id}, {'_id': 0}).to_list(None)
++        active_ids = [b['id'] for b in active]
++        countings = await db.counting.find({'product_batch_id': {'$in': active_ids}}, {'_id': 0}).to_list(None) if active_ids else []
++        by_batch = {}
++        for c in countings:
++            by_batch.setdefault(c['product_batch_id'], []).append(c)
++        entries = await db.finished_stock_movements.find({
++            'type': 'entrada', 'mode': 'normal', 'cancelled': {'$ne': True}, 'product_id': product_id,
++        }, {'_id': 0, 'batch_id': 1, 'size': 1, 'quantity': 1}).to_list(None)
++        entered = {}
++        for e in entries:
++            entered[(e['batch_id'], e['size'])] = entered.get((e['batch_id'], e['size']), 0) + int(e['quantity'])
++        rows = []
++        for batch, counted, status in (
++            [(b, counted_by_size(by_batch.get(b['id'])), b.get('status', '')) for b in active] +
++            [(b, counted_by_size(b.get('countings_history')), 'arquivado') for b in archived]
++        ):
++            per_size = {}
++            for s in product_sizes(product):
++                done = entered.get((batch['id'], s), 0)
++                per_size[s] = {'counted': counted[s], 'entered': done, 'available': max(counted[s] - done, 0)}
++            rows.append({'batch_id': batch['id'], 'batch_number': batch.get('batch_number', ''),
++                         'date': batch.get('date', ''), 'status': status, 'sizes': per_size})
++        if size:
++            rows = [r for r in rows if size in r['sizes']]
++        rows.sort(key=lambda r: (r['date'], r['batch_number']), reverse=True)
++        return rows
++
++    @router.get('/movements')
++    async def movements(product_id: Optional[str] = None, limit: int = 100, current_user=Depends(get_current_user)):
++        query = {'product_id': product_id} if product_id else {}
++        limit = max(1, min(limit, 500))
++        return await db.finished_stock_movements.find(query, {'_id': 0}).sort('created_at', -1).to_list(limit)
++
++    @router.get('/barcode/{code}')
++    async def lookup_barcode(code: str, current_user=Depends(get_current_user)):
++        found = await db.product_barcodes.find_one({'_id': code.strip()})
++        if not found:
++            raise HTTPException(status_code=404, detail='Código de barras não cadastrado')
++        product = await get_product(found['product_id'])
++        return {'code': found['_id'], 'product_id': product['id'], 'name': product.get('name', ''),
++                'size': found['size'], 'label': SIZES.get(found['size'], {}).get('label', '')}
++
++    # ---------- movimentações ----------
++
++    @router.post('/entries')
++    async def create_entry(data: EntryCreate, current_user=Depends(get_current_user)):
++        if data.mode not in ('normal', 'inventario'):
++            raise HTTPException(status_code=400, detail='Modo inválido')
++        product = await get_product(data.product_id)
++        check_size(product, data.size)
++        batch, batch_number, batch_date = None, MIXED, ''
++        if data.batch_id:
++            batch, counted, _ = await find_batch(data.product_id, data.batch_id)
++            if not batch:
++                raise HTTPException(status_code=404, detail='Lote não encontrado para este produto')
++            batch_number, batch_date = batch.get('batch_number', ''), batch.get('date', '')
++        elif data.mode == 'normal':
++            raise HTTPException(status_code=400, detail='Selecione o lote')
++        async with product_lock([data.product_id]):
++            if data.mode == 'normal':
++                done = await entered_normal(data.product_id, data.size, data.batch_id)
++                available = counted[data.size] - done
++                if data.quantity > available:
++                    raise HTTPException(status_code=400, detail=(
++                        f"O lote {batch_number} tem {counted[data.size]} unidades de {SIZES[data.size]['label']} na Contagem "
++                        f"e {done} já entraram no estoque. Disponível: {max(available, 0)}"))
++            batch_key = data.batch_id or MIXED
++            lot_id = f'{data.product_id}:{data.size}:{batch_key}'
++            await db.finished_stock_lots.update_one(
++                {'id': lot_id},
++                {'$inc': {'quantity': data.quantity},
++                 '$set': {'updated_at': now_iso(), 'batch_number': batch_number, 'batch_date': batch_date},
++                 '$setOnInsert': {'product_id': data.product_id, 'size': data.size,
++                                  'batch_id': data.batch_id, 'created_at': now_iso()}},
++                upsert=True,
++            )
++            movement = {
++                'id': str(uuid4()), 'type': 'entrada', 'mode': data.mode,
++                'product_id': product['id'], 'product_name': product.get('name', ''),
++                'size': data.size, 'size_label': SIZES[data.size]['label'], 'quantity': data.quantity,
++                'batch_id': data.batch_id, 'batch_number': batch_number,
++                'allocations': [{'lot_id': lot_id, 'batch_id': data.batch_id, 'batch_number': batch_number, 'quantity': data.quantity}],
++                'operator': operator_name(data.operator, current_user), 'note': data.note.strip(), 'list_id': None,
++                'created_by': current_user.get('name') or current_user.get('email', ''),
++                'created_at': now_iso(), 'cancelled': False,
++            }
++            await db.finished_stock_movements.insert_one(movement)
++            movement.pop('_id', None)
++        return movement
++
++    @router.post('/exits')
++    async def create_exit(data: ExitCreate, background: BackgroundTasks, current_user=Depends(get_current_user)):
++        return await apply_exits(data.items, operator_name(data.operator, current_user), data.note, current_user, background)
++
++    @router.post('/movements/{movement_id}/cancel')
++    async def cancel_movement(movement_id: str, current_user=Depends(get_current_user)):
++        movement = await db.finished_stock_movements.find_one({'id': movement_id}, {'_id': 0})
++        if not movement:
++            raise HTTPException(status_code=404, detail='Movimentação não encontrada')
++        async with product_lock([movement['product_id']]):
++            movement = await db.finished_stock_movements.find_one({'id': movement_id}, {'_id': 0})
++            if movement.get('cancelled'):
++                raise HTTPException(status_code=400, detail='Esta movimentação já foi estornada')
++            sign = -1 if movement['type'] == 'entrada' else 1
++            if sign < 0:
++                for alloc in movement['allocations']:
++                    lot = await db.finished_stock_lots.find_one({'id': alloc['lot_id']}, {'_id': 0}) or {}
++                    if int(lot.get('quantity', 0)) < alloc['quantity']:
++                        raise HTTPException(status_code=400, detail=(
++                            'Não é possível estornar: parte dessas unidades já saiu do estoque. Estorne a saída primeiro'))
++            for alloc in movement['allocations']:
++                await db.finished_stock_lots.update_one(
++                    {'id': alloc['lot_id']}, {'$inc': {'quantity': sign * alloc['quantity']}, '$set': {'updated_at': now_iso()}})
++            await db.finished_stock_movements.update_one({'id': movement_id}, {'$set': {
++                'cancelled': True, 'cancelled_at': now_iso(),
++                'cancelled_by': current_user.get('name') or current_user.get('email', '')}})
++        return {'message': 'Movimentação estornada'}
++
++    # ---------- lista de gestão (estoque -> depósito) ----------
++
++    @router.get('/lists')
++    async def get_lists(current_user=Depends(get_current_user)):
++        return await db.finished_stock_lists.find({'status': {'$ne': 'cancelada'}}, {'_id': 0}).sort('created_at', -1).to_list(50)
++
++    @router.post('/lists')
++    async def create_list(data: ListCreate, current_user=Depends(get_current_user)):
++        items = []
++        for item in data.items:
++            product = await get_product(item.product_id)
++            check_size(product, item.size)
++            items.append({'product_id': product['id'], 'name': product.get('name', ''), 'size': item.size,
++                          'label': SIZES[item.size]['label'], 'quantity': item.quantity})
++        doc = {'id': str(uuid4()), 'items': items, 'note': data.note.strip(), 'status': 'pendente',
++               'created_by': current_user.get('name') or current_user.get('email', ''), 'created_at': now_iso()}
++        await db.finished_stock_lists.insert_one(doc)
++        doc.pop('_id', None)
++        return doc
++
++    @router.post('/lists/{list_id}/confirm')
++    async def confirm_list(list_id: str, data: ListConfirm, background: BackgroundTasks, current_user=Depends(get_current_user)):
++        claimed = await db.finished_stock_lists.update_one(
++            {'id': list_id, 'status': 'pendente'}, {'$set': {'status': 'confirmando'}})
++        if claimed.matched_count != 1:
++            raise HTTPException(status_code=400, detail='Lista não encontrada ou já confirmada')
++        lst = await db.finished_stock_lists.find_one({'id': list_id}, {'_id': 0})
++        try:
++            result = await apply_exits([ExitItem(**i) for i in lst['items']], operator_name(data.operator, current_user),
++                                       f'Lista de gestão {list_id[:8]}', current_user, background, list_id=list_id)
++        except Exception:
++            await db.finished_stock_lists.update_one({'id': list_id}, {'$set': {'status': 'pendente'}})
++            raise
++        await db.finished_stock_lists.update_one({'id': list_id}, {'$set': {
++            'status': 'confirmada', 'confirmed_at': now_iso(),
++            'confirmed_by': operator_name(data.operator, current_user)}})
++        return result
++
++    @router.delete('/lists/{list_id}')
++    async def cancel_list(list_id: str, current_user=Depends(get_current_user)):
++        result = await db.finished_stock_lists.update_one(
++            {'id': list_id, 'status': 'pendente'}, {'$set': {'status': 'cancelada'}})
++        if result.matched_count != 1:
++            raise HTTPException(status_code=400, detail='Só listas pendentes podem ser canceladas')
++        return {'message': 'Lista cancelada'}
++
++    # ---------- configuração ----------
++
++    @router.put('/products/{product_id}/config')
++    async def set_config(product_id: str, data: ProductStockConfig, current_user=Depends(get_current_user)):
++        product = await get_product(product_id)
++        kind = product_kind(product)
++        sizes = [s for s in data.sizes if s in SIZES]
++        if any(SIZES[s]['kind'] != kind for s in sizes):
++            raise HTTPException(status_code=400, detail='Tamanho incompatível com a unidade do produto')
++        minimums = {}
++        for size, value in data.minimums.items():
++            if size in SIZES and SIZES[size]['kind'] == kind:
++                if value < 0:
++                    raise HTTPException(status_code=400, detail='Quantidade mínima não pode ser negativa')
++                minimums[size] = int(value)
++        await db.products.update_one({'id': product_id}, {'$set': {
++            'stock_sizes': sorted(set(sizes), key=lambda s: SIZES[s]['order']), 'stock_minimums': minimums}})
++        return {'stock_sizes': sizes, 'stock_minimums': minimums}
++
++    @router.get('/barcodes')
++    async def list_barcodes(current_user=Depends(get_current_user)):
++        rows = await db.product_barcodes.find({}).to_list(None)
++        return [{'code': r['_id'], 'product_id': r['product_id'], 'size': r['size']} for r in rows]
++
++    @router.put('/barcodes')
++    async def set_barcode(data: BarcodeSet, current_user=Depends(get_current_user)):
++        product = await get_product(data.product_id)
++        if data.size not in SIZES or SIZES[data.size]['kind'] != product_kind(product):
++            raise HTTPException(status_code=400, detail='Tamanho inválido para este produto')
++        code = data.code.strip()
++        if code:
++            existing = await db.product_barcodes.find_one({'_id': code})
++            if existing and (existing['product_id'], existing['size']) != (data.product_id, data.size):
++                other = await db.products.find_one({'id': existing['product_id']}, {'_id': 0, 'name': 1}) or {}
++                raise HTTPException(status_code=400, detail=(
++                    f"Este código já está em {other.get('name', 'outro produto')} {SIZES.get(existing['size'], {}).get('label', '')}"))
++        await db.product_barcodes.delete_many({'product_id': data.product_id, 'size': data.size})
++        if code:
++            await db.product_barcodes.insert_one({'_id': code, 'product_id': data.product_id, 'size': data.size,
++                                                  'updated_at': now_iso()})
++        return {'code': code, 'product_id': data.product_id, 'size': data.size}
++
++    api_router.include_router(router)
+diff --git a/backend/server.py b/backend/server.py
+index 7074e44..d61a942 100644
+--- a/backend/server.py
++++ b/backend/server.py
+@@ -96,6 +96,8 @@ class Product(BaseModel):
+     expected_liters: float
+     recipes: List[ProductRecipe]
+     file_models: Optional[Dict] = None  # Arquivos modelo (OP, Ficha Análise)
++    stock_sizes: Optional[List[str]] = None  # Estoque: tamanhos que o produto possui
++    stock_minimums: Optional[Dict[str, int]] = None  # Estoque: mínimo por tamanho
+     created_at: str
+     deleted: bool = False
+ 
+@@ -4185,6 +4187,10 @@ async def delete_notification(notif_id: str, current_user=Depends(get_current_us
+     return {'message': 'Notificação removida'}
+ 
+ 
++# ========== ESTOQUE DE PRODUTO ACABADO ==========
++from finished_stock import setup_finished_stock_routes
++setup_finished_stock_routes(api_router, db, get_current_user, broadcast_push)
++
+ app.include_router(api_router)
+ 
+ app.add_middleware(
+diff --git a/backend/unit_tests/test_finished_stock.py b/backend/unit_tests/test_finished_stock.py
+new file mode 100644
+index 0000000..55243bf
+--- /dev/null
++++ b/backend/unit_tests/test_finished_stock.py
+@@ -0,0 +1,261 @@
++"""Estoque de produto acabado — testes offline (mongomock, sem banco real).
++
++PYTHONPATH=backend python -m unittest backend.unit_tests.test_finished_stock -v
++"""
++import asyncio
++import sys
++import unittest
++from pathlib import Path
++
++sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
++
++import mongomock
++from fastapi import APIRouter, FastAPI
++from fastapi.testclient import TestClient
++
++from finished_stock import plan_exit, setup_finished_stock_routes, should_notify
++
++
++class Cursor:
++    def __init__(self, cursor):
++        self.cursor = cursor
++
++    def sort(self, *args):
++        self.cursor = self.cursor.sort(*args)
++        return self
++
++    async def to_list(self, limit):
++        return list(self.cursor) if limit is None else list(self.cursor.limit(limit))
++
++
++class Collection:
++    def __init__(self, store, name):
++        self.store, self.name = store, name
++
++    def find(self, *args, **kwargs):
++        return Cursor(self.store[self.name].find(*args, **kwargs))
++
++    def __getattr__(self, method):
++        async def call(*args, **kwargs):
++            await asyncio.sleep(0)
++            return getattr(self.store[self.name], method)(*args, **kwargs)
++        return call
++
++
++class MemoryDB:
++    def __init__(self):
++        self.store = mongomock.MongoClient()['finished_stock_tests']
++
++    def __getattr__(self, name):
++        return Collection(self.store, name)
++
++
++USER = {'id': 'u1', 'name': 'Vitor', 'email': 'vitor@lumix.com'}
++
++
++def build():
++    db = MemoryDB()
++    pushes = []
++
++    async def fake_user():
++        return USER
++
++    async def fake_push(title, body, url='/notificar'):
++        pushes.append(body)
++
++    app, router = FastAPI(), APIRouter(prefix='/api')
++    setup_finished_stock_routes(router, db, fake_user, fake_push)
++    app.include_router(router)
++    s = db.store
++    s.products.insert_many([
++        {'id': 'desinf', 'name': 'Desinfetante', 'unit': 'Litros', 'deleted': False,
++         'stock_sizes': ['one_liter', 'five_liter'], 'stock_minimums': {'one_liter': 10}},
++        {'id': 'sabao', 'name': 'Sabão em pó', 'unit': 'Kg', 'deleted': False},
++        {'id': 'velho', 'name': 'Apagado', 'unit': 'Litros', 'deleted': True},
++    ])
++    # lote ativo: 80 garrafas de 1L contadas em duas contagens
++    s.product_batches.insert_one({'id': 'b1', 'product_id': 'desinf', 'batch_number': '2611001',
++                                  'date': '2026-11-02', 'status': 'finalizado', 'deleted': False})
++    s.counting.insert_many([{'id': 'c1', 'product_batch_id': 'b1', 'one_liter': 50},
++                            {'id': 'c2', 'product_batch_id': 'b1', 'one_liter': 30, 'five_liter': 4}])
++    # lote arquivado mais antigo
++    s.archived_product_batches.insert_one({'id': 'b0', 'product_id': 'desinf', 'batch_number': '2610050',
++                                           'date': '2026-10-20', 'status': 'finalizado',
++                                           'countings_history': [{'one_liter': 20}]})
++    return TestClient(app), db, pushes
++
++
++class PureRules(unittest.TestCase):
++    def test_exit_takes_mixed_then_oldest_lot_first(self):
++        lots = [{'id': 'new', 'batch_id': 'b2', 'batch_date': '2026-11-05', 'quantity': 5},
++                {'id': 'old', 'batch_id': 'b1', 'batch_date': '2026-10-01', 'quantity': 3},
++                {'id': 'mix', 'batch_id': None, 'batch_date': '', 'quantity': 2}]
++        self.assertEqual([(a['lot_id'], a['quantity']) for a in plan_exit(lots, 6)],
++                         [('mix', 2), ('old', 3), ('new', 1)])
++
++    def test_exit_beyond_stock_is_refused(self):
++        with self.assertRaisesRegex(ValueError, 'insuficiente'):
++            plan_exit([{'id': 'a', 'batch_id': 'b', 'quantity': 3}], 4)
++
++    def test_notification_only_when_crossing_minimum(self):
++        self.assertTrue(should_notify(35, 10, 10))
++        self.assertFalse(should_notify(10, 8, 10))   # já estava no mínimo
++        self.assertFalse(should_notify(35, 11, 10))
++        self.assertFalse(should_notify(5, 0, 0))     # sem mínimo configurado
++
++
++class StockFlow(unittest.TestCase):
++    def setUp(self):
++        self.client, self.db, self.pushes = build()
++
++    def entry(self, **kw):
++        body = {'product_id': 'desinf', 'size': 'one_liter', 'quantity': 1, 'batch_id': 'b1', 'operator': 'Vitor', **kw}
++        return self.client.post('/api/finished-stock/entries', json=body)
++
++    def total(self, product='desinf', size='one_liter'):
++        data = self.client.get('/api/finished-stock/overview').json()
++        prod = next(p for p in data['products'] if p['product_id'] == product)
++        return next(s for s in prod['sizes'] if s['size'] == size)
++
++    def test_example_from_production(self):
++        # Vitor fez 80 garrafas; 45 foram direto ao depósito; 35 entram no estoque (mínimo 10)
++        self.assertEqual(self.entry(quantity=35).status_code, 200)
++        self.assertEqual(self.total()['quantity'], 35)
++        self.assertFalse(self.total()['low'])
++        # Vitor tira 25
++        r = self.client.post('/api/finished-stock/exits', json={
++            'items': [{'product_id': 'desinf', 'size': 'one_liter', 'quantity': 25}], 'operator': 'Vitor'})
++        self.assertEqual(r.status_code, 200, r.text)
++        self.assertEqual(self.total()['quantity'], 10)
++        self.assertTrue(self.total()['low'])
++        notes = list(self.db.store.notifications.find())
++        self.assertEqual(len(notes), 1)
++        self.assertIn('apenas 10 unidades', notes[0]['message'])
++        self.assertIn('nova ordem de produção', notes[0]['message'])
++        self.assertEqual(len(self.pushes), 1)
++
++    def test_normal_entry_limited_by_counting(self):
++        self.assertEqual(self.entry(quantity=60).status_code, 200)
++        r = self.entry(quantity=21)
++        self.assertEqual(r.status_code, 400)
++        self.assertIn('Disponível: 20', r.json()['detail'])
++        self.assertEqual(self.entry(quantity=20).status_code, 200)
++        batches = self.client.get('/api/finished-stock/products/desinf/batches').json()
++        b1 = next(b for b in batches if b['batch_id'] == 'b1')
++        self.assertEqual(b1['sizes']['one_liter'], {'counted': 80, 'entered': 80, 'available': 0})
++        self.assertEqual(b1['sizes']['five_liter']['available'], 4)
++
++    def test_archived_batches_are_listed_and_usable(self):
++        batches = self.client.get('/api/finished-stock/products/desinf/batches').json()
++        self.assertEqual([b['batch_id'] for b in batches], ['b1', 'b0'])
++        self.assertEqual(batches[1]['status'], 'arquivado')
++        self.assertEqual(self.entry(batch_id='b0', quantity=20).status_code, 200)
++        self.assertEqual(self.entry(batch_id='b0', quantity=1).status_code, 400)
++
++    def test_inventory_mode_has_no_limit_and_optional_batch(self):
++        r = self.entry(mode='inventario', batch_id=None, quantity=500)
++        self.assertEqual(r.status_code, 200, r.text)
++        self.assertEqual(r.json()['batch_number'], 'misturado')
++        self.assertEqual(self.entry(mode='inventario', quantity=999).status_code, 200)  # com lote, sem limite
++        self.assertEqual(self.total()['quantity'], 1499)
++        # inventário não consome o limite da Contagem
++        self.assertEqual(self.entry(quantity=80).status_code, 200)
++
++    def test_normal_entry_requires_batch(self):
++        self.assertEqual(self.entry(batch_id=None).status_code, 400)
++
++    def test_size_product_does_not_have_is_refused(self):
++        r = self.entry(size='two_liter')
++        self.assertEqual(r.status_code, 400)
++        self.assertIn('não possui', r.json()['detail'])
++        self.assertEqual(self.entry(size='one_kg').status_code, 400)
++
++    def test_weight_product_defaults_to_weight_sizes(self):
++        data = self.client.get('/api/finished-stock/overview').json()
++        sabao = next(p for p in data['products'] if p['product_id'] == 'sabao')
++        self.assertEqual([s['label'] for s in sabao['sizes']], ['330g', '500g', '1Kg'])
++        self.assertNotIn('velho', [p['product_id'] for p in data['products']])
++
++    def test_exit_with_many_items_is_all_or_nothing(self):
++        self.entry(quantity=10)
++        r = self.client.post('/api/finished-stock/exits', json={'items': [
++            {'product_id': 'desinf', 'size': 'one_liter', 'quantity': 5},
++            {'product_id': 'desinf', 'size': 'five_liter', 'quantity': 1}]})
++        self.assertEqual(r.status_code, 400)
++        self.assertEqual(self.total()['quantity'], 10)
++        self.assertEqual(self.db.store.finished_stock_movements.count_documents({'type': 'saida'}), 0)
++
++    def test_cancel_entry_and_exit(self):
++        entry = self.entry(quantity=30).json()
++        out = self.client.post('/api/finished-stock/exits', json={
++            'items': [{'product_id': 'desinf', 'size': 'one_liter', 'quantity': 25}]}).json()['movements'][0]
++        # entrada não pode ser estornada enquanto a saída consome essas unidades
++        self.assertEqual(self.client.post(f"/api/finished-stock/movements/{entry['id']}/cancel").status_code, 400)
++        self.assertEqual(self.client.post(f"/api/finished-stock/movements/{out['id']}/cancel").status_code, 200)
++        self.assertEqual(self.total()['quantity'], 30)
++        self.assertEqual(self.client.post(f"/api/finished-stock/movements/{out['id']}/cancel").status_code, 400)
++        self.assertEqual(self.client.post(f"/api/finished-stock/movements/{entry['id']}/cancel").status_code, 200)
++        self.assertEqual(self.total()['quantity'], 0)
++        # estorno devolve o limite da Contagem
++        self.assertEqual(self.entry(quantity=80).status_code, 200)
++
++    def test_management_list_print_then_confirm(self):
++        self.entry(quantity=35)
++        lst = self.client.post('/api/finished-stock/lists', json={
++            'items': [{'product_id': 'desinf', 'size': 'one_liter', 'quantity': 25}]}).json()
++        self.assertEqual(lst['items'][0]['label'], '1L')
++        self.assertEqual(self.total()['quantity'], 35)  # criar a lista não mexe no estoque
++        r = self.client.post(f"/api/finished-stock/lists/{lst['id']}/confirm", json={'operator': 'Vitor'})
++        self.assertEqual(r.status_code, 200, r.text)
++        self.assertEqual(self.total()['quantity'], 10)
++        self.assertEqual(len(r.json()['notifications']), 1)
++        again = self.client.post(f"/api/finished-stock/lists/{lst['id']}/confirm", json={})
++        self.assertEqual(again.status_code, 400)
++        self.assertEqual(self.total()['quantity'], 10)
++
++    def test_failed_list_confirmation_stays_pending(self):
++        lst = self.client.post('/api/finished-stock/lists', json={
++            'items': [{'product_id': 'desinf', 'size': 'one_liter', 'quantity': 5}]}).json()
++        self.assertEqual(self.client.post(f"/api/finished-stock/lists/{lst['id']}/confirm", json={}).status_code, 400)
++        self.assertEqual(self.db.store.finished_stock_lists.find_one({'id': lst['id']})['status'], 'pendente')
++
++    def test_barcodes_register_lookup_and_uniqueness(self):
++        put = lambda **kw: self.client.put('/api/finished-stock/barcodes', json=kw)
++        self.assertEqual(put(product_id='desinf', size='one_liter', code='7890001').status_code, 200)
++        found = self.client.get('/api/finished-stock/barcode/7890001').json()
++        self.assertEqual((found['product_id'], found['size'], found['label']), ('desinf', 'one_liter', '1L'))
++        r = put(product_id='desinf', size='five_liter', code='7890001')
++        self.assertEqual(r.status_code, 400)
++        self.assertIn('Desinfetante 1L', r.json()['detail'])
++        self.assertEqual(put(product_id='desinf', size='one_liter', code='7890002').status_code, 200)  # troca
++        self.assertEqual(self.client.get('/api/finished-stock/barcode/7890001').status_code, 404)
++        self.assertEqual(self.total()['barcode'], '7890002')
++        self.assertEqual(put(product_id='desinf', size='one_liter', code='').status_code, 200)  # remove
++        self.assertEqual(self.client.get('/api/finished-stock/barcodes').json(), [])
++        self.assertEqual(put(product_id='desinf', size='one_kg', code='1').status_code, 400)
++
++    def test_product_config_sizes_and_minimums(self):
++        r = self.client.put('/api/finished-stock/products/sabao/config', json={
++            'sizes': ['one_kg'], 'minimums': {'one_kg': 5}})
++        self.assertEqual(r.status_code, 200)
++        sabao = next(p for p in self.client.get('/api/finished-stock/overview').json()['products']
++                     if p['product_id'] == 'sabao')
++        self.assertEqual([(s['label'], s['minimum']) for s in sabao['sizes']], [('1Kg', 5)])
++        self.assertEqual(self.client.put('/api/finished-stock/products/sabao/config', json={
++            'sizes': ['one_liter']}).status_code, 400)
++        self.assertEqual(self.client.put('/api/finished-stock/products/sabao/config', json={
++            'sizes': ['one_kg'], 'minimums': {'one_kg': -1}}).status_code, 400)
++        # dados de produção do produto não são tocados
++        doc = self.db.store.products.find_one({'id': 'sabao'})
++        self.assertEqual((doc['name'], doc['unit']), ('Sabão em pó', 'Kg'))
++
++    def test_concurrent_lock_is_released(self):
++        self.db.store.finished_stock_locks.insert_one({'_id': 'desinf', 'owner': 'x', 'at': '2999-01-01'})
++        self.assertEqual(self.entry().status_code, 409)
++        self.db.store.finished_stock_locks.update_one({'_id': 'desinf'}, {'$set': {'at': '2000-01-01'}})  # trava velha
++        self.assertEqual(self.entry().status_code, 200)
++        self.assertEqual(self.db.store.finished_stock_locks.count_documents({}), 0)
++
++
++if __name__ == '__main__':
++    unittest.main()
+diff --git a/frontend/src/App.js b/frontend/src/App.js
+index dccb8c7..d3807e2 100644
+--- a/frontend/src/App.js
++++ b/frontend/src/App.js
+@@ -26,6 +26,7 @@ import FichaAnalise from './pages/FichaAnalise';
+ import { Pedidos } from './pages/Pedidos';
+ import { Notificar } from './pages/Notificar';
+ import { Impressao } from './pages/Impressao';
++import { Estoque } from './pages/Estoque';
+ import './App.css';
+ 
+ const PrivateRoute = ({ children }) => {
+@@ -89,6 +90,7 @@ function App() {
+               <Route path="batch-management" element={<RoleRoute allowedRoles={['laboratorio']}><BatchManagement /></RoleRoute>} />
+               <Route path="impressao" element={<RoleRoute allowedRoles={['laboratorio']}><Impressao /></RoleRoute>} />
+               <Route path="pedidos" element={<RoleRoute allowedRoles={['laboratorio', 'pedidos']}><Pedidos /></RoleRoute>} />
++              <Route path="estoque" element={<RoleRoute allowedRoles={['laboratorio', 'producao']}><Estoque /></RoleRoute>} />
+               <Route path="notificar" element={<RoleRoute allowedRoles={['laboratorio', 'producao']}><Notificar /></RoleRoute>} />
+               <Route path="team" element={<RoleRoute allowedRoles={['laboratorio']}><Team /></RoleRoute>} />
+               <Route path="trash" element={<RoleRoute allowedRoles={['laboratorio']}><Trash /></RoleRoute>} />
+diff --git a/frontend/src/components/BarcodeRegistry.js b/frontend/src/components/BarcodeRegistry.js
+new file mode 100644
+index 0000000..6147897
+--- /dev/null
++++ b/frontend/src/components/BarcodeRegistry.js
+@@ -0,0 +1,115 @@
++import React, { useCallback, useEffect, useMemo, useState } from 'react';
++import api from '../lib/api';
++import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
++import { Button } from './ui/button';
++import { Card } from './ui/card';
++import { Input } from './ui/input';
++import { toast } from 'sonner';
++import { Barcode, Camera, Check, Search, Trash2 } from 'lucide-react';
++import { BarcodeScanner } from './BarcodeScanner';
++import { StockBottle } from './StockBottle';
++import { errorMessage } from '../lib/stockSizes';
++
++const Row = ({ product, s, onSaved, onScan }) => {
++  const [code, setCode] = useState(s.barcode || '');
++  const [saving, setSaving] = useState(false);
++  useEffect(() => setCode(s.barcode || ''), [s.barcode]);
++  const dirty = code.trim() !== (s.barcode || '');
++
++  const save = async (value = code) => {
++    setSaving(true);
++    try {
++      await api.put('/finished-stock/barcodes', { product_id: product.product_id, size: s.size, code: value.trim() });
++      toast.success(value.trim() ? `Código salvo: ${product.name} ${s.label}` : 'Código removido');
++      onSaved();
++    } catch (e) { toast.error(errorMessage(e, 'Erro ao salvar código')); }
++    finally { setSaving(false); }
++  };
++
++  return (
++    <div className="flex items-center gap-2 py-2">
++      <div className="w-12 flex flex-col items-center shrink-0">
++        <StockBottle size={s.size} />
++        <span className="text-xs font-bold">{s.label}</span>
++      </div>
++      <Input value={code} onChange={(e) => setCode(e.target.value)} placeholder="Sem código" inputMode="numeric"
++             onKeyDown={(e) => { if (e.key === 'Enter' && dirty) save(); }} className="h-10" />
++      <Button type="button" size="icon" variant="outline" className="shrink-0" title="Ler com a câmera"
++              onClick={() => onScan((value) => { setCode(value); save(value); })}>
++        <Camera className="w-4 h-4" />
++      </Button>
++      {dirty ? (
++        <Button type="button" size="icon" className="shrink-0 bg-primary" disabled={saving} onClick={() => save()} title="Salvar"><Check className="w-4 h-4" /></Button>
++      ) : s.barcode ? (
++        <Button type="button" size="icon" variant="ghost" className="shrink-0" disabled={saving} onClick={() => save('')} title="Remover"><Trash2 className="w-4 h-4" /></Button>
++      ) : <span className="w-10 shrink-0" />}
++    </div>
++  );
++};
++
++export const BarcodeRegistry = () => {
++  const [open, setOpen] = useState(false);
++  const [products, setProducts] = useState([]);
++  const [search, setSearch] = useState('');
++  const [onlyMissing, setOnlyMissing] = useState(false);
++  const [scanTarget, setScanTarget] = useState(null);
++
++  const load = useCallback(() => {
++    api.get('/finished-stock/overview').then((r) => setProducts(r.data.products)).catch((e) => toast.error(errorMessage(e, 'Erro ao carregar produtos')));
++  }, []);
++  useEffect(() => { if (open) load(); }, [open, load]);
++
++  const total = products.reduce((a, p) => a + p.sizes.length, 0);
++  const done = products.reduce((a, p) => a + p.sizes.filter((s) => s.barcode).length, 0);
++  const visible = useMemo(() => products
++    .filter((p) => p.name.toLowerCase().includes(search.trim().toLowerCase()))
++    .map((p) => ({ ...p, sizes: onlyMissing ? p.sizes.filter((s) => !s.barcode) : p.sizes }))
++    .filter((p) => p.sizes.length), [products, search, onlyMissing]);
++
++  const onDetected = useCallback((code) => {
++    const target = scanTarget;
++    setScanTarget(null);
++    if (target) target(code);
++  }, [scanTarget]);
++
++  return (
++    <>
++      <Card className="p-6 flex items-center justify-between gap-4">
++        <div className="flex items-center gap-3">
++          <Barcode className="w-6 h-6" />
++          <div>
++            <h3 className="font-bold">Códigos de barras</h3>
++            <p className="text-sm text-muted-foreground">Cadastre o código de cada produto e tamanho para usar a câmera no Estoque</p>
++          </div>
++        </div>
++        <Button onClick={() => setOpen(true)}>Registrar códigos</Button>
++      </Card>
++
++      <Dialog open={open} onOpenChange={setOpen}>
++        <DialogContent className="bg-card border-border max-w-lg max-h-[92vh] overflow-y-auto">
++          <DialogHeader><DialogTitle className="flex items-center gap-2"><Barcode className="w-5 h-5" /> Registrar códigos de barras</DialogTitle></DialogHeader>
++          <p className="text-sm text-muted-foreground">{done} de {total} cadastrados. Os tamanhos de cada produto são definidos em Produtos → Editar.</p>
++          <div className="flex gap-2">
++            <div className="relative flex-1">
++              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
++              <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Pesquisar produto" className="pl-9" />
++            </div>
++            <Button variant={onlyMissing ? 'default' : 'outline'} onClick={() => setOnlyMissing(!onlyMissing)}>Faltando</Button>
++          </div>
++          <div className="space-y-3">
++            {visible.map((p) => (
++              <div key={p.product_id} className="rounded-lg border px-3 py-2">
++                <p className="font-semibold">{p.name}</p>
++                <div className="divide-y">
++                  {p.sizes.map((s) => <Row key={s.size} product={p} s={s} onSaved={load} onScan={(fn) => setScanTarget(() => fn)} />)}
++                </div>
++              </div>
++            ))}
++            {visible.length === 0 && <p className="text-sm text-muted-foreground">Nada encontrado.</p>}
++          </div>
++        </DialogContent>
++      </Dialog>
++      <BarcodeScanner open={Boolean(scanTarget)} onOpenChange={(o) => !o && setScanTarget(null)} onDetected={onDetected} />
++    </>
++  );
++};
+diff --git a/frontend/src/components/BarcodeScanner.js b/frontend/src/components/BarcodeScanner.js
+new file mode 100644
+index 0000000..47fd52e
+--- /dev/null
++++ b/frontend/src/components/BarcodeScanner.js
+@@ -0,0 +1,113 @@
++import React, { useEffect, useRef, useState } from 'react';
++import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
++import { Button } from './ui/button';
++import { Input } from './ui/input';
++import { Camera, Keyboard } from 'lucide-react';
++
++// Biblioteca carregada sob demanda (não precisa instalar pacote no projeto).
++const SCRIPT_URL = 'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js';
++let loader = null;
++
++const loadLibrary = () => {
++  if (window.Html5Qrcode) return Promise.resolve(window.Html5Qrcode);
++  if (!loader) {
++    loader = new Promise((resolve, reject) => {
++      const script = document.createElement('script');
++      script.src = SCRIPT_URL;
++      script.async = true;
++      script.onload = () => (window.Html5Qrcode ? resolve(window.Html5Qrcode) : reject(new Error('Leitor indisponível')));
++      script.onerror = () => { loader = null; reject(new Error('Não foi possível carregar o leitor')); };
++      document.body.appendChild(script);
++    });
++  }
++  return loader;
++};
++
++const READER_ID = 'lumix-barcode-reader';
++
++/**
++ * Lê um código de barras pela câmera. Também aceita digitação manual
++ * (ou leitor USB, que "digita" o código e aperta Enter).
++ */
++export const BarcodeScanner = ({ open, onOpenChange, onDetected, title = 'Ler código de barras' }) => {
++  const scannerRef = useRef(null);
++  const doneRef = useRef(false);
++  const [error, setError] = useState('');
++  const [manual, setManual] = useState('');
++
++  useEffect(() => {
++    if (!open) return undefined;
++    doneRef.current = false;
++    setError('');
++    setManual('');
++    let cancelled = false;
++
++    const start = async () => {
++      try {
++        const Html5Qrcode = await loadLibrary();
++        if (cancelled) return;
++        // espera o elemento do diálogo existir
++        await new Promise((r) => setTimeout(r, 150));
++        if (cancelled || !document.getElementById(READER_ID)) return;
++        const scanner = new Html5Qrcode(READER_ID, {
++          verbose: false,
++          experimentalFeatures: { useBarCodeDetectorIfSupported: true },
++        });
++        scannerRef.current = scanner;
++        await scanner.start(
++          { facingMode: 'environment' },
++          { fps: 10, qrbox: (w, h) => ({ width: Math.min(w * 0.85, 320), height: Math.min(h * 0.45, 160) }) },
++          (text) => {
++            if (doneRef.current) return;
++            doneRef.current = true;
++            if (navigator.vibrate) navigator.vibrate(80);
++            onDetected(String(text).trim());
++          },
++          () => {},
++        );
++      } catch (e) {
++        if (!cancelled) {
++          setError(e?.message?.includes('Permission') || e?.name === 'NotAllowedError'
++            ? 'Permita o acesso à câmera no navegador para ler o código.'
++            : 'Não foi possível abrir a câmera. Digite o código abaixo.');
++        }
++      }
++    };
++    start();
++
++    return () => {
++      cancelled = true;
++      const scanner = scannerRef.current;
++      scannerRef.current = null;
++      if (scanner) {
++        scanner.stop().then(() => scanner.clear()).catch(() => {});
++      }
++    };
++  }, [open, onDetected]);
++
++  const submitManual = (e) => {
++    e.preventDefault();
++    if (manual.trim()) onDetected(manual.trim());
++  };
++
++  return (
++    <Dialog open={open} onOpenChange={onOpenChange}>
++      <DialogContent className="bg-card border-border max-w-md">
++        <DialogHeader>
++          <DialogTitle className="flex items-center gap-2"><Camera className="w-5 h-5" /> {title}</DialogTitle>
++        </DialogHeader>
++        <div id={READER_ID} className="w-full overflow-hidden rounded-lg bg-black/90 min-h-[220px]" />
++        {error && <p className="text-sm text-red-600">{error}</p>}
++        <p className="text-xs text-muted-foreground">Aponte a câmera para o código de barras do rótulo.</p>
++        <form onSubmit={submitManual} className="flex gap-2">
++          <div className="relative flex-1">
++            <Keyboard className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
++            <Input value={manual} onChange={(e) => setManual(e.target.value)} placeholder="Ou digite o código"
++                   inputMode="numeric" className="pl-9" />
++          </div>
++          <Button type="submit" variant="outline">OK</Button>
++        </form>
++      </DialogContent>
++    </Dialog>
++  );
++};
+diff --git a/frontend/src/components/Layout.js b/frontend/src/components/Layout.js
+index 9072715..3b51825 100644
+--- a/frontend/src/components/Layout.js
++++ b/frontend/src/components/Layout.js
+@@ -29,6 +29,7 @@ import {
+   Bell,
+   Search,
+   Printer,
++  Warehouse,
+ } from 'lucide-react';
+ 
+ const LAB_EMAIL = 'laboratoriolumix@outlook.com';
+@@ -61,6 +62,7 @@ const menuCategories = [
+   {
+     title: 'ESTOQUE',
+     items: [
++      { path: '/estoque', icon: Warehouse, label: 'Estoque', roles: ['laboratorio', 'producao'] },
+       { path: '/products', icon: Package, label: 'Produtos', roles: ['laboratorio'] },
+       { path: '/raw-materials', icon: Boxes, label: 'Matérias-Primas', roles: ['laboratorio'] },
+       { path: '/suppliers', icon: Truck, label: 'Fornecedores', roles: ['laboratorio'] },
+diff --git a/frontend/src/components/ProductStockFields.js b/frontend/src/components/ProductStockFields.js
+new file mode 100644
+index 0000000..1c03ee1
+--- /dev/null
++++ b/frontend/src/components/ProductStockFields.js
+@@ -0,0 +1,56 @@
++import React from 'react';
++import { Input } from './ui/input';
++import { Label } from './ui/label';
++import { StockBottle } from './StockBottle';
++import { productKind, sizesForKind } from '../lib/stockSizes';
++
++/** Tamanhos que o produto possui e quantidade mínima de cada um (aba Estoque). */
++export const ProductStockFields = ({ unit, sizes = [], minimums = {}, onChange }) => {
++  const options = sizesForKind(productKind(unit));
++  const selected = sizes.filter((s) => options.some((o) => o.size === s));
++
++  const toggle = (size) => {
++    const next = selected.includes(size) ? selected.filter((s) => s !== size) : [...selected, size];
++    onChange({ sizes: next, minimums });
++  };
++  const setMin = (size, value) => onChange({ sizes: selected, minimums: { ...minimums, [size]: value.replace(/\D/g, '') } });
++
++  return (
++    <div className="space-y-2 rounded-lg border p-3">
++      <Label className="text-foreground">Estoque — tamanhos e quantidade mínima</Label>
++      <p className="text-xs text-muted-foreground">
++        Marque os tamanhos que este produto tem. Quando o estoque chegar no mínimo, todos recebem uma notificação.
++        {selected.length === 0 && ' Nenhum marcado = aparecem todos os tamanhos.'}
++      </p>
++      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
++        {options.map((o) => {
++          const on = selected.includes(o.size);
++          return (
++            <div key={o.size} className={`rounded-xl border-2 p-2 space-y-2 transition ${on ? 'border-primary bg-primary/5' : 'border-border'}`}>
++              <button type="button" onClick={() => toggle(o.size)} className="w-full flex flex-col items-center gap-1">
++                <StockBottle size={o.size} empty={!on} />
++                <span className="text-sm font-bold">{o.label}</span>
++                <span className="text-[11px] text-muted-foreground">{on ? 'Tem ✓' : 'Não tem'}</span>
++              </button>
++              {on && (
++                <div>
++                  <span className="text-[11px] text-muted-foreground">Mínimo</span>
++                  <Input type="number" inputMode="numeric" min="0" value={minimums[o.size] ?? ''} placeholder="0"
++                         onChange={(e) => setMin(o.size, e.target.value)} className="h-9 text-center" />
++                </div>
++              )}
++            </div>
++          );
++        })}
++      </div>
++    </div>
++  );
++};
++
++export const stockConfigPayload = (unit, sizes = [], minimums = {}) => {
++  const allowed = sizesForKind(productKind(unit)).map((o) => o.size);
++  const chosen = sizes.filter((s) => allowed.includes(s));
++  const mins = {};
++  chosen.forEach((s) => { const n = parseInt(minimums[s], 10); if (n > 0) mins[s] = n; });
++  return { sizes: chosen, minimums: mins };
++};
+diff --git a/frontend/src/components/StockBottle.js b/frontend/src/components/StockBottle.js
+new file mode 100644
+index 0000000..3b53d66
+--- /dev/null
++++ b/frontend/src/components/StockBottle.js
+@@ -0,0 +1,28 @@
++import React from 'react';
++import { sizeInfo } from '../lib/stockSizes';
++
++// Garrafinha (L) ou pote (Kg) desenhada em SVG; altura proporcional ao tamanho.
++export const StockBottle = ({ size, low = false, empty = false, className = '' }) => {
++  const info = sizeInfo(size);
++  const h = Math.round(46 * info.scale);
++  const fill = empty ? 'fill-muted' : low ? 'fill-red-400' : 'fill-primary';
++  const fillOpacity = empty ? 1 : 0.75;
++  const stroke = low ? 'stroke-red-600' : 'stroke-primary';
++  if (info.kind === 'Kg') {
++    return (
++      <svg viewBox="0 0 40 48" height={h} width={h * 0.83} className={className} aria-hidden="true">
++        <rect x="6" y="6" width="28" height="7" rx="2" className={`${stroke} fill-background`} strokeWidth="2" />
++        <rect x="4" y="13" width="32" height="32" rx="5" className={`${stroke} ${fill}`} fillOpacity={fillOpacity} strokeWidth="2" />
++        <rect x="9" y="22" width="22" height="12" rx="2" className="fill-background" fillOpacity="0.85" />
++      </svg>
++    );
++  }
++  return (
++    <svg viewBox="0 0 30 60" height={h} width={h / 2} className={className} aria-hidden="true">
++      <rect x="11" y="2" width="8" height="6" rx="1.5" className={`${stroke} fill-background`} strokeWidth="2" />
++      <path d="M11 8 L11 14 Q4 18 4 26 L4 54 Q4 58 8 58 L22 58 Q26 58 26 54 L26 26 Q26 18 19 14 L19 8 Z"
++            className={`${stroke} ${fill}`} fillOpacity={fillOpacity} strokeWidth="2" />
++      <rect x="7" y="32" width="16" height="12" rx="2" className="fill-background" fillOpacity="0.85" />
++    </svg>
++  );
++};
+diff --git a/frontend/src/context/AuthContext.js b/frontend/src/context/AuthContext.js
+index dff0a99..4f6de4a 100644
+--- a/frontend/src/context/AuthContext.js
++++ b/frontend/src/context/AuthContext.js
+@@ -79,7 +79,7 @@ export const AuthProvider = ({ children }) => {
+     if (path === '/in-production') return Boolean(user);
+     if (role === 'laboratorio') return true;
+     // Rotas permitidas para produção
+-    const producaoRoutes = ['/counting', '/samples', '/archives', '/dashboard'];
++    const producaoRoutes = ['/counting', '/samples', '/archives', '/dashboard', '/estoque'];
+     return producaoRoutes.some(route => path.startsWith(route));
+   };
+ 
+diff --git a/frontend/src/lib/stockSizes.js b/frontend/src/lib/stockSizes.js
+new file mode 100644
+index 0000000..f214e5d
+--- /dev/null
++++ b/frontend/src/lib/stockSizes.js
+@@ -0,0 +1,26 @@
++// Tamanhos do estoque de produto acabado — mesmos campos da Contagem.
++export const STOCK_SIZES = [
++  { size: 'half_liter', label: '500ml', kind: 'L', scale: 0.62 },
++  { size: 'one_liter', label: '1L', kind: 'L', scale: 0.74 },
++  { size: 'two_liter', label: '2L', kind: 'L', scale: 0.86 },
++  { size: 'five_liter', label: '5L', kind: 'L', scale: 1 },
++  { size: 'three_thirty_gram', label: '330g', kind: 'Kg', scale: 0.68 },
++  { size: 'five_hundred_gram', label: '500g', kind: 'Kg', scale: 0.8 },
++  { size: 'one_kg', label: '1Kg', kind: 'Kg', scale: 1 },
++];
++
++export const sizeInfo = (size) => STOCK_SIZES.find((s) => s.size === size) || { size, label: size, kind: 'L', scale: 1 };
++
++export const productKind = (unit) => {
++  const u = (unit || 'L').toLowerCase();
++  return u.includes('kg') || u.includes('g') || u.includes('quilo') ? 'Kg' : 'L';
++};
++
++export const sizesForKind = (kind) => STOCK_SIZES.filter((s) => s.kind === kind);
++
++export const errorMessage = (err, fallback) => {
++  const detail = err?.response?.data?.detail;
++  if (typeof detail === 'string') return detail;
++  if (Array.isArray(detail) && detail[0]?.msg) return detail[0].msg;
++  return fallback;
++};
+diff --git a/frontend/src/pages/Estoque.js b/frontend/src/pages/Estoque.js
+new file mode 100644
+index 0000000..eee9803
+--- /dev/null
++++ b/frontend/src/pages/Estoque.js
+@@ -0,0 +1,664 @@
++import React, { useCallback, useEffect, useMemo, useState } from 'react';
++import api from '../lib/api';
++import { useAuth } from '../context/AuthContext';
++import { Button } from '../components/ui/button';
++import { Card } from '../components/ui/card';
++import { Input } from '../components/ui/input';
++import { Label } from '../components/ui/label';
++import { Combobox } from '../components/ui/combobox';
++import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
++import {
++  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
++  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
++} from '../components/ui/alert-dialog';
++import { toast } from 'sonner';
++import {
++  ArrowDownToLine, ArrowUpFromLine, ClipboardList, Search, Camera, Printer, Check, X,
++  Plus, Minus, Trash2, AlertTriangle, History, Undo2, PackageOpen, ChevronDown, ChevronUp,
++} from 'lucide-react';
++import { BarcodeScanner } from '../components/BarcodeScanner';
++import { StockBottle } from '../components/StockBottle';
++import { STOCK_SIZES, sizeInfo, errorMessage } from '../lib/stockSizes';
++
++const MIXED = 'misturado';
++
++const fmtDateTime = (iso) => {
++  try { return new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); }
++  catch { return iso; }
++};
++const fmtDate = (d) => (d && /^\d{4}-\d{2}-\d{2}/.test(d) ? d.slice(0, 10).split('-').reverse().join('/') : d || '');
++const batchLabel = (n) => (!n || n === MIXED ? 'Lotes misturados' : `Lote ${n}`);
++
++// ---------- seletor de quantidade com botões grandes ----------
++const QuantityInput = ({ value, onChange, max }) => {
++  const n = parseInt(value, 10) || 0;
++  const set = (v) => onChange(String(Math.max(0, max != null ? Math.min(v, max) : v)));
++  return (
++    <div className="flex items-center gap-2">
++      <Button type="button" variant="outline" size="icon" className="h-12 w-12 shrink-0" onClick={() => set(n - 1)}><Minus className="w-5 h-5" /></Button>
++      <Input type="number" inputMode="numeric" min="1" value={value} onChange={(e) => { const v = e.target.value.replace(/\D/g, ''); onChange(v && max != null && parseInt(v, 10) > max ? String(max) : v); }}
++             className="h-12 text-center text-2xl font-bold" placeholder="0" />
++      <Button type="button" variant="outline" size="icon" className="h-12 w-12 shrink-0" onClick={() => set(n + 1)}><Plus className="w-5 h-5" /></Button>
++    </div>
++  );
++};
++
++// ---------- botões de tamanho ----------
++const SizePicker = ({ sizes, value, onChange, showQty = false }) => (
++  <div className="grid grid-cols-4 gap-2">
++    {sizes.map((s) => (
++      <button key={s.size} type="button" onClick={() => onChange(s.size)}
++              className={`flex flex-col items-center justify-end gap-1 rounded-xl border-2 p-2 h-24 transition ${
++                value === s.size ? 'border-primary bg-primary/10' : 'border-border hover:border-primary/50'}`}>
++        <StockBottle size={s.size} low={s.low} empty={showQty && s.quantity === 0} />
++        <span className="text-sm font-bold">{s.label}</span>
++        {showQty && <span className="text-[11px] text-muted-foreground leading-none">{s.quantity} un</span>}
++      </button>
++    ))}
++  </div>
++);
++
++// ---------- diálogo de entrada / saída / inventário ----------
++const MODE_META = {
++  entrada: { title: 'Entrada no estoque', icon: ArrowDownToLine, button: 'Registrar entrada' },
++  inventario: { title: 'Inventário inicial / ajuste', icon: ClipboardList, button: 'Registrar no inventário' },
++  saida: { title: 'Saída para o depósito', icon: ArrowUpFromLine, button: 'Registrar saída' },
++};
++
++const MovementDialog = ({ mode, open, onOpenChange, products, team, defaultOperator, initial, onDone }) => {
++  const [productId, setProductId] = useState('');
++  const [size, setSize] = useState('');
++  const [batches, setBatches] = useState([]);
++  const [batchId, setBatchId] = useState('');
++  const [qty, setQty] = useState('');
++  const [operator, setOperator] = useState('');
++  const [note, setNote] = useState('');
++  const [scanOpen, setScanOpen] = useState(false);
++  const [saving, setSaving] = useState(false);
++  const meta = MODE_META[mode] || MODE_META.entrada;
++
++  useEffect(() => {
++    if (!open) return;
++    setProductId(initial?.product_id || '');
++    setSize(initial?.size || '');
++    setBatchId(mode === 'inventario' ? MIXED : '');
++    setQty('');
++    setNote('');
++    setOperator((o) => o || defaultOperator || '');
++  }, [open, initial, mode, defaultOperator]);
++
++  const product = products.find((p) => p.product_id === productId);
++  const sizeRow = product?.sizes.find((s) => s.size === size);
++
++  useEffect(() => {
++    if (product && product.sizes.length === 1) setSize(product.sizes[0].size);
++  }, [product]);
++
++  useEffect(() => {
++    if (!open || !productId || mode === 'saida') { setBatches([]); return; }
++    api.get(`/finished-stock/products/${productId}/batches`).then((r) => setBatches(r.data)).catch(() => setBatches([]));
++  }, [open, productId, mode]);
++
++  const batchOptions = useMemo(() => {
++    const rows = batches.map((b) => {
++      const info = size ? b.sizes[size] : null;
++      const avail = info ? info.available : null;
++      const status = b.status === 'arquivado' ? 'arquivado' : b.status === 'finalizado' ? 'finalizado' : 'em andamento';
++      const extra = mode === 'entrada' && info ? ` · disp. ${avail}/${info.counted}` : '';
++      return { value: b.batch_id, label: `${b.batch_number} · ${fmtDate(b.date).slice(0, 5)} · ${status}${extra}`, avail };
++    });
++    const visible = mode === 'entrada' && size ? rows.filter((r) => r.avail > 0) : rows;
++    return mode === 'inventario' ? [{ value: MIXED, label: 'Lotes misturados / não sei o lote' }, ...visible] : visible;
++  }, [batches, size, mode]);
++
++  const selectedBatch = batches.find((b) => b.batch_id === batchId);
++  const maxQty = mode === 'entrada' && selectedBatch && size ? selectedBatch.sizes[size]?.available
++    : mode === 'saida' ? sizeRow?.quantity : undefined;
++
++  const onScan = useCallback(async (code) => {
++    setScanOpen(false);
++    try {
++      const r = await api.get(`/finished-stock/barcode/${encodeURIComponent(code)}`);
++      setProductId(r.data.product_id);
++      setSize(r.data.size);
++      setBatchId(mode === 'inventario' ? MIXED : '');
++      toast.success(`${r.data.name} ${r.data.label}`);
++    } catch (e) { toast.error(errorMessage(e, 'Código não encontrado')); }
++  }, [mode]);
++
++  const submit = async (keepOpen) => {
++    const quantity = parseInt(qty, 10);
++    if (!productId) return toast.error('Escolha o produto');
++    if (!size) return toast.error('Escolha o tamanho');
++    if (mode === 'entrada' && !batchId) return toast.error('Escolha o lote');
++    if (!quantity || quantity <= 0) return toast.error('Informe a quantidade');
++    if (!operator.trim()) return toast.error('Informe quem está registrando');
++    setSaving(true);
++    try {
++      if (mode === 'saida') {
++        const r = await api.post('/finished-stock/exits', { items: [{ product_id: productId, size, quantity }], operator, note });
++        toast.success(`Saída registrada: ${quantity} × ${product.name} ${sizeInfo(size).label}`);
++        r.data.notifications?.forEach((n) => toast.warning(n.message, { duration: 10000 }));
++      } else {
++        await api.post('/finished-stock/entries', {
++          product_id: productId, size, quantity, operator, note, mode: mode === 'inventario' ? 'inventario' : 'normal',
++          batch_id: batchId && batchId !== MIXED ? batchId : null,
++        });
++        toast.success(`Entrada registrada: ${quantity} × ${product.name} ${sizeInfo(size).label}`);
++      }
++      onDone();
++      if (keepOpen) {
++        setQty('');
++        if (mode === 'inventario') { setProductId(''); setSize(''); setBatchId(MIXED); }
++        else if (mode === 'entrada') {
++          api.get(`/finished-stock/products/${productId}/batches`).then((r) => setBatches(r.data)).catch(() => {});
++        }
++      } else onOpenChange(false);
++    } catch (e) {
++      toast.error(errorMessage(e, 'Erro ao registrar'));
++    } finally { setSaving(false); }
++  };
++
++  const Icon = meta.icon;
++  const teamOptions = [...new Set([defaultOperator, ...team.map((t) => t.name)].filter(Boolean))].map((n) => ({ value: n, label: n }));
++
++  return (
++    <>
++      <Dialog open={open} onOpenChange={onOpenChange}>
++        <DialogContent className="bg-card border-border max-w-lg max-h-[92vh] overflow-y-auto">
++          <DialogHeader><DialogTitle className="flex items-center gap-2"><Icon className="w-5 h-5" /> {meta.title}</DialogTitle></DialogHeader>
++          {mode === 'inventario' && (
++            <p className="text-xs rounded-md bg-amber-50 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200 p-2">
++              Use para a contagem manual inicial ou para acertar o estoque. Não tem limite da Contagem e o lote é opcional.
++              Depois de salvar, a tela fica aberta para o próximo produto.
++            </p>
++          )}
++          <div className="space-y-4">
++            <div>
++              <Label>Produto</Label>
++              <div className="flex gap-2">
++                <div className="flex-1 min-w-0">
++                  <Combobox options={products.map((p) => ({ value: p.product_id, label: p.name }))} value={productId}
++                            onChange={(v) => { setProductId(v); setSize(''); setBatchId(mode === 'inventario' ? MIXED : ''); }}
++                            placeholder="Pesquise o produto" searchPlaceholder="Nome do produto..." emptyText="Nenhum produto" />
++                </div>
++                <Button type="button" variant="outline" size="icon" className="shrink-0" onClick={() => setScanOpen(true)} title="Ler código de barras">
++                  <Camera className="w-5 h-5" />
++                </Button>
++              </div>
++            </div>
++
++            {product && (
++              <div>
++                <Label>Tamanho</Label>
++                <SizePicker sizes={product.sizes} value={size} onChange={(s) => { setSize(s); if (mode === 'entrada') setBatchId(''); }} showQty />
++              </div>
++            )}
++
++            {product && size && mode !== 'saida' && (
++              <div>
++                <Label>{mode === 'inventario' ? 'Lote (opcional)' : 'Lote'}</Label>
++                {batchOptions.length === 0 && mode === 'entrada' ? (
++                  <p className="text-sm text-muted-foreground border rounded-md p-3">
++                    Nenhum lote com garrafas de {sizeInfo(size).label} disponíveis na Contagem.
++                    Para estoque antigo, use <b>Inventário</b>.
++                  </p>
++                ) : (
++                  <Combobox options={batchOptions} value={batchId} onChange={setBatchId}
++                            placeholder="Escolha ou digite o lote" searchPlaceholder="Número do lote..." emptyText="Lote não encontrado" />
++                )}
++              </div>
++            )}
++
++            {product && size && mode === 'saida' && sizeRow && (
++              <div className="text-sm rounded-md border p-3">
++                <p>Em estoque: <b>{sizeRow.quantity}</b> {sizeRow.minimum > 0 && <span className="text-muted-foreground">(mínimo {sizeRow.minimum})</span>}</p>
++                {sizeRow.lots.length > 0 && (
++                  <p className="text-xs text-muted-foreground mt-1">Sai primeiro de: {sizeRow.lots.map((l) => `${batchLabel(l.batch_number)} (${l.quantity})`).join(', ')}</p>
++                )}
++              </div>
++            )}
++
++            {product && size && (
++              <div>
++                <Label>Quantidade de unidades {maxQty != null && <span className="text-muted-foreground font-normal">(máx. {maxQty})</span>}</Label>
++                <QuantityInput value={qty} onChange={setQty} max={maxQty} />
++              </div>
++            )}
++
++            <div>
++              <Label>Quem está registrando</Label>
++              <Combobox options={teamOptions} value={operator} onChange={setOperator} placeholder="Selecione" searchPlaceholder="Nome..." emptyText="Ninguém encontrado" />
++            </div>
++            <div>
++              <Label>Observação (opcional)</Label>
++              <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ex.: palete 3" />
++            </div>
++
++            <div className="flex flex-col sm:flex-row gap-2">
++              {mode !== 'saida' && (
++                <Button type="button" variant="outline" className="flex-1 h-12" disabled={saving} onClick={() => submit(true)}>
++                  Salvar e continuar
++                </Button>
++              )}
++              <Button type="button" className="flex-1 h-12 bg-primary hover:bg-primary/90" disabled={saving} onClick={() => submit(false)}>
++                {meta.button}
++              </Button>
++            </div>
++          </div>
++        </DialogContent>
++      </Dialog>
++      <BarcodeScanner open={scanOpen} onOpenChange={setScanOpen} onDetected={onScan} />
++    </>
++  );
++};
++
++// ---------- impressão da lista de gestão ----------
++const escapeHtml = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
++
++const printList = (list, products) => {
++  const lotsFor = (item) => {
++    const p = products.find((x) => x.product_id === item.product_id);
++    const s = p?.sizes.find((x) => x.size === item.size);
++    if (!s) return '';
++    let left = item.quantity;
++    const parts = [];
++    for (const lot of s.lots) {
++      if (left <= 0) break;
++      const take = Math.min(lot.quantity, left);
++      parts.push(`${lot.batch_number === MIXED ? 'misturado' : lot.batch_number} (${take})`);
++      left -= take;
++    }
++    return parts.join(', ') + (left > 0 ? ` — faltam ${left}` : '');
++  };
++  const rows = list.items.map((i, idx) => `
++    <tr><td>${idx + 1}</td><td>${escapeHtml(i.name)}</td><td class="c">${escapeHtml(i.label)}</td>
++    <td class="c b">${i.quantity}</td><td>${escapeHtml(lotsFor(i))}</td><td class="c">☐</td></tr>`).join('');
++  const total = list.items.reduce((a, i) => a + i.quantity, 0);
++  const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Lista de gestão</title>
++  <style>
++    body{font-family:Arial,Helvetica,sans-serif;margin:24px;color:#111}
++    h1{font-size:20px;margin:0}.sub{color:#555;font-size:12px;margin:4px 0 16px}
++    table{width:100%;border-collapse:collapse;font-size:13px}th,td{border:1px solid #999;padding:6px 8px;text-align:left}
++    th{background:#eee}.c{text-align:center}.b{font-weight:bold;font-size:15px}
++    .sign{display:flex;gap:40px;margin-top:48px;font-size:12px}.sign div{flex:1;border-top:1px solid #333;padding-top:4px;text-align:center}
++    @media print{body{margin:10mm}}
++  </style></head><body>
++  <h1>Lumix — Lista de gestão (Estoque → Depósito)</h1>
++  <p class="sub">Lista ${escapeHtml(list.id.slice(0, 8).toUpperCase())} · criada por ${escapeHtml(list.created_by)} em ${escapeHtml(new Date(list.created_at).toLocaleString('pt-BR'))}${list.note ? ' · ' + escapeHtml(list.note) : ''}</p>
++  <table><thead><tr><th>#</th><th>Produto</th><th class="c">Tamanho</th><th class="c">Qtd</th><th>Retirar dos lotes</th><th class="c">OK</th></tr></thead>
++  <tbody>${rows}</tbody><tfoot><tr><th colspan="3">Total de unidades</th><th class="c">${total}</th><th colspan="2"></th></tr></tfoot></table>
++  <div class="sign"><div>Separado por</div><div>Conferido por</div><div>Data</div></div>
++  <script>window.onload=function(){window.print()}</script></body></html>`;
++  const w = window.open('', '_blank');
++  if (!w) { toast.error('Permita pop-ups para imprimir'); return; }
++  w.document.open(); w.document.write(html); w.document.close();
++};
++
++// ---------- diálogo da lista de gestão ----------
++const ListDialog = ({ open, onOpenChange, products, onCreated }) => {
++  const [items, setItems] = useState([]);
++  const [productId, setProductId] = useState('');
++  const [size, setSize] = useState('');
++  const [qty, setQty] = useState('');
++  const [note, setNote] = useState('');
++  const [scanOpen, setScanOpen] = useState(false);
++  const [saving, setSaving] = useState(false);
++
++  useEffect(() => { if (open) { setItems([]); setProductId(''); setSize(''); setQty(''); setNote(''); } }, [open]);
++
++  const product = products.find((p) => p.product_id === productId);
++  useEffect(() => { if (product && product.sizes.length === 1) setSize(product.sizes[0].size); }, [product]);
++
++  const hasStock = products.some((p) => p.sizes.some((s) => s.quantity > 0));
++
++  const add = () => {
++    const quantity = parseInt(qty, 10);
++    if (!product || !size || !quantity) return toast.error('Escolha produto, tamanho e quantidade');
++    const s = product.sizes.find((x) => x.size === size);
++    const already = items.filter((i) => i.product_id === productId && i.size === size).reduce((a, i) => a + i.quantity, 0);
++    if (quantity + already > s.quantity) return toast.error(`Em estoque só há ${s.quantity} de ${s.label}`);
++    setItems([...items, { product_id: productId, name: product.name, size, label: s.label, quantity, stock: s.quantity }]);
++    setProductId(''); setSize(''); setQty('');
++  };
++
++  const onScan = async (code) => {
++    setScanOpen(false);
++    try {
++      const r = await api.get(`/finished-stock/barcode/${encodeURIComponent(code)}`);
++      setProductId(r.data.product_id); setSize(r.data.size);
++    } catch (e) { toast.error(errorMessage(e, 'Código não encontrado')); }
++  };
++
++  const save = async () => {
++    if (!items.length) return toast.error('Adicione pelo menos um item');
++    setSaving(true);
++    try {
++      const r = await api.post('/finished-stock/lists', { items: items.map(({ product_id, size: s, quantity }) => ({ product_id, size: s, quantity })), note });
++      toast.success('Lista criada');
++      printList(r.data, products);
++      onCreated();
++      onOpenChange(false);
++    } catch (e) { toast.error(errorMessage(e, 'Erro ao criar lista')); }
++    finally { setSaving(false); }
++  };
++
++  return (
++    <>
++      <Dialog open={open} onOpenChange={onOpenChange}>
++        <DialogContent className="bg-card border-border max-w-lg max-h-[92vh] overflow-y-auto">
++          <DialogHeader><DialogTitle className="flex items-center gap-2"><Printer className="w-5 h-5" /> Lista de gestão — estoque → depósito</DialogTitle></DialogHeader>
++          <p className="text-xs text-muted-foreground">Monte a lista, imprima para separar e, depois da baldeação, toque em <b>Confirmar saída</b> na lista.</p>
++          <div className="space-y-3 rounded-lg border p-3">
++            <div className="flex gap-2">
++              <div className="flex-1 min-w-0">
++                <Combobox options={products.filter((p) => p.sizes.some((s) => s.quantity > 0)).map((p) => ({ value: p.product_id, label: p.name }))}
++                          value={productId} onChange={(v) => { setProductId(v); setSize(''); }}
++                          placeholder="Produto com estoque" searchPlaceholder="Nome do produto..." emptyText="Nenhum produto com estoque" />
++              </div>
++              <Button type="button" variant="outline" size="icon" className="shrink-0" onClick={() => setScanOpen(true)}><Camera className="w-5 h-5" /></Button>
++            </div>
++            {product && <SizePicker sizes={product.sizes} value={size} onChange={setSize} showQty />}
++            {product && size && <QuantityInput value={qty} onChange={setQty} max={product.sizes.find((s) => s.size === size)?.quantity} />}
++            <Button type="button" variant="outline" className="w-full" onClick={add} disabled={!product || !size}><Plus className="w-4 h-4 mr-1" /> Adicionar à lista</Button>
++          </div>
++          {items.length > 0 && (
++            <div className="divide-y rounded-lg border">
++              {items.map((i, idx) => (
++                <div key={idx} className="flex items-center justify-between p-2 text-sm">
++                  <div className="flex items-center gap-2 min-w-0">
++                    <StockBottle size={i.size} />
++                    <span className="truncate">{i.name} <b>{i.label}</b></span>
++                  </div>
++                  <div className="flex items-center gap-2 shrink-0">
++                    <span className="font-bold text-lg">{i.quantity}</span>
++                    <Button type="button" size="icon" variant="ghost" onClick={() => setItems(items.filter((_, k) => k !== idx))}><Trash2 className="w-4 h-4" /></Button>
++                  </div>
++                </div>
++              ))}
++            </div>
++          )}
++          {items.length === 0 && !hasStock && (
++            <p className="text-sm text-muted-foreground">Nenhum produto com estoque no momento.</p>
++          )}
++          <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Observação (opcional)" />
++          <Button className="w-full h-12 bg-primary hover:bg-primary/90" onClick={save} disabled={saving || !items.length}>
++            <Printer className="w-4 h-4 mr-2" /> Salvar e imprimir
++          </Button>
++        </DialogContent>
++      </Dialog>
++      <BarcodeScanner open={scanOpen} onOpenChange={setScanOpen} onDetected={onScan} />
++    </>
++  );
++};
++
++// ---------- página ----------
++export const Estoque = () => {
++  const { user, role } = useAuth();
++  const isLab = role === 'laboratorio';
++  const [data, setData] = useState({ products: [], sizes: [] });
++  const [loading, setLoading] = useState(true);
++  const [team, setTeam] = useState([]);
++  const [lists, setLists] = useState([]);
++  const [movements, setMovements] = useState([]);
++  const [search, setSearch] = useState('');
++  const [sizeFilter, setSizeFilter] = useState('');
++  const [onlyLow, setOnlyLow] = useState(false);
++  const [highlight, setHighlight] = useState(null);
++  const [expanded, setExpanded] = useState({});
++  const [dialog, setDialog] = useState({ mode: null, initial: null });
++  const [listOpen, setListOpen] = useState(false);
++  const [scanOpen, setScanOpen] = useState(false);
++  const [showHistory, setShowHistory] = useState(false);
++  const [confirm, setConfirm] = useState(null); // {type:'list'|'cancelList'|'undo', item}
++  const defaultOperator = user?.name || '';
++
++  const load = useCallback(async () => {
++    try {
++      const [o, l, m] = await Promise.all([
++        api.get('/finished-stock/overview'), api.get('/finished-stock/lists'), api.get('/finished-stock/movements', { params: { limit: 60 } }),
++      ]);
++      setData(o.data); setLists(l.data); setMovements(m.data);
++    } catch (e) { toast.error(errorMessage(e, 'Erro ao carregar o estoque')); }
++    finally { setLoading(false); }
++  }, []);
++
++  useEffect(() => {
++    load();
++    api.get('/team').then((r) => setTeam((r.data || []).filter((t) => t.active !== false))).catch(() => {});
++  }, [load]);
++
++  const usedSizes = useMemo(() => {
++    const set = new Set();
++    data.products.forEach((p) => p.sizes.forEach((s) => set.add(s.size)));
++    return STOCK_SIZES.filter((s) => set.has(s.size));
++  }, [data]);
++
++  const visible = useMemo(() => {
++    const q = search.trim().toLowerCase();
++    return data.products
++      .filter((p) => !q || p.name.toLowerCase().includes(q) || p.sizes.some((s) => s.barcode && s.barcode === search.trim()))
++      .map((p) => ({ ...p, sizes: p.sizes.filter((s) => (!sizeFilter || s.size === sizeFilter) && (!onlyLow || s.low)) }))
++      .filter((p) => p.sizes.length > 0)
++      .filter((p) => !onlyLow || p.sizes.some((s) => s.low));
++  }, [data, search, sizeFilter, onlyLow]);
++
++  const lowCount = data.products.reduce((a, p) => a + p.sizes.filter((s) => s.low).length, 0);
++  const totalUnits = visible.reduce((a, p) => a + p.sizes.reduce((b, s) => b + s.quantity, 0), 0);
++  const pendingLists = lists.filter((l) => l.status === 'pendente');
++
++  const onScan = useCallback(async (code) => {
++    setScanOpen(false);
++    try {
++      const r = await api.get(`/finished-stock/barcode/${encodeURIComponent(code)}`);
++      setSearch(r.data.name); setSizeFilter(r.data.size); setOnlyLow(false);
++      setHighlight(`${r.data.product_id}:${r.data.size}`);
++      toast.success(`${r.data.name} ${r.data.label}`);
++    } catch (e) { toast.error(errorMessage(e, 'Código não encontrado')); }
++  }, []);
++
++  const onSearchKey = async (e) => {
++    // leitor USB: digita o código e aperta Enter
++    if (e.key === 'Enter' && /^\d{6,}$/.test(search.trim())) onScan(search.trim());
++  };
++
++  const runConfirm = async () => {
++    const c = confirm; setConfirm(null);
++    try {
++      if (c.type === 'list') {
++        const r = await api.post(`/finished-stock/lists/${c.item.id}/confirm`, { operator: defaultOperator });
++        toast.success('Saída da lista registrada');
++        r.data.notifications?.forEach((n) => toast.warning(n.message, { duration: 10000 }));
++      } else if (c.type === 'cancelList') {
++        await api.delete(`/finished-stock/lists/${c.item.id}`); toast.success('Lista cancelada');
++      } else if (c.type === 'undo') {
++        await api.post(`/finished-stock/movements/${c.item.id}/cancel`); toast.success('Movimentação estornada');
++      }
++      load();
++    } catch (e) { toast.error(errorMessage(e, 'Não foi possível concluir')); }
++  };
++
++  const openMove = (mode, initial = null) => setDialog({ mode, initial });
++
++  return (
++    <div className="space-y-6">
++      <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
++        <div>
++          <h1 className="text-4xl md:text-5xl font-bold mb-1">Estoque</h1>
++          <p className="text-muted-foreground">Produtos prontos, separados por tamanho</p>
++        </div>
++        <div className="grid grid-cols-2 sm:flex gap-2">
++          <Button className="h-12 bg-primary hover:bg-primary/90" onClick={() => openMove('entrada')}><ArrowDownToLine className="w-5 h-5 mr-2" /> Entrada</Button>
++          <Button className="h-12" variant="outline" onClick={() => openMove('saida')}><ArrowUpFromLine className="w-5 h-5 mr-2" /> Saída</Button>
++          <Button className="h-12" variant="outline" onClick={() => setListOpen(true)}><Printer className="w-5 h-5 mr-2" /> Lista de gestão</Button>
++          {isLab && <Button className="h-12" variant="outline" onClick={() => openMove('inventario')}><ClipboardList className="w-5 h-5 mr-2" /> Inventário</Button>}
++        </div>
++      </div>
++
++      {lowCount > 0 && (
++        <button type="button" onClick={() => { setOnlyLow(true); setSizeFilter(''); setSearch(''); }}
++                className="w-full flex items-center gap-3 rounded-xl border border-red-300 bg-red-50 dark:bg-red-950/40 p-3 text-left text-red-800 dark:text-red-200">
++          <AlertTriangle className="w-5 h-5 shrink-0" />
++          <span className="text-sm"><b>{lowCount}</b> {lowCount === 1 ? 'item está' : 'itens estão'} no estoque mínimo ou abaixo — necessita nova ordem de produção. Toque para ver.</span>
++        </button>
++      )}
++
++      <Card className="p-4 space-y-3">
++        <div className="flex gap-2">
++          <div className="relative flex-1">
++            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
++            <Input value={search} onChange={(e) => { setSearch(e.target.value); setHighlight(null); }} onKeyDown={onSearchKey}
++                   placeholder="Pesquisar produto ou código de barras" className="pl-9 h-11" />
++          </div>
++          <Button variant="outline" className="h-11" onClick={() => setScanOpen(true)}><Camera className="w-5 h-5 sm:mr-2" /><span className="hidden sm:inline">Câmera</span></Button>
++        </div>
++        <div className="flex gap-2 overflow-x-auto pb-1">
++          {[{ size: '', label: 'Todos' }, ...usedSizes].map((s) => (
++            <button key={s.size || 'all'} type="button" onClick={() => setSizeFilter(s.size)}
++                    className={`px-4 h-10 rounded-full border-2 text-sm font-semibold whitespace-nowrap transition ${
++                      sizeFilter === s.size ? 'border-primary bg-primary text-primary-foreground' : 'border-border hover:border-primary/50'}`}>
++              {s.label}
++            </button>
++          ))}
++          <button type="button" onClick={() => setOnlyLow(!onlyLow)}
++                  className={`px-4 h-10 rounded-full border-2 text-sm font-semibold whitespace-nowrap transition ${
++                    onlyLow ? 'border-red-500 bg-red-500 text-white' : 'border-border hover:border-red-300'}`}>
++            Abaixo do mínimo
++          </button>
++        </div>
++        <p className="text-xs text-muted-foreground">{visible.length} {visible.length === 1 ? 'produto' : 'produtos'} · {totalUnits} {totalUnits === 1 ? 'unidade' : 'unidades'}{sizeFilter ? ` de ${sizeInfo(sizeFilter).label}` : ''}</p>
++      </Card>
++
++      {pendingLists.length > 0 && (
++        <Card className="p-4 space-y-3">
++          <h2 className="font-bold flex items-center gap-2"><ClipboardList className="w-5 h-5" /> Listas de gestão pendentes</h2>
++          {pendingLists.map((l) => (
++            <div key={l.id} className="rounded-lg border p-3 space-y-2">
++              <div className="flex flex-wrap items-center justify-between gap-2">
++                <span className="text-sm"><b>{l.id.slice(0, 8).toUpperCase()}</b> · {l.created_by} · {fmtDateTime(l.created_at)}</span>
++                <div className="flex gap-2">
++                  <Button size="sm" variant="outline" onClick={() => printList(l, data.products)}><Printer className="w-4 h-4 mr-1" /> Imprimir</Button>
++                  <Button size="sm" className="bg-primary hover:bg-primary/90" onClick={() => setConfirm({ type: 'list', item: l })}><Check className="w-4 h-4 mr-1" /> Confirmar saída</Button>
++                  <Button size="sm" variant="ghost" onClick={() => setConfirm({ type: 'cancelList', item: l })}><X className="w-4 h-4" /></Button>
++                </div>
++              </div>
++              <p className="text-xs text-muted-foreground">{l.items.map((i) => `${i.quantity}× ${i.name} ${i.label}`).join(' · ')}</p>
++            </div>
++          ))}
++        </Card>
++      )}
++
++      {loading ? (
++        <p className="text-muted-foreground">Carregando...</p>
++      ) : visible.length === 0 ? (
++        <Card className="p-10 text-center text-muted-foreground">
++          <PackageOpen className="w-10 h-10 mx-auto mb-2" />
++          Nenhum produto encontrado{onlyLow ? ' abaixo do mínimo' : ''}.
++        </Card>
++      ) : (
++        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
++          {visible.map((p) => {
++            const anyLow = p.sizes.some((s) => s.low);
++            const isOpen = expanded[p.product_id];
++            return (
++              <Card key={p.product_id} data-testid={`stock-card-${p.product_id}`} className={`p-4 space-y-3 ${anyLow ? 'border-red-300' : ''}`}>
++                <div className="flex items-start justify-between gap-2">
++                  <h3 className="font-bold text-lg leading-tight">{p.name}</h3>
++                  {anyLow && <span className="shrink-0 rounded-full bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-200 px-2 py-0.5 text-[11px] font-semibold">Estoque baixo</span>}
++                </div>
++                <div className="grid grid-cols-4 gap-2">
++                  {p.sizes.map((s) => (
++                    <button key={s.size} type="button" onClick={() => openMove('saida', { product_id: p.product_id, size: s.size })}
++                            title="Registrar saída"
++                            className={`flex flex-col items-center justify-end gap-1 rounded-xl border p-2 h-28 transition hover:shadow ${
++                              s.low ? 'border-red-300 bg-red-50 dark:bg-red-950/30' : 'border-border'} ${
++                              highlight === `${p.product_id}:${s.size}` ? 'ring-2 ring-primary' : ''}`}>
++                      <StockBottle size={s.size} low={s.low} empty={s.quantity === 0} />
++                      <span className={`text-xl font-bold leading-none ${s.low ? 'text-red-600' : ''}`}>{s.quantity}</span>
++                      <span className="text-xs font-semibold text-muted-foreground leading-none">{s.label}</span>
++                      {s.minimum > 0 && <span className="text-[10px] text-muted-foreground leading-none">mín {s.minimum}</span>}
++                    </button>
++                  ))}
++                </div>
++                <div className="flex gap-2">
++                  <Button size="sm" variant="outline" className="flex-1" onClick={() => openMove('entrada', { product_id: p.product_id, size: p.sizes.length === 1 ? p.sizes[0].size : '' })}>
++                    <ArrowDownToLine className="w-4 h-4 mr-1" /> Entrada
++                  </Button>
++                  <Button size="sm" variant="ghost" onClick={() => setExpanded({ ...expanded, [p.product_id]: !isOpen })}>
++                    Lotes {isOpen ? <ChevronUp className="w-4 h-4 ml-1" /> : <ChevronDown className="w-4 h-4 ml-1" />}
++                  </Button>
++                </div>
++                {isOpen && (
++                  <div className="text-xs space-y-1 border-t pt-2">
++                    {p.sizes.every((s) => s.lots.length === 0) && <p className="text-muted-foreground">Sem unidades em estoque.</p>}
++                    {p.sizes.map((s) => s.lots.map((l) => (
++                      <div key={`${s.size}-${l.batch_number}`} className="flex justify-between">
++                        <span>{s.label} · {batchLabel(l.batch_number)}</span><b>{l.quantity}</b>
++                      </div>
++                    )))}
++                  </div>
++                )}
++              </Card>
++            );
++          })}
++        </div>
++      )}
++
++      <Card className="p-4">
++        <button type="button" className="w-full flex items-center justify-between font-bold" onClick={() => setShowHistory(!showHistory)}>
++          <span className="flex items-center gap-2"><History className="w-5 h-5" /> Últimas movimentações</span>
++          {showHistory ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
++        </button>
++        {showHistory && (
++          <div className="mt-3 divide-y">
++            {movements.length === 0 && <p className="text-sm text-muted-foreground py-2">Nenhuma movimentação ainda.</p>}
++            {movements.map((m) => (
++              <div key={m.id} className={`flex items-center justify-between gap-2 py-2 text-sm ${m.cancelled ? 'opacity-50 line-through' : ''}`}>
++                <div className="min-w-0">
++                  <p className="truncate">
++                    <span className={m.type === 'saida' ? 'text-orange-600 font-semibold' : 'text-primary font-semibold'}>
++                      {m.type === 'saida' ? '▲ Saída' : m.mode === 'inventario' ? '● Inventário' : '▼ Entrada'}
++                    </span>{' '}
++                    {m.quantity}× {m.product_name} {m.size_label}
++                  </p>
++                  <p className="text-xs text-muted-foreground truncate">
++                    {batchLabel(m.batch_number)} · {m.operator} · {fmtDateTime(m.created_at)}{m.note ? ` · ${m.note}` : ''}
++                  </p>
++                </div>
++                {isLab && !m.cancelled && (
++                  <Button size="sm" variant="ghost" title="Estornar" onClick={() => setConfirm({ type: 'undo', item: m })}><Undo2 className="w-4 h-4" /></Button>
++                )}
++              </div>
++            ))}
++          </div>
++        )}
++      </Card>
++
++      <MovementDialog mode={dialog.mode} open={Boolean(dialog.mode)} onOpenChange={(o) => !o && setDialog({ mode: null, initial: null })}
++                      products={data.products} team={team} defaultOperator={defaultOperator} initial={dialog.initial} onDone={load} />
++      <ListDialog open={listOpen} onOpenChange={setListOpen} products={data.products} onCreated={load} />
++      <BarcodeScanner open={scanOpen} onOpenChange={setScanOpen} onDetected={onScan} />
++
++      <AlertDialog open={Boolean(confirm)} onOpenChange={(o) => !o && setConfirm(null)}>
++        <AlertDialogContent>
++          <AlertDialogHeader>
++            <AlertDialogTitle>
++              {confirm?.type === 'list' ? 'Confirmar saída da lista?' : confirm?.type === 'cancelList' ? 'Cancelar esta lista?' : 'Estornar movimentação?'}
++            </AlertDialogTitle>
++            <AlertDialogDescription>
++              {confirm?.type === 'list' && 'Todos os itens da lista saem do estoque agora. Confirme só depois da baldeação.'}
++              {confirm?.type === 'cancelList' && 'A lista é descartada. O estoque não muda.'}
++              {confirm?.type === 'undo' && confirm?.item && `${confirm.item.quantity}× ${confirm.item.product_name} ${confirm.item.size_label} — o estoque volta como estava antes desta movimentação.`}
++            </AlertDialogDescription>
++          </AlertDialogHeader>
++          <AlertDialogFooter>
++            <AlertDialogCancel>Voltar</AlertDialogCancel>
++            <AlertDialogAction onClick={runConfirm} className="bg-primary">Confirmar</AlertDialogAction>
++          </AlertDialogFooter>
++        </AlertDialogContent>
++      </AlertDialog>
++    </div>
++  );
++};
++
++export default Estoque;
+diff --git a/frontend/src/pages/Products.js b/frontend/src/pages/Products.js
+index a95b735..d2f98df 100644
+--- a/frontend/src/pages/Products.js
++++ b/frontend/src/pages/Products.js
+@@ -15,6 +15,7 @@ import { WhatsAppSender } from '../components/WhatsAppSender';
+ import { WhatsAppMultiBatch } from '../components/WhatsAppMultiBatch';
+ import { ProductPrintButton } from '../components/ProductPrintButton';
+ import { ProductPrintFichaButton } from '../components/ProductPrintFichaButton';
++import { ProductStockFields, stockConfigPayload } from '../components/ProductStockFields';
+ 
+ export const Products = () => {
+   const [products, setProducts] = useState([]);
+@@ -33,7 +34,9 @@ export const Products = () => {
+     name: '',
+     unit: 'Litros',
+     expected_liters: '',
+-    recipes: []
++    recipes: [],
++    stock_sizes: [],
++    stock_minimums: {}
+   });
+   const [batchFormData, setBatchFormData] = useState({
+     product_id: '',
+@@ -122,16 +125,26 @@ export const Products = () => {
+     
+     setSubmitting(true);
+     try {
++      const { stock_sizes, stock_minimums, ...productData } = formData;
++      let savedId = selectedProduct?.id;
+       if (selectedProduct) {
+         await api.put(`/products/${selectedProduct.id}`, {
+-          ...formData,
++          ...productData,
+           expected_liters: parseFloat(formData.expected_liters)
+         });
+       } else {
+-        await api.post('/products', {
+-          ...formData,
++        const created = await api.post('/products', {
++          ...productData,
+           expected_liters: parseFloat(formData.expected_liters)
+         });
++        savedId = created.data?.id;
++      }
++      if (savedId) {
++        try {
++          await api.put(`/finished-stock/products/${savedId}/config`, stockConfigPayload(formData.unit, stock_sizes, stock_minimums));
++        } catch (stockError) {
++          toast.error('Produto salvo, mas não foi possível salvar os tamanhos/mínimos do estoque');
++        }
+       }
+       
+       if (isMountedRef.current) {
+@@ -274,7 +287,9 @@ export const Products = () => {
+       name: product.name,
+       unit: product.unit,
+       expected_liters: product.expected_liters.toString(),
+-      recipes: product.recipes
++      recipes: product.recipes,
++      stock_sizes: product.stock_sizes || [],
++      stock_minimums: product.stock_minimums || {}
+     });
+     setDialogOpen(true);
+   };
+@@ -285,7 +300,9 @@ export const Products = () => {
+       name: `${product.name} (Cópia)`,
+       unit: product.unit,
+       expected_liters: product.expected_liters.toString(),
+-      recipes: product.recipes ? [...product.recipes] : []
++      recipes: product.recipes ? [...product.recipes] : [],
++      stock_sizes: product.stock_sizes || [],
++      stock_minimums: product.stock_minimums || {}
+     });
+     setDialogOpen(true);
+     toast.info('Produto duplicado! Edite o nome e salve.');
+@@ -302,7 +319,9 @@ export const Products = () => {
+       name: '',
+       unit: 'Litros',
+       expected_liters: '',
+-      recipes: []
++      recipes: [],
++      stock_sizes: [],
++      stock_minimums: {}
+     });
+   };
+ 
+@@ -513,6 +532,12 @@ export const Products = () => {
+                     </div>
+                   ))}
+                 </div>
++                <ProductStockFields
++                  unit={formData.unit}
++                  sizes={formData.stock_sizes}
++                  minimums={formData.stock_minimums}
++                  onChange={({ sizes, minimums }) => setFormData({ ...formData, stock_sizes: sizes, stock_minimums: minimums })}
++                />
+                 <Button type="submit" disabled={submitting} className="w-full bg-primary hover:bg-primary/90">Salvar</Button>
+               </form>
+             </DialogContent>
+diff --git a/frontend/src/pages/Settings.js b/frontend/src/pages/Settings.js
+index 0575f27..df968d3 100644
+--- a/frontend/src/pages/Settings.js
++++ b/frontend/src/pages/Settings.js
+@@ -4,6 +4,7 @@ import { useTheme } from '../context/ThemeContext';
+ import { Card } from '../components/ui/card';
+ import { Button } from '../components/ui/button';
+ import { User, Moon, Sun, Zap } from 'lucide-react';
++import { BarcodeRegistry } from '../components/BarcodeRegistry';
+ 
+ export const Settings = () => {
+ 
+@@ -113,6 +114,10 @@ export const Settings = () => {
+ 
+             </Card>
+ 
++            {/* Códigos de barras (Estoque) */}
++
++            <BarcodeRegistry />
++
+             {/* Sobre */}
+ 
+             <Card className="p-6 flex gap-4">
