@@ -29,6 +29,7 @@ import {
   Bell,
   Search,
   Printer,
+  Warehouse,
 } from 'lucide-react';
 
 const LAB_EMAIL = 'laboratoriolumix@outlook.com';
@@ -61,6 +62,7 @@ const menuCategories = [
   {
     title: 'ESTOQUE',
     items: [
+      { path: '/estoque', icon: Warehouse, label: 'Estoque', roles: ['laboratorio', 'producao'] },
       { path: '/products', icon: Package, label: 'Produtos', roles: ['laboratorio'] },
       { path: '/raw-materials', icon: Boxes, label: 'Matérias-Primas', roles: ['laboratorio'] },
       { path: '/suppliers', icon: Truck, label: 'Fornecedores', roles: ['laboratorio'] },
