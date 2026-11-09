@@ -128,6 +128,44 @@ class ProductStockConfig(BaseModel):
     minimums: Dict[str, int] = Field(default_factory=dict)
 
 
+class MinimumUpdate(BaseModel):
+    product_id: str
+    minimums: Dict[str, int] = Field(default_factory=dict)  # 0 remove o mínimo
+    add_sizes: List[str] = Field(default_factory=list)       # marca o tamanho como "Tem"
+
+
+class MinimumsBulk(BaseModel):
+    updates: List[MinimumUpdate] = Field(min_length=1, max_length=2000)
+
+
+def merge_minimums(product, update):
+    """Mescla mínimos e tamanhos de um produto; ignora tamanhos de outra unidade.
+
+    Retorna (stock_sizes, stock_minimums, ignorados).
+    """
+    kind = product_kind(product)
+    fits = lambda s: s in SIZES and SIZES[s]['kind'] == kind
+    for value in update.minimums.values():
+        if value < 0:
+            raise ValueError('Quantidade mínima não pode ser negativa')
+    ignored = sorted({s for s in list(update.minimums) + update.add_sizes if not fits(s)})
+    sizes = [s for s in (product.get('stock_sizes') or []) if fits(s)]
+    minimums = {k: int(v) for k, v in (product.get('stock_minimums') or {}).items() if fits(k)}
+    for size, value in update.minimums.items():
+        if not fits(size):
+            continue
+        if value > 0:
+            minimums[size] = int(value)
+        else:
+            minimums.pop(size, None)
+    added = [s for s in update.add_sizes if fits(s)]
+    added += [s for s, v in update.minimums.items() if fits(s) and v > 0]
+    # Produto sem tamanhos definidos mostra todos: o mínimo não deve esconder os demais.
+    if added and sizes:
+        sizes = sorted(set(sizes) | set(added), key=lambda s: SIZES[s]['order'])
+    return sizes, minimums, ignored
+
+
 class BarcodeSet(BaseModel):
     product_id: str
     size: str
@@ -172,6 +210,12 @@ def setup_finished_stock_routes(api_router: APIRouter, db, get_current_user, bro
             raise HTTPException(status_code=400, detail='Tamanho inválido')
         if size not in product_sizes(product):
             raise HTTPException(status_code=400, detail=f"{product.get('name', 'Produto')} não possui o tamanho {SIZES[size]['label']}")
+
+    async def check_size_or_stock(product, size):
+        """Saída/lista: aceita tamanho desmarcado se ainda houver unidades dele no estoque."""
+        if size in SIZES and size not in product_sizes(product) and await size_total(product['id'], size) > 0:
+            return
+        check_size(product, size)
 
     async def find_batch(product_id, batch_id):
         """Lote ativo ou arquivado do produto, com as garrafas contadas por tamanho."""
@@ -225,7 +269,7 @@ def setup_finished_stock_routes(api_router: APIRouter, db, get_current_user, bro
             plans = []
             for (pid, size), qty in grouped.items():
                 product = await get_product(pid)
-                check_size(product, size)
+                await check_size_or_stock(product, size)
                 lots = await db.finished_stock_lots.find({'product_id': pid, 'size': size}, {'_id': 0}).to_list(None)
                 try:
                     allocations = plan_exit(lots, qty)
@@ -273,13 +317,17 @@ def setup_finished_stock_routes(api_router: APIRouter, db, get_current_user, bro
         for product in sorted(products, key=lambda p: (p.get('name') or '').lower()):
             minimums = product.get('stock_minimums') or {}
             sizes = []
-            for size in product_sizes(product):
+            shown = set(product_sizes(product)) | {
+                size for (pid, size), rows in by_key.items()
+                if pid == product['id'] and size in SIZES and sum(int(r['quantity']) for r in rows) > 0}
+            for size in sorted(shown, key=lambda s: SIZES[s]['order']):
                 size_lots = sorted(by_key.get((product['id'], size), []),
                                    key=lambda lot: (lot.get('batch_id') is not None, lot.get('batch_date') or ''))
                 total = sum(int(lot['quantity']) for lot in size_lots)
                 minimum = int(minimums.get(size, 0) or 0)
                 sizes.append({
                     'size': size, 'label': SIZES[size]['label'], 'quantity': total, 'minimum': minimum,
+                    'unlisted': size not in product_sizes(product),
                     'low': minimum > 0 and total <= minimum,
                     'barcode': code_map.get((product['id'], size), ''),
                     'lots': [{'batch_id': lot.get('batch_id'), 'batch_number': lot.get('batch_number') or MIXED,
@@ -287,6 +335,8 @@ def setup_finished_stock_routes(api_router: APIRouter, db, get_current_user, bro
                 })
             result.append({'product_id': product['id'], 'name': product.get('name', ''),
                            'kind': product_kind(product), 'configured': bool(product.get('stock_sizes')),
+                           'stock_sizes': product.get('stock_sizes') or [],
+                           'minimums': {k: int(v) for k, v in minimums.items() if k in SIZES},
                            'sizes': sizes})
         return {'sizes': [{'size': k, **v} for k, v in sorted(SIZES.items(), key=lambda kv: kv[1]['order'])],
                 'products': result}
@@ -425,7 +475,7 @@ def setup_finished_stock_routes(api_router: APIRouter, db, get_current_user, bro
         items = []
         for item in data.items:
             product = await get_product(item.product_id)
-            check_size(product, item.size)
+            await check_size_or_stock(product, item.size)
             items.append({'product_id': product['id'], 'name': product.get('name', ''), 'size': item.size,
                           'label': SIZES[item.size]['label'], 'quantity': item.quantity})
         doc = {'id': str(uuid4()), 'items': items, 'note': data.note.strip(), 'status': 'pendente',
@@ -478,6 +528,33 @@ def setup_finished_stock_routes(api_router: APIRouter, db, get_current_user, bro
         await db.products.update_one({'id': product_id}, {'$set': {
             'stock_sizes': sorted(set(sizes), key=lambda s: SIZES[s]['order']), 'stock_minimums': minimums}})
         return {'stock_sizes': sizes, 'stock_minimums': minimums}
+
+    @router.put('/minimums/bulk')
+    async def set_minimums_bulk(data: MinimumsBulk, current_user=Depends(get_current_user)):
+        """Mínimos de vários produtos de uma vez (valida tudo antes de gravar)."""
+        ids = [u.product_id for u in data.updates]
+        if len(set(ids)) != len(ids):
+            raise HTTPException(status_code=400, detail='Produto repetido na lista')
+        products = {p['id']: p for p in await db.products.find(
+            {'id': {'$in': ids}, 'deleted': False}, {'_id': 0, 'id': 1, 'name': 1, 'unit': 1,
+                                                     'stock_sizes': 1, 'stock_minimums': 1}).to_list(None)}
+        missing = [pid for pid in ids if pid not in products]
+        if missing:
+            raise HTTPException(status_code=404, detail=f'{len(missing)} produto(s) não encontrado(s). Atualize a página')
+        plans, skipped = [], []
+        for update in data.updates:
+            product = products[update.product_id]
+            try:
+                sizes, minimums, ignored = merge_minimums(product, update)
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=f"{product.get('name')}: {exc}")
+            if ignored:
+                skipped.append({'product_id': product['id'], 'name': product.get('name', ''),
+                                'sizes': [SIZES[s]['label'] if s in SIZES else s for s in ignored]})
+            plans.append((product['id'], sizes, minimums))
+        for pid, sizes, minimums in plans:
+            await db.products.update_one({'id': pid}, {'$set': {'stock_sizes': sizes, 'stock_minimums': minimums}})
+        return {'updated': len(plans), 'skipped': skipped}
 
     @router.get('/barcodes')
     async def list_barcodes(current_user=Depends(get_current_user)):

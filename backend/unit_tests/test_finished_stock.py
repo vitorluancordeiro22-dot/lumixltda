@@ -249,6 +249,67 @@ class StockFlow(unittest.TestCase):
         doc = self.db.store.products.find_one({'id': 'sabao'})
         self.assertEqual((doc['name'], doc['unit']), ('Sabão em pó', 'Kg'))
 
+    def bulk(self, updates):
+        return self.client.put('/api/finished-stock/minimums/bulk', json={'updates': updates})
+
+    def test_bulk_minimums_apply_standard_to_many_products(self):
+        self.db.store.products.insert_many([
+            {'id': f'p{i}', 'name': f'Produto {i}', 'unit': 'Litros', 'deleted': False} for i in range(15)])
+        std = {'two_liter': 20, 'five_liter': 10}
+        r = self.bulk([{'product_id': f'p{i}', 'minimums': std} for i in range(15)])
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertEqual(r.json(), {'updated': 15, 'skipped': []})
+        doc = self.db.store.products.find_one({'id': 'p7'})
+        self.assertEqual(doc['stock_minimums'], std)
+        self.assertEqual(doc['stock_sizes'], [])  # sem tamanhos definidos: continua mostrando todos
+        sizes = next(p for p in self.client.get('/api/finished-stock/overview').json()['products']
+                     if p['product_id'] == 'p7')['sizes']
+        self.assertEqual([(s['label'], s['minimum']) for s in sizes], [('500ml', 0), ('1L', 0), ('2L', 20), ('5L', 10)])
+
+    def test_bulk_adds_size_to_product_with_defined_sizes(self):
+        self.bulk([{'product_id': 'desinf', 'minimums': {'two_liter': 6}}])  # desinf tem 1L e 5L
+        doc = self.db.store.products.find_one({'id': 'desinf'})
+        self.assertEqual(doc['stock_sizes'], ['one_liter', 'two_liter', 'five_liter'])
+
+    def test_bulk_merges_without_erasing_other_sizes(self):
+        # desinf: tamanhos 1L e 5L, mínimo 1L = 10
+        r = self.bulk([{'product_id': 'desinf', 'minimums': {'five_liter': 3}}])
+        self.assertEqual(r.status_code, 200)
+        doc = self.db.store.products.find_one({'id': 'desinf'})
+        self.assertEqual(doc['stock_minimums'], {'one_liter': 10, 'five_liter': 3})
+        self.assertEqual(doc['stock_sizes'], ['one_liter', 'five_liter'])
+        self.bulk([{'product_id': 'desinf', 'minimums': {'one_liter': 0}}])  # 0 remove o mínimo
+        doc = self.db.store.products.find_one({'id': 'desinf'})
+        self.assertEqual(doc['stock_minimums'], {'five_liter': 3})
+        self.assertEqual(doc['stock_sizes'], ['one_liter', 'five_liter'])  # tamanho continua
+
+    def test_bulk_skips_sizes_of_other_unit_and_validates_first(self):
+        r = self.bulk([{'product_id': 'desinf', 'minimums': {'two_liter': 20}},
+                       {'product_id': 'sabao', 'minimums': {'two_liter': 20, 'one_kg': 5}}])
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()['skipped'], [{'product_id': 'sabao', 'name': 'Sabão em pó', 'sizes': ['2L']}])
+        self.assertEqual(self.db.store.products.find_one({'id': 'sabao'})['stock_minimums'], {'one_kg': 5})
+        before = list(self.db.store.products.find({}, {'_id': 0}))
+        bad = self.bulk([{'product_id': 'desinf', 'minimums': {'one_liter': 99}},
+                         {'product_id': 'sabao', 'minimums': {'one_kg': -1}}])
+        self.assertEqual(bad.status_code, 400)
+        self.assertEqual(list(self.db.store.products.find({}, {'_id': 0})), before)  # nada gravado
+        self.assertEqual(self.bulk([{'product_id': 'velho', 'minimums': {'one_liter': 1}}]).status_code, 404)
+        self.assertEqual(self.bulk([{'product_id': 'desinf'}, {'product_id': 'desinf'}]).status_code, 400)
+
+    def test_unmarked_size_with_stock_stays_visible_and_can_leave(self):
+        self.entry(quantity=12)  # 12 garrafas de 1L
+        self.client.put('/api/finished-stock/products/desinf/config', json={'sizes': ['five_liter']})
+        row = self.total()
+        self.assertEqual((row['quantity'], row['unlisted']), (12, True))
+        self.assertEqual(self.entry(quantity=1).status_code, 400)  # nova entrada não, tamanho desmarcado
+        r = self.client.post('/api/finished-stock/exits', json={
+            'items': [{'product_id': 'desinf', 'size': 'one_liter', 'quantity': 12}]})
+        self.assertEqual(r.status_code, 200, r.text)
+        sizes = next(p for p in self.client.get('/api/finished-stock/overview').json()['products']
+                     if p['product_id'] == 'desinf')['sizes']
+        self.assertEqual([s['label'] for s in sizes], ['5L'])  # zerou: some da tela
+
     def test_concurrent_lock_is_released(self):
         self.db.store.finished_stock_locks.insert_one({'_id': 'desinf', 'owner': 'x', 'at': '2999-01-01'})
         self.assertEqual(self.entry().status_code, 409)

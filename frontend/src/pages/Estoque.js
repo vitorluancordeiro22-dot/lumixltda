@@ -14,10 +14,11 @@ import {
 import { toast } from 'sonner';
 import {
   ArrowDownToLine, ArrowUpFromLine, ClipboardList, Search, Camera, Printer, Check, X,
-  Plus, Minus, Trash2, AlertTriangle, History, Undo2, PackageOpen, ChevronDown, ChevronUp,
+  Plus, Minus, Trash2, AlertTriangle, History, Undo2, PackageOpen, ChevronDown, ChevronUp, Gauge,
 } from 'lucide-react';
 import { BarcodeScanner } from '../components/BarcodeScanner';
 import { StockBottle } from '../components/StockBottle';
+import { MinimumsManager } from '../components/MinimumsManager';
 import { STOCK_SIZES, sizeInfo, errorMessage } from '../lib/stockSizes';
 
 const MIXED = 'misturado';
@@ -408,6 +409,7 @@ export const Estoque = () => {
   const [expanded, setExpanded] = useState({});
   const [dialog, setDialog] = useState({ mode: null, initial: null });
   const [listOpen, setListOpen] = useState(false);
+  const [minOpen, setMinOpen] = useState(false);
   const [scanOpen, setScanOpen] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [confirm, setConfirm] = useState(null); // {type:'list'|'cancelList'|'undo', item}
@@ -492,6 +494,7 @@ export const Estoque = () => {
           <Button className="h-12" variant="outline" onClick={() => openMove('saida')}><ArrowUpFromLine className="w-5 h-5 mr-2" /> Saída</Button>
           <Button className="h-12" variant="outline" onClick={() => setListOpen(true)}><Printer className="w-5 h-5 mr-2" /> Lista de gestão</Button>
           {isLab && <Button className="h-12" variant="outline" onClick={() => openMove('inventario')}><ClipboardList className="w-5 h-5 mr-2" /> Inventário</Button>}
+          {isLab && <Button className="h-12" variant="outline" onClick={() => setMinOpen(true)}><Gauge className="w-5 h-5 mr-2" /> Estoque mínimo</Button>}
         </div>
       </div>
 
@@ -636,6 +639,7 @@ export const Estoque = () => {
 
       <MovementDialog mode={dialog.mode} open={Boolean(dialog.mode)} onOpenChange={(o) => !o && setDialog({ mode: null, initial: null })}
                       products={data.products} team={team} defaultOperator={defaultOperator} initial={dialog.initial} onDone={load} />
+      <MinimumsManager open={minOpen} onOpenChange={setMinOpen} onSaved={load} />
       <ListDialog open={listOpen} onOpenChange={setListOpen} products={data.products} onCreated={load} />
       <BarcodeScanner open={scanOpen} onOpenChange={setScanOpen} onDetected={onScan} />
 
