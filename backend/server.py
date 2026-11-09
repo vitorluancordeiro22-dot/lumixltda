@@ -96,6 +96,8 @@ class Product(BaseModel):
     expected_liters: float
     recipes: List[ProductRecipe]
     file_models: Optional[Dict] = None  # Arquivos modelo (OP, Ficha Análise)
+    stock_sizes: Optional[List[str]] = None  # Estoque: tamanhos que o produto possui
+    stock_minimums: Optional[Dict[str, int]] = None  # Estoque: mínimo por tamanho
     created_at: str
     deleted: bool = False
 
@@ -4184,6 +4186,10 @@ async def delete_notification(notif_id: str, current_user=Depends(get_current_us
     await db.notifications.update_one({'id': notif_id}, {'$set': {'deleted': True}})
     return {'message': 'Notificação removida'}
 
+
+# ========== ESTOQUE DE PRODUTO ACABADO ==========
+from finished_stock import setup_finished_stock_routes
+setup_finished_stock_routes(api_router, db, get_current_user, broadcast_push)
 
 app.include_router(api_router)
 
