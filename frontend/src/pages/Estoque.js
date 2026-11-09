@@ -20,6 +20,7 @@ import { BarcodeScanner } from '../components/BarcodeScanner';
 import { StockBottle } from '../components/StockBottle';
 import { MinimumsManager } from '../components/MinimumsManager';
 import { STOCK_SIZES, sizeInfo, errorMessage } from '../lib/stockSizes';
+import { code128Svg } from '../lib/code128';
 
 const MIXED = 'misturado';
 
@@ -255,6 +256,8 @@ const MovementDialog = ({ mode, open, onOpenChange, products, team, defaultOpera
 };
 
 // ---------- impressão da lista de gestão ----------
+export const listCode = (list) => 'LS' + list.id.replace(/-/g, '').slice(0, 10).toUpperCase();
+
 const escapeHtml = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 const printList = (list, products) => {
@@ -272,23 +275,36 @@ const printList = (list, products) => {
     }
     return parts.join(', ') + (left > 0 ? ` — faltam ${left}` : '');
   };
+  const codeFor = (item) => {
+    const p = products.find((x) => x.product_id === item.product_id);
+    const s = p?.sizes.find((x) => x.size === item.size);
+    return s ? (s.barcode || s.internal_code) : '';
+  };
+  const barcodeCell = (item) => {
+    const code = codeFor(item);
+    if (!code) return '';
+    try { return code128Svg(code, { height: 34, module: 1.1 }); } catch { return escapeHtml(code); }
+  };
   const rows = list.items.map((i, idx) => `
     <tr><td>${idx + 1}</td><td>${escapeHtml(i.name)}</td><td class="c">${escapeHtml(i.label)}</td>
-    <td class="c b">${i.quantity}</td><td>${escapeHtml(lotsFor(i))}</td><td class="c">☐</td></tr>`).join('');
+    <td class="c b">${i.quantity}</td><td class="bc">${barcodeCell(i)}</td><td>${escapeHtml(lotsFor(i))}</td><td class="c">☐</td></tr>`).join('');
   const total = list.items.reduce((a, i) => a + i.quantity, 0);
   const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Lista de gestão</title>
   <style>
     body{font-family:Arial,Helvetica,sans-serif;margin:24px;color:#111}
     h1{font-size:20px;margin:0}.sub{color:#555;font-size:12px;margin:4px 0 16px}
     table{width:100%;border-collapse:collapse;font-size:13px}th,td{border:1px solid #999;padding:6px 8px;text-align:left}
-    th{background:#eee}.c{text-align:center}.b{font-weight:bold;font-size:15px}
+    th{background:#eee}.c{text-align:center}.b{font-weight:bold;font-size:15px}td{vertical-align:middle}
+    .bc{text-align:center;padding:4px}.bc svg{display:block;margin:0 auto;max-width:100%}
+    .head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px}.lc{text-align:center;font-size:10px;color:#555}
     .sign{display:flex;gap:40px;margin-top:48px;font-size:12px}.sign div{flex:1;border-top:1px solid #333;padding-top:4px;text-align:center}
     @media print{body{margin:10mm}}
   </style></head><body>
-  <h1>Lumix — Lista de gestão (Estoque → Depósito)</h1>
-  <p class="sub">Lista ${escapeHtml(list.id.slice(0, 8).toUpperCase())} · criada por ${escapeHtml(list.created_by)} em ${escapeHtml(new Date(list.created_at).toLocaleString('pt-BR'))}${list.note ? ' · ' + escapeHtml(list.note) : ''}</p>
-  <table><thead><tr><th>#</th><th>Produto</th><th class="c">Tamanho</th><th class="c">Qtd</th><th>Retirar dos lotes</th><th class="c">OK</th></tr></thead>
-  <tbody>${rows}</tbody><tfoot><tr><th colspan="3">Total de unidades</th><th class="c">${total}</th><th colspan="2"></th></tr></tfoot></table>
+  <div class="head"><div><h1>Lumix — Lista de gestão (Estoque → Depósito)</h1>
+  <p class="sub">Lista ${escapeHtml(listCode(list))} · criada por ${escapeHtml(list.created_by)} em ${escapeHtml(new Date(list.created_at).toLocaleString('pt-BR'))}${list.note ? ' · ' + escapeHtml(list.note) : ''}</p></div>
+  <div class="lc">${code128Svg(listCode(list), { height: 40, module: 1.3 })}<div>Leia na aba Estoque para confirmar a saída</div></div></div>
+  <table><thead><tr><th>#</th><th>Produto</th><th class="c">Tamanho</th><th class="c">Qtd</th><th class="c">Código</th><th>Retirar dos lotes</th><th class="c">OK</th></tr></thead>
+  <tbody>${rows}</tbody><tfoot><tr><th colspan="3">Total de unidades</th><th class="c">${total}</th><th colspan="3"></th></tr></tfoot></table>
   <div class="sign"><div>Separado por</div><div>Conferido por</div><div>Data</div></div>
   <script>window.onload=function(){window.print()}</script></body></html>`;
   const w = window.open('', '_blank');
@@ -451,17 +467,23 @@ export const Estoque = () => {
 
   const onScan = useCallback(async (code) => {
     setScanOpen(false);
+    if (/^LS[0-9A-F]{10}$/i.test(code.trim())) {
+      const lst = lists.find((l) => l.status === 'pendente' && listCode(l) === code.trim().toUpperCase());
+      if (lst) { setSearch(''); setConfirm({ type: 'list', item: lst }); }
+      else toast.error('Lista não encontrada ou já confirmada');
+      return;
+    }
     try {
       const r = await api.get(`/finished-stock/barcode/${encodeURIComponent(code)}`);
       setSearch(r.data.name); setSizeFilter(r.data.size); setOnlyLow(false);
       setHighlight(`${r.data.product_id}:${r.data.size}`);
       toast.success(`${r.data.name} ${r.data.label}`);
     } catch (e) { toast.error(errorMessage(e, 'Código não encontrado')); }
-  }, []);
+  }, [lists]);
 
   const onSearchKey = async (e) => {
     // leitor USB: digita o código e aperta Enter
-    if (e.key === 'Enter' && /^\d{6,}$/.test(search.trim())) onScan(search.trim());
+    if (e.key === 'Enter' && /^(\d{6,}|L[XS][0-9A-F]{10,11})$/i.test(search.trim())) onScan(search.trim());
   };
 
   const runConfirm = async () => {
@@ -538,7 +560,7 @@ export const Estoque = () => {
           {pendingLists.map((l) => (
             <div key={l.id} className="rounded-lg border p-3 space-y-2">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="text-sm"><b>{l.id.slice(0, 8).toUpperCase()}</b> · {l.created_by} · {fmtDateTime(l.created_at)}</span>
+                <span className="text-sm"><b>{listCode(l)}</b> · {l.created_by} · {fmtDateTime(l.created_at)}</span>
                 <div className="flex gap-2">
                   <Button size="sm" variant="outline" onClick={() => printList(l, data.products)}><Printer className="w-4 h-4 mr-1" /> Imprimir</Button>
                   <Button size="sm" className="bg-primary hover:bg-primary/90" onClick={() => setConfirm({ type: 'list', item: l })}><Check className="w-4 h-4 mr-1" /> Confirmar saída</Button>
@@ -650,7 +672,7 @@ export const Estoque = () => {
               {confirm?.type === 'list' ? 'Confirmar saída da lista?' : confirm?.type === 'cancelList' ? 'Cancelar esta lista?' : 'Estornar movimentação?'}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {confirm?.type === 'list' && 'Todos os itens da lista saem do estoque agora. Confirme só depois da baldeação.'}
+              {confirm?.type === 'list' && `Lista ${listCode(confirm.item)}: ${confirm.item.items.map((i) => `${i.quantity}× ${i.name} ${i.label}`).join(', ')}. Todos os itens saem do estoque agora. Confirme só depois da baldeação.`}
               {confirm?.type === 'cancelList' && 'A lista é descartada. O estoque não muda.'}
               {confirm?.type === 'undo' && confirm?.item && `${confirm.item.quantity}× ${confirm.item.product_name} ${confirm.item.size_label} — o estoque volta como estava antes desta movimentação.`}
             </AlertDialogDescription>

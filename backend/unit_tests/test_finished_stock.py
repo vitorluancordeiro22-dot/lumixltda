@@ -234,6 +234,17 @@ class StockFlow(unittest.TestCase):
         self.assertEqual(self.client.get('/api/finished-stock/barcodes').json(), [])
         self.assertEqual(put(product_id='desinf', size='one_kg', code='1').status_code, 400)
 
+    def test_internal_code_for_products_without_barcode(self):
+        self.db.store.products.insert_one({'id': '3f2a9c1d-77aa-4b2e-9c11-000000000001', 'name': 'Limpa Vidro',
+                                           'unit': 'Litros', 'deleted': False})
+        data = self.client.get('/api/finished-stock/overview').json()
+        row = next(s for p in data['products'] if p['name'] == 'Limpa Vidro' for s in p['sizes'] if s['size'] == 'five_liter')
+        self.assertEqual(row['internal_code'], 'LX43F2A9C1D77')
+        found = self.client.get('/api/finished-stock/barcode/lx43f2a9c1d77').json()  # leitor pode mandar minúsculo
+        self.assertEqual((found['name'], found['size'], found['label']), ('Limpa Vidro', 'five_liter', '5L'))
+        self.assertEqual(self.client.get('/api/finished-stock/barcode/LX9ZZZZZZZZZZ').status_code, 404)
+        self.assertEqual(self.client.get('/api/finished-stock/barcode/LX4FFFFFFFFFF').status_code, 404)
+
     def test_product_config_sizes_and_minimums(self):
         r = self.client.put('/api/finished-stock/products/sabao/config', json={
             'sizes': ['one_kg'], 'minimums': {'one_kg': 5}})

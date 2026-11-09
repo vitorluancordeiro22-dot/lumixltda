@@ -86,6 +86,20 @@ def low_stock_message(product_name, size, after, minimum):
             'Necessita nova ordem de produção.')
 
 
+def internal_code(product_id, size):
+    """Código interno para produto+tamanho sem código cadastrado (ex.: LX2A1B2C3D4E5)."""
+    return 'LX' + str(SIZES[size]['order']) + product_id.replace('-', '')[:10].upper()
+
+
+def parse_internal_code(code):
+    """Retorna (prefixo do produto, tamanho) de um código LX, ou None."""
+    code = (code or '').strip().upper()
+    if not (4 <= len(code) <= 13) or not code.startswith('LX') or not code[2].isdigit():
+        return None
+    size = next((k for k, v in SIZES.items() if v['order'] == int(code[2])), None)
+    return (code[3:], size) if size else None
+
+
 def should_notify(before, after, minimum):
     return minimum > 0 and after <= minimum < before
 
@@ -336,6 +350,7 @@ def setup_finished_stock_routes(api_router: APIRouter, db, get_current_user, bro
                     'unlisted': size not in product_sizes(product),
                     'low': minimum > 0 and total <= minimum,
                     'barcode': code_map.get((product['id'], size), ''),
+                    'internal_code': internal_code(product['id'], size),
                     'lots': [{'batch_id': lot.get('batch_id'), 'batch_number': lot.get('batch_number') or MIXED,
                               'quantity': int(lot['quantity'])} for lot in size_lots],
                 })
@@ -388,6 +403,12 @@ def setup_finished_stock_routes(api_router: APIRouter, db, get_current_user, bro
     @router.get('/barcode/{code}')
     async def lookup_barcode(code: str, current_user=Depends(get_current_user)):
         found = await db.product_barcodes.find_one({'_id': code.strip()})
+        if not found and parse_internal_code(code):
+            prefix, size = parse_internal_code(code)
+            matches = [p for p in await db.products.find({'deleted': False}, {'_id': 0, 'id': 1}).to_list(None)
+                       if p['id'].replace('-', '')[:10].upper() == prefix]
+            if len(matches) == 1:
+                found = {'_id': code.strip().upper(), 'product_id': matches[0]['id'], 'size': size}
         if not found:
             raise HTTPException(status_code=404, detail='Código de barras não cadastrado')
         product = await get_product(found['product_id'])
