@@ -37,27 +37,89 @@
 }
 
 /* =========================
-   TEMA ESCURO (mantido)
+   TEMA ESCURO — mesma identidade do claro (verde Lumix)
 ========================= */
 
 .dark {
-  --background: 15 23 42;
-  --foreground: 241 245 249;
+  color-scheme: dark;
 
-  --card: 30 41 59;
-  --card-foreground: 241 245 249;
+  --background: 10 15 20;             /* #0A0F14 */
+  --foreground: 229 236 241;          /* #E5ECF1 */
 
-  --primary: 96 165 250;
-  --primary-foreground: 15 23 42;
+  --card: 17 24 31;                   /* #11181F */
+  --card-foreground: 229 236 241;
 
-  --secondary: 52 211 153;
-  --secondary-foreground: 15 23 42;
+  --primary: 34 197 135;              /* #22C587 — Verde Lumix (versão para fundo escuro) */
+  --primary-foreground: 3 26 17;
+  --primary-dark: 22 163 108;
 
-  --muted: 30 41 59;
-  --muted-foreground: 148 163 184;
+  --secondary: 56 140 160;            /* petróleo claro */
+  --secondary-foreground: 240 249 255;
 
-  --border: 51 65 85;
+  --muted: 26 35 44;                  /* #1A232C */
+  --muted-foreground: 148 163 178;
+
+  --auxiliary: 100 116 133;
+
+  --border: 40 52 64;                 /* #283440 */
+
+  --success: 34 197 94;
+  --warning: 251 191 36;
+  --destructive: 248 113 113;
+  --info: 96 165 250;
 }
+
+/* Borda padrão (sem cor definida) segue o tema escuro; bordas coloridas continuam iguais */
+@layer base {
+  .dark *, .dark ::before, .dark ::after { border-color: rgb(var(--border)); }
+}
+
+/* Telas que usam cores fixas do tema claro: no escuro, seguem o tema.
+   (Não afeta o tema claro.) */
+.dark .bg-white, .dark .focus\:bg-white:focus { background-color: rgb(var(--card)); }
+.dark .bg-slate-50, .dark .bg-gray-50, .dark .hover\:bg-slate-50:hover, .dark .hover\:bg-slate-50\/60:hover,
+.dark .hover\:bg-gray-100:hover { background-color: rgb(var(--muted)); }
+.dark .bg-slate-100, .dark .bg-gray-100, .dark .hover\:bg-slate-200:hover,
+.dark .group:hover .group-hover\:bg-slate-200 { background-color: rgb(var(--border)); }
+.dark .text-slate-900, .dark .text-slate-800, .dark .text-slate-700, .dark .text-gray-900, .dark .text-gray-800,
+.dark .text-gray-700, .dark .text-black, .dark .hover\:text-slate-700:hover, .dark .hover\:text-slate-800:hover,
+.dark .group:hover .group-hover\:text-slate-700 { color: rgb(var(--foreground)); }
+.dark .text-slate-600, .dark .text-slate-500, .dark .text-gray-600, .dark .text-gray-500 { color: rgb(var(--muted-foreground)); }
+.dark .text-slate-400 { color: rgb(var(--auxiliary)); }
+.dark .border-slate-50, .dark .border-slate-100, .dark .border-slate-200, .dark .border-gray-200,
+.dark .focus\:border-slate-200:focus, .dark .md\:border-slate-100 { border-color: rgb(var(--border)); }
+.dark .placeholder\:text-slate-400::placeholder { color: rgb(var(--auxiliary)); }
+
+/* Fundos claros coloridos (avisos, selos) viram tons translúcidos */
+.dark .bg-red-50, .dark .bg-red-100, .dark .hover\:bg-red-50:hover { background-color: rgb(239 68 68 / 0.14); }
+.dark .bg-orange-50, .dark .hover\:bg-orange-50:hover { background-color: rgb(249 115 22 / 0.14); }
+.dark .bg-amber-50, .dark .bg-yellow-50 { background-color: rgb(245 158 11 / 0.14); }
+.dark .bg-green-50, .dark .bg-green-50\/50, .dark .bg-green-100\/50, .dark .bg-emerald-50,
+.dark .hover\:bg-green-50:hover { background-color: rgb(34 197 94 / 0.12); }
+.dark .bg-blue-50, .dark .hover\:bg-blue-50:hover { background-color: rgb(59 130 246 / 0.14); }
+.dark .border-red-200, .dark .border-red-300 { border-color: rgb(248 113 113 / 0.4); }
+.dark .border-green-200, .dark .border-green-300, .dark .border-emerald-200 { border-color: rgb(74 222 128 / 0.35); }
+.dark .border-amber-200, .dark .border-yellow-200, .dark .border-orange-200 { border-color: rgb(251 191 36 / 0.35); }
+.dark .border-blue-200 { border-color: rgb(96 165 250 / 0.35); }
+.dark .text-red-700, .dark .text-red-800 { color: rgb(252 165 165); }
+.dark .text-orange-700, .dark .text-orange-800 { color: rgb(253 186 116); }
+.dark .text-amber-700, .dark .text-amber-800 { color: rgb(252 211 77); }
+.dark .text-green-700, .dark .text-green-900, .dark .text-emerald-700, .dark .text-emerald-800 { color: rgb(134 239 172); }
+.dark .text-blue-700, .dark .text-blue-800, .dark .text-blue-900 { color: rgb(147 197 253); }
+
+/* Degradês claros */
+.dark .from-green-50, .dark .from-emerald-50 { --tw-gradient-from: rgb(34 197 94 / 0.10) var(--tw-gradient-from-position); --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
+.dark .from-yellow-50 { --tw-gradient-from: rgb(245 158 11 / 0.10) var(--tw-gradient-from-position); --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
+.dark .from-gray-50 { --tw-gradient-from: rgb(var(--muted)) var(--tw-gradient-from-position); --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
+.dark .to-green-50, .dark .to-emerald-50 { --tw-gradient-to: rgb(34 197 94 / 0.04) var(--tw-gradient-to-position); }
+.dark .to-orange-50 { --tw-gradient-to: rgb(249 115 22 / 0.06) var(--tw-gradient-to-position); }
+.dark .to-slate-50 { --tw-gradient-to: rgb(var(--card)) var(--tw-gradient-to-position); }
+
+/* Sombras e gráficos no escuro */
+.dark .shadow-premium, .dark .shadow-soft, .dark .shadow-lift { box-shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px -12px rgb(0 0 0 / 0.6); }
+.dark .recharts-cartesian-grid line { stroke: rgb(var(--border)); }
+.dark .recharts-text { fill: rgb(var(--muted-foreground)); }
+.dark .recharts-default-tooltip { background-color: rgb(var(--card)) !important; border-color: rgb(var(--border)) !important; }
 
 /* =========================
    FIX: inputs/seletores
