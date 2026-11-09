@@ -1,0 +1,509 @@
+diff --git a/backend/finished_stock.py b/backend/finished_stock.py
+index ac0b4d2..a2d8148 100644
+--- a/backend/finished_stock.py
++++ b/backend/finished_stock.py
+@@ -128,6 +128,44 @@ class ProductStockConfig(BaseModel):
+     minimums: Dict[str, int] = Field(default_factory=dict)
+ 
+ 
++class MinimumUpdate(BaseModel):
++    product_id: str
++    minimums: Dict[str, int] = Field(default_factory=dict)  # 0 remove o mínimo
++    add_sizes: List[str] = Field(default_factory=list)       # marca o tamanho como "Tem"
++
++
++class MinimumsBulk(BaseModel):
++    updates: List[MinimumUpdate] = Field(min_length=1, max_length=2000)
++
++
++def merge_minimums(product, update):
++    """Mescla mínimos e tamanhos de um produto; ignora tamanhos de outra unidade.
++
++    Retorna (stock_sizes, stock_minimums, ignorados).
++    """
++    kind = product_kind(product)
++    fits = lambda s: s in SIZES and SIZES[s]['kind'] == kind
++    for value in update.minimums.values():
++        if value < 0:
++            raise ValueError('Quantidade mínima não pode ser negativa')
++    ignored = sorted({s for s in list(update.minimums) + update.add_sizes if not fits(s)})
++    sizes = [s for s in (product.get('stock_sizes') or []) if fits(s)]
++    minimums = {k: int(v) for k, v in (product.get('stock_minimums') or {}).items() if fits(k)}
++    for size, value in update.minimums.items():
++        if not fits(size):
++            continue
++        if value > 0:
++            minimums[size] = int(value)
++        else:
++            minimums.pop(size, None)
++    added = [s for s in update.add_sizes if fits(s)]
++    added += [s for s, v in update.minimums.items() if fits(s) and v > 0]
++    # Produto sem tamanhos definidos mostra todos: o mínimo não deve esconder os demais.
++    if added and sizes:
++        sizes = sorted(set(sizes) | set(added), key=lambda s: SIZES[s]['order'])
++    return sizes, minimums, ignored
++
++
+ class BarcodeSet(BaseModel):
+     product_id: str
+     size: str
+@@ -173,6 +211,12 @@ def setup_finished_stock_routes(api_router: APIRouter, db, get_current_user, bro
+         if size not in product_sizes(product):
+             raise HTTPException(status_code=400, detail=f"{product.get('name', 'Produto')} não possui o tamanho {SIZES[size]['label']}")
+ 
++    async def check_size_or_stock(product, size):
++        """Saída/lista: aceita tamanho desmarcado se ainda houver unidades dele no estoque."""
++        if size in SIZES and size not in product_sizes(product) and await size_total(product['id'], size) > 0:
++            return
++        check_size(product, size)
++
+     async def find_batch(product_id, batch_id):
+         """Lote ativo ou arquivado do produto, com as garrafas contadas por tamanho."""
+         batch = await db.product_batches.find_one({'id': batch_id, 'product_id': product_id, 'deleted': False}, {'_id': 0})
+@@ -225,7 +269,7 @@ def setup_finished_stock_routes(api_router: APIRouter, db, get_current_user, bro
+             plans = []
+             for (pid, size), qty in grouped.items():
+                 product = await get_product(pid)
+-                check_size(product, size)
++                await check_size_or_stock(product, size)
+                 lots = await db.finished_stock_lots.find({'product_id': pid, 'size': size}, {'_id': 0}).to_list(None)
+                 try:
+                     allocations = plan_exit(lots, qty)
+@@ -273,13 +317,17 @@ def setup_finished_stock_routes(api_router: APIRouter, db, get_current_user, bro
+         for product in sorted(products, key=lambda p: (p.get('name') or '').lower()):
+             minimums = product.get('stock_minimums') or {}
+             sizes = []
+-            for size in product_sizes(product):
++            shown = set(product_sizes(product)) | {
++                size for (pid, size), rows in by_key.items()
++                if pid == product['id'] and size in SIZES and sum(int(r['quantity']) for r in rows) > 0}
++            for size in sorted(shown, key=lambda s: SIZES[s]['order']):
+                 size_lots = sorted(by_key.get((product['id'], size), []),
+                                    key=lambda lot: (lot.get('batch_id') is not None, lot.get('batch_date') or ''))
+                 total = sum(int(lot['quantity']) for lot in size_lots)
+                 minimum = int(minimums.get(size, 0) or 0)
+                 sizes.append({
+                     'size': size, 'label': SIZES[size]['label'], 'quantity': total, 'minimum': minimum,
++                    'unlisted': size not in product_sizes(product),
+                     'low': minimum > 0 and total <= minimum,
+                     'barcode': code_map.get((product['id'], size), ''),
+                     'lots': [{'batch_id': lot.get('batch_id'), 'batch_number': lot.get('batch_number') or MIXED,
+@@ -287,6 +335,8 @@ def setup_finished_stock_routes(api_router: APIRouter, db, get_current_user, bro
+                 })
+             result.append({'product_id': product['id'], 'name': product.get('name', ''),
+                            'kind': product_kind(product), 'configured': bool(product.get('stock_sizes')),
++                           'stock_sizes': product.get('stock_sizes') or [],
++                           'minimums': {k: int(v) for k, v in minimums.items() if k in SIZES},
+                            'sizes': sizes})
+         return {'sizes': [{'size': k, **v} for k, v in sorted(SIZES.items(), key=lambda kv: kv[1]['order'])],
+                 'products': result}
+@@ -425,7 +475,7 @@ def setup_finished_stock_routes(api_router: APIRouter, db, get_current_user, bro
+         items = []
+         for item in data.items:
+             product = await get_product(item.product_id)
+-            check_size(product, item.size)
++            await check_size_or_stock(product, item.size)
+             items.append({'product_id': product['id'], 'name': product.get('name', ''), 'size': item.size,
+                           'label': SIZES[item.size]['label'], 'quantity': item.quantity})
+         doc = {'id': str(uuid4()), 'items': items, 'note': data.note.strip(), 'status': 'pendente',
+@@ -479,6 +529,33 @@ def setup_finished_stock_routes(api_router: APIRouter, db, get_current_user, bro
+             'stock_sizes': sorted(set(sizes), key=lambda s: SIZES[s]['order']), 'stock_minimums': minimums}})
+         return {'stock_sizes': sizes, 'stock_minimums': minimums}
+ 
++    @router.put('/minimums/bulk')
++    async def set_minimums_bulk(data: MinimumsBulk, current_user=Depends(get_current_user)):
++        """Mínimos de vários produtos de uma vez (valida tudo antes de gravar)."""
++        ids = [u.product_id for u in data.updates]
++        if len(set(ids)) != len(ids):
++            raise HTTPException(status_code=400, detail='Produto repetido na lista')
++        products = {p['id']: p for p in await db.products.find(
++            {'id': {'$in': ids}, 'deleted': False}, {'_id': 0, 'id': 1, 'name': 1, 'unit': 1,
++                                                     'stock_sizes': 1, 'stock_minimums': 1}).to_list(None)}
++        missing = [pid for pid in ids if pid not in products]
++        if missing:
++            raise HTTPException(status_code=404, detail=f'{len(missing)} produto(s) não encontrado(s). Atualize a página')
++        plans, skipped = [], []
++        for update in data.updates:
++            product = products[update.product_id]
++            try:
++                sizes, minimums, ignored = merge_minimums(product, update)
++            except ValueError as exc:
++                raise HTTPException(status_code=400, detail=f"{product.get('name')}: {exc}")
++            if ignored:
++                skipped.append({'product_id': product['id'], 'name': product.get('name', ''),
++                                'sizes': [SIZES[s]['label'] if s in SIZES else s for s in ignored]})
++            plans.append((product['id'], sizes, minimums))
++        for pid, sizes, minimums in plans:
++            await db.products.update_one({'id': pid}, {'$set': {'stock_sizes': sizes, 'stock_minimums': minimums}})
++        return {'updated': len(plans), 'skipped': skipped}
++
+     @router.get('/barcodes')
+     async def list_barcodes(current_user=Depends(get_current_user)):
+         rows = await db.product_barcodes.find({}).to_list(None)
+diff --git a/backend/unit_tests/test_finished_stock.py b/backend/unit_tests/test_finished_stock.py
+index 55243bf..2d35d0d 100644
+--- a/backend/unit_tests/test_finished_stock.py
++++ b/backend/unit_tests/test_finished_stock.py
+@@ -249,6 +249,67 @@ class StockFlow(unittest.TestCase):
+         doc = self.db.store.products.find_one({'id': 'sabao'})
+         self.assertEqual((doc['name'], doc['unit']), ('Sabão em pó', 'Kg'))
+ 
++    def bulk(self, updates):
++        return self.client.put('/api/finished-stock/minimums/bulk', json={'updates': updates})
++
++    def test_bulk_minimums_apply_standard_to_many_products(self):
++        self.db.store.products.insert_many([
++            {'id': f'p{i}', 'name': f'Produto {i}', 'unit': 'Litros', 'deleted': False} for i in range(15)])
++        std = {'two_liter': 20, 'five_liter': 10}
++        r = self.bulk([{'product_id': f'p{i}', 'minimums': std} for i in range(15)])
++        self.assertEqual(r.status_code, 200, r.text)
++        self.assertEqual(r.json(), {'updated': 15, 'skipped': []})
++        doc = self.db.store.products.find_one({'id': 'p7'})
++        self.assertEqual(doc['stock_minimums'], std)
++        self.assertEqual(doc['stock_sizes'], [])  # sem tamanhos definidos: continua mostrando todos
++        sizes = next(p for p in self.client.get('/api/finished-stock/overview').json()['products']
++                     if p['product_id'] == 'p7')['sizes']
++        self.assertEqual([(s['label'], s['minimum']) for s in sizes], [('500ml', 0), ('1L', 0), ('2L', 20), ('5L', 10)])
++
++    def test_bulk_adds_size_to_product_with_defined_sizes(self):
++        self.bulk([{'product_id': 'desinf', 'minimums': {'two_liter': 6}}])  # desinf tem 1L e 5L
++        doc = self.db.store.products.find_one({'id': 'desinf'})
++        self.assertEqual(doc['stock_sizes'], ['one_liter', 'two_liter', 'five_liter'])
++
++    def test_bulk_merges_without_erasing_other_sizes(self):
++        # desinf: tamanhos 1L e 5L, mínimo 1L = 10
++        r = self.bulk([{'product_id': 'desinf', 'minimums': {'five_liter': 3}}])
++        self.assertEqual(r.status_code, 200)
++        doc = self.db.store.products.find_one({'id': 'desinf'})
++        self.assertEqual(doc['stock_minimums'], {'one_liter': 10, 'five_liter': 3})
++        self.assertEqual(doc['stock_sizes'], ['one_liter', 'five_liter'])
++        self.bulk([{'product_id': 'desinf', 'minimums': {'one_liter': 0}}])  # 0 remove o mínimo
++        doc = self.db.store.products.find_one({'id': 'desinf'})
++        self.assertEqual(doc['stock_minimums'], {'five_liter': 3})
++        self.assertEqual(doc['stock_sizes'], ['one_liter', 'five_liter'])  # tamanho continua
++
++    def test_bulk_skips_sizes_of_other_unit_and_validates_first(self):
++        r = self.bulk([{'product_id': 'desinf', 'minimums': {'two_liter': 20}},
++                       {'product_id': 'sabao', 'minimums': {'two_liter': 20, 'one_kg': 5}}])
++        self.assertEqual(r.status_code, 200)
++        self.assertEqual(r.json()['skipped'], [{'product_id': 'sabao', 'name': 'Sabão em pó', 'sizes': ['2L']}])
++        self.assertEqual(self.db.store.products.find_one({'id': 'sabao'})['stock_minimums'], {'one_kg': 5})
++        before = list(self.db.store.products.find({}, {'_id': 0}))
++        bad = self.bulk([{'product_id': 'desinf', 'minimums': {'one_liter': 99}},
++                         {'product_id': 'sabao', 'minimums': {'one_kg': -1}}])
++        self.assertEqual(bad.status_code, 400)
++        self.assertEqual(list(self.db.store.products.find({}, {'_id': 0})), before)  # nada gravado
++        self.assertEqual(self.bulk([{'product_id': 'velho', 'minimums': {'one_liter': 1}}]).status_code, 404)
++        self.assertEqual(self.bulk([{'product_id': 'desinf'}, {'product_id': 'desinf'}]).status_code, 400)
++
++    def test_unmarked_size_with_stock_stays_visible_and_can_leave(self):
++        self.entry(quantity=12)  # 12 garrafas de 1L
++        self.client.put('/api/finished-stock/products/desinf/config', json={'sizes': ['five_liter']})
++        row = self.total()
++        self.assertEqual((row['quantity'], row['unlisted']), (12, True))
++        self.assertEqual(self.entry(quantity=1).status_code, 400)  # nova entrada não, tamanho desmarcado
++        r = self.client.post('/api/finished-stock/exits', json={
++            'items': [{'product_id': 'desinf', 'size': 'one_liter', 'quantity': 12}]})
++        self.assertEqual(r.status_code, 200, r.text)
++        sizes = next(p for p in self.client.get('/api/finished-stock/overview').json()['products']
++                     if p['product_id'] == 'desinf')['sizes']
++        self.assertEqual([s['label'] for s in sizes], ['5L'])  # zerou: some da tela
++
+     def test_concurrent_lock_is_released(self):
+         self.db.store.finished_stock_locks.insert_one({'_id': 'desinf', 'owner': 'x', 'at': '2999-01-01'})
+         self.assertEqual(self.entry().status_code, 409)
+diff --git a/frontend/src/components/MinimumsManager.js b/frontend/src/components/MinimumsManager.js
+new file mode 100644
+index 0000000..15ef6cb
+--- /dev/null
++++ b/frontend/src/components/MinimumsManager.js
+@@ -0,0 +1,248 @@
++import React, { useEffect, useMemo, useState } from 'react';
++import api from '../lib/api';
++import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
++import { Button } from './ui/button';
++import { Input } from './ui/input';
++import { toast } from 'sonner';
++import { Gauge, Search, CheckSquare, Square, Table2, Layers } from 'lucide-react';
++import { StockBottle } from './StockBottle';
++import { sizesForKind, errorMessage } from '../lib/stockSizes';
++
++const digits = (v) => String(v ?? '').replace(/\D/g, '');
++
++const KindToggle = ({ kind, onChange, counts }) => (
++  <div className="inline-flex rounded-lg border p-1 gap-1">
++    {[{ k: 'L', label: 'Litros' }, { k: 'Kg', label: 'Kg' }].map(({ k, label }) => (
++      <button key={k} type="button" onClick={() => onChange(k)}
++              className={`px-3 h-8 rounded-md text-sm font-semibold transition ${kind === k ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}>
++        {label} <span className="opacity-70">({counts[k] || 0})</span>
++      </button>
++    ))}
++  </div>
++);
++
++const currentText = (p, kind) => sizesForKind(kind)
++  .filter((s) => p.minimums?.[s.size])
++  .map((s) => `${s.label}: ${p.minimums[s.size]}`)
++  .join(' · ');
++
++// ---------- aba 1: aplicar o mesmo padrão a vários produtos ----------
++const ApplyMany = ({ products, kind, onSaved }) => {
++  const sizes = sizesForKind(kind);
++  const [values, setValues] = useState({});
++  const [selected, setSelected] = useState(new Set());
++  const [search, setSearch] = useState('');
++  const [saving, setSaving] = useState(false);
++
++  useEffect(() => { setValues({}); setSelected(new Set()); setSearch(''); }, [kind]);
++
++  const visible = products.filter((p) => p.name.toLowerCase().includes(search.trim().toLowerCase()));
++  const allVisibleSelected = visible.length > 0 && visible.every((p) => selected.has(p.product_id));
++  const filled = Object.entries(values).filter(([, v]) => v !== '');
++
++  const toggle = (id) => {
++    const next = new Set(selected);
++    next.has(id) ? next.delete(id) : next.add(id);
++    setSelected(next);
++  };
++  const toggleAll = () => {
++    const next = new Set(selected);
++    visible.forEach((p) => (allVisibleSelected ? next.delete(p.product_id) : next.add(p.product_id)));
++    setSelected(next);
++  };
++
++  const apply = async () => {
++    if (!filled.length) return toast.error('Digite o mínimo de pelo menos um tamanho');
++    if (!selected.size) return toast.error('Selecione os produtos');
++    const minimums = Object.fromEntries(filled.map(([k, v]) => [k, parseInt(v, 10) || 0]));
++    setSaving(true);
++    try {
++      const r = await api.put('/finished-stock/minimums/bulk', {
++        updates: [...selected].map((product_id) => ({ product_id, minimums })),
++      });
++      toast.success(`Mínimo aplicado em ${r.data.updated} produto(s)`);
++      setSelected(new Set());
++      onSaved();
++    } catch (e) { toast.error(errorMessage(e, 'Erro ao aplicar')); }
++    finally { setSaving(false); }
++  };
++
++  return (
++    <div className="space-y-4">
++      <div className="rounded-lg border p-3 space-y-2">
++        <p className="text-sm font-semibold">1. Digite o padrão</p>
++        <div className="grid grid-cols-4 gap-2">
++          {sizes.map((s) => (
++            <div key={s.size} className="flex flex-col items-center gap-1 rounded-xl border p-2">
++              <StockBottle size={s.size} empty={!values[s.size]} />
++              <span className="text-sm font-bold">{s.label}</span>
++              <Input value={values[s.size] ?? ''} inputMode="numeric" placeholder="—" className="h-9 text-center"
++                     onChange={(e) => setValues({ ...values, [s.size]: digits(e.target.value) })} />
++            </div>
++          ))}
++        </div>
++        <p className="text-[11px] text-muted-foreground">Vazio = não mexe nesse tamanho · 0 = tira o mínimo. Nenhum tamanho é escondido dos produtos.</p>
++      </div>
++
++      <div className="rounded-lg border p-3 space-y-2">
++        <div className="flex items-center justify-between gap-2">
++          <p className="text-sm font-semibold">2. Marque os produtos <span className="text-muted-foreground font-normal">({selected.size} selecionados)</span></p>
++          <Button type="button" size="sm" variant="outline" onClick={toggleAll}>
++            {allVisibleSelected ? 'Desmarcar' : 'Selecionar'} {search ? 'filtrados' : 'todos'}
++          </Button>
++        </div>
++        <div className="relative">
++          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
++          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Filtrar por nome (ex.: desinfetante)" className="pl-9" />
++        </div>
++        <div className="max-h-[38vh] overflow-y-auto divide-y rounded-md border">
++          {visible.map((p) => {
++            const on = selected.has(p.product_id);
++            const cur = currentText(p, kind);
++            return (
++              <button key={p.product_id} type="button" onClick={() => toggle(p.product_id)}
++                      className={`w-full flex items-center gap-3 px-3 py-2 text-left transition ${on ? 'bg-primary/10' : 'hover:bg-muted'}`}>
++                {on ? <CheckSquare className="w-5 h-5 text-primary shrink-0" /> : <Square className="w-5 h-5 text-muted-foreground shrink-0" />}
++                <span className="flex-1 min-w-0">
++                  <span className="block truncate text-sm font-medium">{p.name}</span>
++                  <span className="block truncate text-[11px] text-muted-foreground">{cur || 'sem mínimo'}</span>
++                </span>
++              </button>
++            );
++          })}
++          {visible.length === 0 && <p className="p-3 text-sm text-muted-foreground">Nenhum produto.</p>}
++        </div>
++      </div>
++
++      <Button className="w-full h-12 bg-primary hover:bg-primary/90" disabled={saving || !selected.size || !filled.length} onClick={apply}>
++        Aplicar em {selected.size} produto(s)
++      </Button>
++    </div>
++  );
++};
++
++// ---------- aba 2: tabela para digitar em sequência ----------
++const TableEdit = ({ products, kind, onSaved }) => {
++  const sizes = sizesForKind(kind);
++  const [edits, setEdits] = useState({});
++  const [search, setSearch] = useState('');
++  const [saving, setSaving] = useState(false);
++
++  useEffect(() => { setEdits({}); setSearch(''); }, [kind]);
++
++  const visible = products.filter((p) => p.name.toLowerCase().includes(search.trim().toLowerCase()));
++  const original = (p, size) => (p.minimums?.[size] ? String(p.minimums[size]) : '');
++  const value = (p, size) => edits[p.product_id]?.[size] ?? original(p, size);
++  const changed = useMemo(() => products.filter((p) => sizes.some((s) => {
++    const e = edits[p.product_id]?.[s.size];
++    return e !== undefined && e !== original(p, s.size);
++  })), [edits, products, sizes]);
++
++  const setCell = (pid, size, v) => setEdits({ ...edits, [pid]: { ...(edits[pid] || {}), [size]: digits(v) } });
++
++  const save = async () => {
++    if (!changed.length) return;
++    setSaving(true);
++    try {
++      const updates = changed.map((p) => ({
++        product_id: p.product_id,
++        minimums: Object.fromEntries(sizes
++          .filter((s) => edits[p.product_id]?.[s.size] !== undefined && edits[p.product_id][s.size] !== original(p, s.size))
++          .map((s) => [s.size, parseInt(edits[p.product_id][s.size], 10) || 0])),
++      }));
++      const r = await api.put('/finished-stock/minimums/bulk', { updates });
++      toast.success(`${r.data.updated} produto(s) salvos`);
++      setEdits({});
++      onSaved();
++    } catch (e) { toast.error(errorMessage(e, 'Erro ao salvar')); }
++    finally { setSaving(false); }
++  };
++
++  return (
++    <div className="space-y-3 min-w-0">
++      <div className="relative">
++        <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
++        <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Filtrar por nome" className="pl-9" />
++      </div>
++      <p className="text-[11px] text-muted-foreground">Digite e use <b>Tab</b> ou <b>Enter</b> para ir ao próximo campo. Vazio = sem mínimo. Campo apagado = tamanho desmarcado no produto (ao digitar um mínimo, ele passa a ter).</p>
++      <div className="max-h-[50vh] overflow-auto rounded-md border">
++        <table className="w-full text-sm">
++          <thead className="sticky top-0 z-10 bg-card">
++            <tr className="border-b">
++              <th className="text-left p-2 sticky left-0 bg-card min-w-[120px]">Produto</th>
++              {sizes.map((s) => <th key={s.size} className="p-2 text-center min-w-[64px]">{s.label}</th>)}
++            </tr>
++          </thead>
++          <tbody>
++            {visible.map((p) => {
++              const dirty = changed.includes(p);
++              return (
++                <tr key={p.product_id} className={`border-b last:border-0 ${dirty ? 'bg-amber-50 dark:bg-amber-900/20' : ''}`}>
++                  <td className="p-2 sticky left-0 bg-inherit font-medium"><span className="line-clamp-2">{p.name}</span></td>
++                  {sizes.map((s) => {
++                    const has = !p.configured || p.stock_sizes.includes(s.size);
++                    return (
++                      <td key={s.size} className="p-1">
++                        <Input value={value(p, s.size)} inputMode="numeric" placeholder="—" data-cell
++                               className={`h-9 text-center px-1 ${has ? '' : 'opacity-50'}`}
++                               onChange={(e) => setCell(p.product_id, s.size, e.target.value)}
++                               onKeyDown={(e) => {
++                                 if (e.key !== 'Enter') return;
++                                 e.preventDefault();
++                                 const cells = [...document.querySelectorAll('input[data-cell]')];
++                                 cells[cells.indexOf(e.currentTarget) + 1]?.focus();
++                               }} />
++                      </td>
++                    );
++                  })}
++                </tr>
++              );
++            })}
++          </tbody>
++        </table>
++        {visible.length === 0 && <p className="p-3 text-sm text-muted-foreground">Nenhum produto.</p>}
++      </div>
++      <Button className="w-full h-12 bg-primary hover:bg-primary/90" disabled={saving || !changed.length} onClick={save}>
++        Salvar alterações {changed.length ? `(${changed.length} produto${changed.length === 1 ? '' : 's'})` : ''}
++      </Button>
++    </div>
++  );
++};
++
++/** Estoque mínimo de vários produtos de uma vez. */
++export const MinimumsManager = ({ open, onOpenChange, onSaved }) => {
++  const [tab, setTab] = useState('many');
++  const [kind, setKind] = useState('L');
++  const [products, setProducts] = useState([]);
++
++  const load = () => api.get('/finished-stock/overview')
++    .then((r) => setProducts(r.data.products))
++    .catch((e) => toast.error(errorMessage(e, 'Erro ao carregar produtos')));
++
++  useEffect(() => { if (open) load(); }, [open]);
++
++  const counts = products.reduce((a, p) => ({ ...a, [p.kind]: (a[p.kind] || 0) + 1 }), {});
++  const ofKind = products.filter((p) => p.kind === kind);
++  const saved = () => { load(); onSaved?.(); };
++
++  return (
++    <Dialog open={open} onOpenChange={onOpenChange}>
++      <DialogContent className="bg-card border-border max-w-2xl max-h-[94vh] overflow-y-auto [&>*]:min-w-0">
++        <DialogHeader><DialogTitle className="flex items-center gap-2"><Gauge className="w-5 h-5" /> Estoque mínimo</DialogTitle></DialogHeader>
++        <div className="grid grid-cols-2 gap-2">
++          {[{ k: 'many', label: 'Aplicar a vários', icon: Layers }, { k: 'table', label: 'Tabela', icon: Table2 }].map(({ k, label, icon: Icon }) => (
++            <button key={k} type="button" onClick={() => setTab(k)}
++                    className={`h-11 rounded-lg border-2 font-semibold flex items-center justify-center gap-2 transition ${
++                      tab === k ? 'border-primary bg-primary/10' : 'border-border hover:border-primary/50'}`}>
++              <Icon className="w-4 h-4" /> {label}
++            </button>
++          ))}
++        </div>
++        <KindToggle kind={kind} onChange={setKind} counts={counts} />
++        {tab === 'many'
++          ? <ApplyMany products={ofKind} kind={kind} onSaved={saved} />
++          : <TableEdit products={ofKind} kind={kind} onSaved={saved} />}
++      </DialogContent>
++    </Dialog>
++  );
++};
+diff --git a/frontend/src/pages/Estoque.js b/frontend/src/pages/Estoque.js
+index eee9803..ff8b4c6 100644
+--- a/frontend/src/pages/Estoque.js
++++ b/frontend/src/pages/Estoque.js
+@@ -14,10 +14,11 @@ import {
+ import { toast } from 'sonner';
+ import {
+   ArrowDownToLine, ArrowUpFromLine, ClipboardList, Search, Camera, Printer, Check, X,
+-  Plus, Minus, Trash2, AlertTriangle, History, Undo2, PackageOpen, ChevronDown, ChevronUp,
++  Plus, Minus, Trash2, AlertTriangle, History, Undo2, PackageOpen, ChevronDown, ChevronUp, Gauge,
+ } from 'lucide-react';
+ import { BarcodeScanner } from '../components/BarcodeScanner';
+ import { StockBottle } from '../components/StockBottle';
++import { MinimumsManager } from '../components/MinimumsManager';
+ import { STOCK_SIZES, sizeInfo, errorMessage } from '../lib/stockSizes';
+ 
+ const MIXED = 'misturado';
+@@ -408,6 +409,7 @@ export const Estoque = () => {
+   const [expanded, setExpanded] = useState({});
+   const [dialog, setDialog] = useState({ mode: null, initial: null });
+   const [listOpen, setListOpen] = useState(false);
++  const [minOpen, setMinOpen] = useState(false);
+   const [scanOpen, setScanOpen] = useState(false);
+   const [showHistory, setShowHistory] = useState(false);
+   const [confirm, setConfirm] = useState(null); // {type:'list'|'cancelList'|'undo', item}
+@@ -492,6 +494,7 @@ export const Estoque = () => {
+           <Button className="h-12" variant="outline" onClick={() => openMove('saida')}><ArrowUpFromLine className="w-5 h-5 mr-2" /> Saída</Button>
+           <Button className="h-12" variant="outline" onClick={() => setListOpen(true)}><Printer className="w-5 h-5 mr-2" /> Lista de gestão</Button>
+           {isLab && <Button className="h-12" variant="outline" onClick={() => openMove('inventario')}><ClipboardList className="w-5 h-5 mr-2" /> Inventário</Button>}
++          {isLab && <Button className="h-12" variant="outline" onClick={() => setMinOpen(true)}><Gauge className="w-5 h-5 mr-2" /> Estoque mínimo</Button>}
+         </div>
+       </div>
+ 
+@@ -636,6 +639,7 @@ export const Estoque = () => {
+ 
+       <MovementDialog mode={dialog.mode} open={Boolean(dialog.mode)} onOpenChange={(o) => !o && setDialog({ mode: null, initial: null })}
+                       products={data.products} team={team} defaultOperator={defaultOperator} initial={dialog.initial} onDone={load} />
++      <MinimumsManager open={minOpen} onOpenChange={setMinOpen} onSaved={load} />
+       <ListDialog open={listOpen} onOpenChange={setListOpen} products={data.products} onCreated={load} />
+       <BarcodeScanner open={scanOpen} onOpenChange={setScanOpen} onDetected={onScan} />
+ 
