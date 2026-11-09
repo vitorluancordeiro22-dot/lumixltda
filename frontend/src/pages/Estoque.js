@@ -513,7 +513,7 @@ export const Estoque = () => {
             <Input value={search} onChange={(e) => { setSearch(e.target.value); setHighlight(null); }} onKeyDown={onSearchKey}
                    placeholder="Pesquisar produto ou código de barras" className="pl-9 h-11" />
           </div>
-          <Button variant="outline" className="h-11" onClick={() => setScanOpen(true)}><Camera className="w-5 h-5 sm:mr-2" /><span className="hidden sm:inline">Câmera</span></Button>
+          <Button variant="outline" className="h-11" title="Ler código de barras" onClick={() => setScanOpen(true)}><Camera className="w-5 h-5 sm:mr-2" /><span className="hidden sm:inline">Câmera</span></Button>
         </div>
         <div className="flex gap-2 overflow-x-auto pb-1">
           {[{ size: '', label: 'Todos' }, ...usedSizes].map((s) => (
