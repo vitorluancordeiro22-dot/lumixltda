@@ -297,6 +297,21 @@ class StockFlow(unittest.TestCase):
         self.assertEqual(self.bulk([{'product_id': 'velho', 'minimums': {'one_liter': 1}}]).status_code, 404)
         self.assertEqual(self.bulk([{'product_id': 'desinf'}, {'product_id': 'desinf'}]).status_code, 400)
 
+    def test_bulk_set_sizes_defines_exactly_the_sizes(self):
+        self.db.store.products.insert_one({'id': 'piso', 'name': 'Limpa Piso', 'unit': 'Litros', 'deleted': False,
+                                           'stock_sizes': ['one_liter', 'two_liter'], 'stock_minimums': {'one_liter': 8}})
+        r = self.bulk([{'product_id': 'piso', 'set_sizes': ['two_liter', 'five_liter'],
+                        'minimums': {'two_liter': 20, 'five_liter': 10}}])
+        self.assertEqual(r.status_code, 200, r.text)
+        doc = self.db.store.products.find_one({'id': 'piso'})
+        self.assertEqual(doc['stock_sizes'], ['two_liter', 'five_liter'])
+        self.assertEqual(doc['stock_minimums'], {'two_liter': 20, 'five_liter': 10})  # 1L saiu junto
+        # produto em Kg: nenhum tamanho serve -> recusa tudo, nada gravado
+        bad = self.bulk([{'product_id': 'piso', 'set_sizes': ['two_liter'], 'minimums': {'two_liter': 5}},
+                         {'product_id': 'sabao', 'set_sizes': ['two_liter'], 'minimums': {'two_liter': 5}}])
+        self.assertEqual(bad.status_code, 400)
+        self.assertEqual(self.db.store.products.find_one({'id': 'piso'})['stock_minimums'], {'two_liter': 20, 'five_liter': 10})
+
     def test_unmarked_size_with_stock_stays_visible_and_can_leave(self):
         self.entry(quantity=12)  # 12 garrafas de 1L
         self.client.put('/api/finished-stock/products/desinf/config', json={'sizes': ['five_liter']})

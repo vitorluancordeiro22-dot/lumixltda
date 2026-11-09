@@ -132,6 +132,7 @@ class MinimumUpdate(BaseModel):
     product_id: str
     minimums: Dict[str, int] = Field(default_factory=dict)  # 0 remove o mínimo
     add_sizes: List[str] = Field(default_factory=list)       # marca o tamanho como "Tem"
+    set_sizes: Optional[List[str]] = None                    # define exatamente os tamanhos que o produto tem
 
 
 class MinimumsBulk(BaseModel):
@@ -148,9 +149,14 @@ def merge_minimums(product, update):
     for value in update.minimums.values():
         if value < 0:
             raise ValueError('Quantidade mínima não pode ser negativa')
-    ignored = sorted({s for s in list(update.minimums) + update.add_sizes if not fits(s)})
+    ignored = sorted({s for s in list(update.minimums) + update.add_sizes + (update.set_sizes or []) if not fits(s)})
     sizes = [s for s in (product.get('stock_sizes') or []) if fits(s)]
     minimums = {k: int(v) for k, v in (product.get('stock_minimums') or {}).items() if fits(k)}
+    if update.set_sizes is not None:
+        sizes = sorted({s for s in update.set_sizes if fits(s)}, key=lambda s: SIZES[s]['order'])
+        if not sizes:
+            raise ValueError('nenhum dos tamanhos escolhidos serve para a unidade deste produto')
+        minimums = {k: v for k, v in minimums.items() if k in sizes}
     for size, value in update.minimums.items():
         if not fits(size):
             continue

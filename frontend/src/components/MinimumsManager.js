@@ -29,16 +29,20 @@ const currentText = (p, kind) => sizesForKind(kind)
 // ---------- aba 1: aplicar o mesmo padrão a vários produtos ----------
 const ApplyMany = ({ products, kind, onSaved }) => {
   const sizes = sizesForKind(kind);
+  const [picked, setPicked] = useState([]);
   const [values, setValues] = useState({});
+  const [onlyThese, setOnlyThese] = useState(false);
   const [selected, setSelected] = useState(new Set());
   const [search, setSearch] = useState('');
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => { setValues({}); setSelected(new Set()); setSearch(''); }, [kind]);
+  useEffect(() => { setPicked([]); setValues({}); setOnlyThese(false); setSelected(new Set()); setSearch(''); }, [kind]);
+
+  const pick = (size) => setPicked(picked.includes(size) ? picked.filter((s) => s !== size) : [...picked, size]);
 
   const visible = products.filter((p) => p.name.toLowerCase().includes(search.trim().toLowerCase()));
   const allVisibleSelected = visible.length > 0 && visible.every((p) => selected.has(p.product_id));
-  const filled = Object.entries(values).filter(([, v]) => v !== '');
+  const filled = picked.filter((s) => (values[s] ?? '') !== '').map((s) => [s, values[s]]);
 
   const toggle = (id) => {
     const next = new Set(selected);
@@ -52,13 +56,14 @@ const ApplyMany = ({ products, kind, onSaved }) => {
   };
 
   const apply = async () => {
-    if (!filled.length) return toast.error('Digite o mínimo de pelo menos um tamanho');
+    if (!picked.length) return toast.error('Toque nos tamanhos (ex.: 2L e 5L)');
+    if (!filled.length && !onlyThese) return toast.error('Digite o mínimo dos tamanhos escolhidos');
     if (!selected.size) return toast.error('Selecione os produtos');
     const minimums = Object.fromEntries(filled.map(([k, v]) => [k, parseInt(v, 10) || 0]));
     setSaving(true);
     try {
       const r = await api.put('/finished-stock/minimums/bulk', {
-        updates: [...selected].map((product_id) => ({ product_id, minimums })),
+        updates: [...selected].map((product_id) => ({ product_id, minimums, ...(onlyThese ? { set_sizes: picked } : {}) })),
       });
       toast.success(`Mínimo aplicado em ${r.data.updated} produto(s)`);
       setSelected(new Set());
@@ -70,18 +75,39 @@ const ApplyMany = ({ products, kind, onSaved }) => {
   return (
     <div className="space-y-4">
       <div className="rounded-lg border p-3 space-y-2">
-        <p className="text-sm font-semibold">1. Digite o padrão</p>
+        <p className="text-sm font-semibold">1. Toque nos tamanhos e digite o mínimo</p>
         <div className="grid grid-cols-4 gap-2">
-          {sizes.map((s) => (
-            <div key={s.size} className="flex flex-col items-center gap-1 rounded-xl border p-2">
-              <StockBottle size={s.size} empty={!values[s.size]} />
-              <span className="text-sm font-bold">{s.label}</span>
-              <Input value={values[s.size] ?? ''} inputMode="numeric" placeholder="—" className="h-9 text-center"
-                     onChange={(e) => setValues({ ...values, [s.size]: digits(e.target.value) })} />
-            </div>
-          ))}
+          {sizes.map((s) => {
+            const on = picked.includes(s.size);
+            return (
+              <div key={s.size} className={`rounded-xl border-2 p-2 space-y-2 transition ${on ? 'border-primary bg-primary/5' : 'border-border'}`}>
+                <button type="button" onClick={() => pick(s.size)} className="w-full flex flex-col items-center gap-1">
+                  <StockBottle size={s.size} empty={!on} />
+                  <span className="text-sm font-bold">{s.label}</span>
+                  <span className="text-[11px] text-muted-foreground">{on ? 'Escolhido ✓' : 'Tocar'}</span>
+                </button>
+                {on && (
+                  <div>
+                    <span className="text-[11px] text-muted-foreground">Mínimo</span>
+                    <Input value={values[s.size] ?? ''} inputMode="numeric" placeholder="0" className="h-9 text-center" autoFocus
+                           onChange={(e) => setValues({ ...values, [s.size]: digits(e.target.value) })} />
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
-        <p className="text-[11px] text-muted-foreground">Vazio = não mexe nesse tamanho · 0 = tira o mínimo. Nenhum tamanho é escondido dos produtos.</p>
+        {picked.length > 0 && (
+          <button type="button" onClick={() => setOnlyThese(!onlyThese)}
+                  className={`w-full flex items-start gap-2 rounded-lg border p-2 text-left transition ${onlyThese ? 'border-primary bg-primary/5' : ''}`}>
+            {onlyThese ? <CheckSquare className="w-5 h-5 text-primary shrink-0" /> : <Square className="w-5 h-5 text-muted-foreground shrink-0" />}
+            <span className="text-sm">
+              Esses produtos <b>só têm</b> {sizes.filter((s) => picked.includes(s.size)).map((s) => s.label).join(' e ')}
+              <span className="block text-[11px] text-muted-foreground">Os outros tamanhos somem dos cards (se ainda tiver garrafas deles, continuam aparecendo até zerar).</span>
+            </span>
+          </button>
+        )}
+        <p className="text-[11px] text-muted-foreground">Campo vazio = não mexe no mínimo daquele tamanho · 0 = tira o mínimo.</p>
       </div>
 
       <div className="rounded-lg border p-3 space-y-2">
@@ -114,7 +140,7 @@ const ApplyMany = ({ products, kind, onSaved }) => {
         </div>
       </div>
 
-      <Button className="w-full h-12 bg-primary hover:bg-primary/90" disabled={saving || !selected.size || !filled.length} onClick={apply}>
+      <Button className="w-full h-12 bg-primary hover:bg-primary/90" disabled={saving || !selected.size || !picked.length} onClick={apply}>
         Aplicar em {selected.size} produto(s)
       </Button>
     </div>
