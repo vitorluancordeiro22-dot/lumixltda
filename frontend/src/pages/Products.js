@@ -15,6 +15,7 @@ import { WhatsAppSender } from '../components/WhatsAppSender';
 import { WhatsAppMultiBatch } from '../components/WhatsAppMultiBatch';
 import { ProductPrintButton } from '../components/ProductPrintButton';
 import { ProductPrintFichaButton } from '../components/ProductPrintFichaButton';
+import { ProductStockFields, stockConfigPayload } from '../components/ProductStockFields';
 
 export const Products = () => {
   const [products, setProducts] = useState([]);
@@ -33,7 +34,9 @@ export const Products = () => {
     name: '',
     unit: 'Litros',
     expected_liters: '',
-    recipes: []
+    recipes: [],
+    stock_sizes: [],
+    stock_minimums: {}
   });
   const [batchFormData, setBatchFormData] = useState({
     product_id: '',
@@ -122,16 +125,26 @@ export const Products = () => {
     
     setSubmitting(true);
     try {
+      const { stock_sizes, stock_minimums, ...productData } = formData;
+      let savedId = selectedProduct?.id;
       if (selectedProduct) {
         await api.put(`/products/${selectedProduct.id}`, {
-          ...formData,
+          ...productData,
           expected_liters: parseFloat(formData.expected_liters)
         });
       } else {
-        await api.post('/products', {
-          ...formData,
+        const created = await api.post('/products', {
+          ...productData,
           expected_liters: parseFloat(formData.expected_liters)
         });
+        savedId = created.data?.id;
+      }
+      if (savedId) {
+        try {
+          await api.put(`/finished-stock/products/${savedId}/config`, stockConfigPayload(formData.unit, stock_sizes, stock_minimums));
+        } catch (stockError) {
+          toast.error('Produto salvo, mas não foi possível salvar os tamanhos/mínimos do estoque');
+        }
       }
       
       if (isMountedRef.current) {
@@ -274,7 +287,9 @@ export const Products = () => {
       name: product.name,
       unit: product.unit,
       expected_liters: product.expected_liters.toString(),
-      recipes: product.recipes
+      recipes: product.recipes,
+      stock_sizes: product.stock_sizes || [],
+      stock_minimums: product.stock_minimums || {}
     });
     setDialogOpen(true);
   };
@@ -285,7 +300,9 @@ export const Products = () => {
       name: `${product.name} (Cópia)`,
       unit: product.unit,
       expected_liters: product.expected_liters.toString(),
-      recipes: product.recipes ? [...product.recipes] : []
+      recipes: product.recipes ? [...product.recipes] : [],
+      stock_sizes: product.stock_sizes || [],
+      stock_minimums: product.stock_minimums || {}
     });
     setDialogOpen(true);
     toast.info('Produto duplicado! Edite o nome e salve.');
@@ -302,7 +319,9 @@ export const Products = () => {
       name: '',
       unit: 'Litros',
       expected_liters: '',
-      recipes: []
+      recipes: [],
+      stock_sizes: [],
+      stock_minimums: {}
     });
   };
 
@@ -513,6 +532,12 @@ export const Products = () => {
                     </div>
                   ))}
                 </div>
+                <ProductStockFields
+                  unit={formData.unit}
+                  sizes={formData.stock_sizes}
+                  minimums={formData.stock_minimums}
+                  onChange={({ sizes, minimums }) => setFormData({ ...formData, stock_sizes: sizes, stock_minimums: minimums })}
+                />
                 <Button type="submit" disabled={submitting} className="w-full bg-primary hover:bg-primary/90">Salvar</Button>
               </form>
             </DialogContent>

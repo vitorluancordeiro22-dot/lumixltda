@@ -4,6 +4,7 @@ import { useTheme } from '../context/ThemeContext';
 import { Card } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { User, Moon, Sun, Zap } from 'lucide-react';
+import { BarcodeRegistry } from '../components/BarcodeRegistry';
 
 export const Settings = () => {
 
@@ -112,6 +113,10 @@ export const Settings = () => {
                 </Button>
 
             </Card>
+
+            {/* Códigos de barras (Estoque) */}
+
+            <BarcodeRegistry />
 
             {/* Sobre */}
 
