@@ -1,9 +1,9 @@
 diff --git a/backend/deposit_sales.py b/backend/deposit_sales.py
 new file mode 100644
-index 0000000..5c82314
+index 0000000..33121e0
 --- /dev/null
 +++ b/backend/deposit_sales.py
-@@ -0,0 +1,318 @@
+@@ -0,0 +1,320 @@
 +"""Saída do Depósito pelo relatório de vendas do GigaMob (PDF). Somente Laboratório.
 +
 +- O PDF é lido em memória e descartado; preços e valores nunca são guardados.
@@ -21,7 +21,7 @@ index 0000000..5c82314
 +from pydantic import BaseModel, Field
 +
 +from finished_stock import SIZES, MIXED, now_iso, product_kind, plan_partial
-+from sales_report import MAX_PDF_BYTES, fingerprint, parse_report, periods_overlap, suggest_product
++from sales_report import MAX_PDF_BYTES, PdfSupportMissing, fingerprint, parse_report, periods_overlap, suggest_product
 +
 +DEFAULT_LAB_EMAILS = ('laboratoriolumix@outlook.com', 'leonicelaboratorio@lumix.com')
 +PENDING_TTL = timedelta(hours=24)
@@ -169,6 +169,8 @@ index 0000000..5c82314
 +        data = await file.read(MAX_PDF_BYTES + 1)
 +        try:
 +            report = await asyncio.to_thread(parse_report, data)
++        except PdfSupportMissing as exc:
++            raise HTTPException(status_code=503, detail=str(exc))
 +        except ValueError as exc:
 +            raise HTTPException(status_code=400, detail=str(exc))
 +        cutoff = (datetime.now(timezone.utc) - PENDING_TTL).isoformat()
@@ -724,10 +726,10 @@ index 1b04019..7c13e9a 100644
      api_router.include_router(router)
 diff --git a/backend/sales_report.py b/backend/sales_report.py
 new file mode 100644
-index 0000000..b6e040f
+index 0000000..0081172
 --- /dev/null
 +++ b/backend/sales_report.py
-@@ -0,0 +1,206 @@
+@@ -0,0 +1,213 @@
 +"""Leitura do relatório de vendas (GigaMob, PDF) e sugestão de produto.
 +
 +Só funções puras: nada aqui acessa o banco. O PDF é lido em memória e
@@ -742,7 +744,6 @@ index 0000000..b6e040f
 +import re
 +import unicodedata
 +
-+from pypdf import PdfReader
 +
 +MAX_PDF_BYTES = 10 * 1024 * 1024
 +
@@ -757,6 +758,10 @@ index 0000000..b6e040f
 +PERIOD = re.compile(r'Emiss[ãa]o:\s*(\d{2})/(\d{2})/(\d{4})\s+at[ée]\s+(\d{2})/(\d{2})/(\d{4})', re.I)
 +TOTAL = re.compile(rf'Total\s+geral:\s*({_MONEY})', re.I)
 +COMPANY = re.compile(r'Empresa:\s*([^\n\r]+)', re.I)
++
++
++class PdfSupportMissing(Exception):
++    """O leitor de PDF (pypdf) não está instalado no servidor."""
 +
 +
 +def parse_decimal(text):
@@ -783,6 +788,10 @@ index 0000000..b6e040f
 +    start = data.find(b'%PDF-')
 +    if start < 0 or start > 4096:
 +        raise ValueError('Este arquivo não é um PDF')
++    try:
++        from pypdf import PdfReader   # carregado só aqui: sem pypdf o servidor continua subindo
++    except ImportError:
++        raise PdfSupportMissing('O leitor de PDF (pypdf) não está instalado no servidor. Instale com: pip install pypdf==6.16.1')
 +    try:
 +        reader = PdfReader(io.BytesIO(data[start:]))
 +        text = '\n'.join((page.extract_text() or '') for page in reader.pages)
@@ -936,18 +945,20 @@ index 0000000..b6e040f
 +    return {'product_id': product['id'], 'size': size, 'score': score, 'exact': score >= 0.95 and size is not None}
 diff --git a/backend/unit_tests/test_deposit.py b/backend/unit_tests/test_deposit.py
 new file mode 100644
-index 0000000..886c207
+index 0000000..6d5b2ac
 --- /dev/null
 +++ b/backend/unit_tests/test_deposit.py
-@@ -0,0 +1,385 @@
+@@ -0,0 +1,401 @@
 +"""Depósito e baixa por relatório de vendas — testes offline.
 +
 +PYTHONPATH=backend python -m unittest discover -s backend/unit_tests -v
 +Os PDFs aqui são sintéticos (nenhum relatório real entra no repositório).
 +"""
++import subprocess
 +import sys
 +import unittest
 +from pathlib import Path
++from unittest.mock import patch
 +
 +sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 +
@@ -1194,6 +1205,20 @@ index 0000000..886c207
 +            self.assertEqual(r.status_code, 403, url)
 +        # o Depósito em si é aberto a todos
 +        self.assertEqual(other.get(f'{API}/deposit/overview').status_code, 200)
++
++    def test_missing_pypdf_does_not_break_the_server_and_gives_a_clear_error(self):
++        backend = str(Path(__file__).resolve().parents[1])
++        code = ("import sys; sys.modules['pypdf'] = None; sys.path.insert(0, %r); "
++                "import sales_report, deposit_sales, finished_stock; print('sobe sem pypdf')" % backend)
++        out = subprocess.run([sys.executable, '-I', '-c', code], capture_output=True, text=True)
++        self.assertEqual(out.returncode, 0, out.stderr[-400:])
++        self.assertIn('sobe sem pypdf', out.stdout)
++        with patch.dict(sys.modules, {'pypdf': None}):
++            r = self.upload([(6, 'PINHO GEL 2L', 'und', 1)])
++        self.assertEqual(r.status_code, 503)
++        self.assertIn('pip install pypdf', r.json()['detail'])
++        # o resto do Depósito continua funcionando sem pypdf
++        self.assertEqual(self.client.get(f'{API}/deposit/overview').status_code, 200)
 +
 +    def test_rejects_files_that_are_not_the_sales_report(self):
 +        r = self.client.post(f'{API}/sales/parse', files={'file': ('x.pdf', b'isto nao e pdf', 'application/pdf')})
