@@ -1,0 +1,2255 @@
+diff --git a/backend/deposit_sales.py b/backend/deposit_sales.py
+new file mode 100644
+index 0000000..5c82314
+--- /dev/null
++++ b/backend/deposit_sales.py
+@@ -0,0 +1,318 @@
++"""Saída do Depósito pelo relatório de vendas do GigaMob (PDF). Somente Laboratório.
++
++- O PDF é lido em memória e descartado; preços e valores nunca são guardados.
++- Cada código do GigaMob precisa estar ligado a um produto+tamanho (ou marcado "ignorar").
++  Código novo/sem ligação = o sistema pergunta antes de baixar.
++- A baixa sai só do Depósito. Se faltar saldo, baixa o que existe e registra a falta.
++"""
++import asyncio
++import os
++from datetime import datetime, timezone, timedelta
++from typing import List, Optional
++from uuid import uuid4
++
++from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
++from pydantic import BaseModel, Field
++
++from finished_stock import SIZES, MIXED, now_iso, product_kind, plan_partial
++from sales_report import MAX_PDF_BYTES, fingerprint, parse_report, periods_overlap, suggest_product
++
++DEFAULT_LAB_EMAILS = ('laboratoriolumix@outlook.com', 'leonicelaboratorio@lumix.com')
++PENDING_TTL = timedelta(hours=24)
++
++BLOCK_MESSAGES = {
++    'unmapped': 'Ainda há códigos do relatório sem produto ligado. Ligue ou ignore cada um.',
++    'fractional': 'Há produto ligado com quantidade fracionada no relatório. Confira o PDF.',
++    'incomplete': 'O PDF não foi lido por completo (a soma não bate com o total do relatório). Gere o relatório de novo.',
++    'duplicate': 'Este relatório já foi baixado antes.',
++}
++
++
++def lab_emails():
++    """E-mails do Laboratório (os mesmos do login). LUMIX_SALES_EMAILS acrescenta outros, se precisar."""
++    extra = [e.strip().lower() for e in os.environ.get('LUMIX_SALES_EMAILS', '').split(',') if e.strip()]
++    return {e.lower() for e in DEFAULT_LAB_EMAILS} | set(extra)
++
++
++def period_text(period):
++    if not period:
++        return 'sem período'
++    fmt = lambda iso: '/'.join(reversed(iso.split('-')))
++    return fmt(period['start']) if period['start'] == period['end'] else f"{fmt(period['start'])} a {fmt(period['end'])}"
++
++
++class CodeItem(BaseModel):
++    code: str = Field(min_length=1, max_length=40)
++    action: str                      # map | ignore | clear
++    product_id: Optional[str] = None
++    size: Optional[str] = None
++    name: str = ''
++
++
++class CodesSave(BaseModel):
++    items: List[CodeItem] = Field(min_length=1, max_length=2000)
++
++
++class ConfirmData(BaseModel):
++    allow_overlap: bool = False
++    operator: str = ''
++
++
++def setup_sales_routes(router: APIRouter, db, get_current_user, product_lock):
++    sales = APIRouter(prefix='/sales')
++
++    async def lab_user(current_user=Depends(get_current_user)):
++        if (current_user.get('email') or '').strip().lower() not in lab_emails():
++            raise HTTPException(status_code=403, detail='Somente o Laboratório pode usar o relatório de vendas')
++        return current_user
++
++    def who(user):
++        return user.get('name') or user.get('email', '')
++
++    async def get_doc(import_id):
++        doc = await db.sales_imports.find_one({'id': import_id}, {'_id': 0})
++        if not doc:
++            raise HTTPException(status_code=404, detail='Relatório não encontrado')
++        return doc
++
++    async def build_state(doc):
++        """Situação do relatório agora: ligações, plano de baixa, bloqueios e avisos."""
++        lines = doc['lines']
++        maps = {m['_id']: m for m in await db.sales_code_map.find(
++            {'_id': {'$in': [l['code'] for l in lines]}}).to_list(None)}
++        products = await db.products.find({'deleted': False}, {'_id': 0, 'id': 1, 'name': 1, 'unit': 1}).to_list(None)
++        by_id = {p['id']: p for p in products}
++        suggest_from = [{'id': p['id'], 'name': p.get('name', ''), 'kind': product_kind(p)} for p in products]
++        pending = doc['status'] == 'pendente'
++
++        rows, wanted = [], {}
++        for line in lines:
++            row = {**line, 'status': 'unmapped', 'product_id': None, 'product_name': '', 'size': None,
++                   'label': '', 'suggestion': None, 'issue': None}
++            m = maps.get(line['code'])
++            if m and m.get('action') == 'ignore':
++                row['status'] = 'ignored'
++            elif m and m.get('action') == 'map' and m.get('product_id') in by_id and m.get('size') in SIZES:
++                row.update(status='mapped', product_id=m['product_id'], size=m['size'], label=SIZES[m['size']]['label'],
++                           product_name=by_id[m['product_id']].get('name', ''))
++                quantity = line['quantity']
++                if quantity <= 0:
++                    row['issue'] = 'sem_baixa'          # devolução líquida: nada a baixar
++                elif quantity != int(quantity):
++                    row['issue'] = 'fracionada'
++                else:
++                    key = (m['product_id'], m['size'])
++                    wanted[key] = wanted.get(key, 0) + int(quantity)
++            else:
++                row['suggestion'] = suggest_product(line['name'], suggest_from) if pending else None
++                row['stale'] = bool(m)                  # estava ligado a um produto que não existe mais
++            rows.append(row)
++
++        if pending:
++            pids = sorted({pid for pid, _ in wanted})
++            lots = await db.deposit_lots.find({'product_id': {'$in': pids}, 'quantity': {'$gt': 0}}, {'_id': 0}).to_list(None) if pids else []
++            plan = []
++            for (pid, size), requested in sorted(
++                    wanted.items(), key=lambda kv: (by_id[kv[0][0]].get('name', '').lower(), SIZES[kv[0][1]]['order'])):
++                key_lots = [l for l in lots if l['product_id'] == pid and l['size'] == size]
++                _, missing = plan_partial(key_lots, requested)
++                plan.append({'product_id': pid, 'name': by_id[pid].get('name', ''), 'size': size,
++                             'label': SIZES[size]['label'], 'requested': requested,
++                             'available': sum(int(l['quantity']) for l in key_lots),
++                             'deduct': requested - missing, 'shortage': missing})
++        else:
++            plan = [{**item, 'deduct': item['taken'], 'available': None} for item in doc.get('applied', [])]
++
++        blocking, duplicate, overlaps = [], None, []
++        if pending:
++            if any(r['status'] == 'unmapped' for r in rows):
++                blocking.append('unmapped')
++            if any(r['issue'] == 'fracionada' for r in rows):
++                blocking.append('fractional')
++            if not doc.get('complete', True):
++                blocking.append('incomplete')
++            others = await db.sales_imports.find({'status': 'baixado', 'id': {'$ne': doc['id']}},
++                                                 {'_id': 0, 'lines': 0}).to_list(None)
++            duplicate = next((o for o in others if o.get('fingerprint') == doc.get('fingerprint')), None)
++            if duplicate:
++                blocking.append('duplicate')
++            overlaps = [{'id': o['id'], 'period': o.get('period'), 'confirmed_at': o.get('confirmed_at')}
++                        for o in others if o is not duplicate and periods_overlap(doc.get('period'), o.get('period'))]
++
++        return {
++            'id': doc['id'], 'status': doc['status'], 'period': doc.get('period'), 'company': doc.get('company', ''),
++            'created_at': doc.get('created_at'), 'confirmed_at': doc.get('confirmed_at'),
++            'confirmed_by': doc.get('confirmed_by'), 'warnings': doc.get('warnings', []),
++            'file_total_quantity': doc.get('file_total_quantity'), 'lines': rows, 'plan': plan,
++            'summary': {
++                'lines': len(rows),
++                'mapped': sum(1 for r in rows if r['status'] == 'mapped'),
++                'ignored': sum(1 for r in rows if r['status'] == 'ignored'),
++                'unmapped': sum(1 for r in rows if r['status'] == 'unmapped'),
++                'units': sum(i['deduct'] for i in plan),
++                'shortage_units': sum(i['shortage'] for i in plan),
++            },
++            'blocking': blocking, 'duplicate': {'id': duplicate['id'], 'confirmed_at': duplicate.get('confirmed_at')} if duplicate else None,
++            'overlaps': overlaps,
++        }
++
++    # ---------- ler o PDF ----------
++
++    @sales.post('/parse')
++    async def parse(file: UploadFile = File(...), current_user=Depends(lab_user)):
++        data = await file.read(MAX_PDF_BYTES + 1)
++        try:
++            report = await asyncio.to_thread(parse_report, data)
++        except ValueError as exc:
++            raise HTTPException(status_code=400, detail=str(exc))
++        cutoff = (datetime.now(timezone.utc) - PENDING_TTL).isoformat()
++        await db.sales_imports.delete_many({'status': 'pendente', 'created_at': {'$lt': cutoff}})
++        doc = {
++            'id': str(uuid4()), 'status': 'pendente', 'created_at': now_iso(), 'created_by': who(current_user),
++            'fingerprint': fingerprint(report['period'], report['lines']), 'period': report['period'],
++            'company': report['company'], 'file_total_quantity': report['total_quantity'],
++            'warnings': report['warnings'], 'complete': report['complete'],
++            'lines': report['lines'],   # código, nome, unidade e quantidade (sem preços)
++        }
++        await db.sales_imports.insert_one(doc)
++        doc.pop('_id', None)
++        return await build_state(doc)
++
++    @sales.get('/imports/{import_id}')
++    async def get_import(import_id: str, current_user=Depends(lab_user)):
++        return await build_state(await get_doc(import_id))
++
++    @sales.delete('/imports/{import_id}')
++    async def discard_import(import_id: str, current_user=Depends(lab_user)):
++        result = await db.sales_imports.delete_one({'id': import_id, 'status': 'pendente'})
++        if result.deleted_count != 1:
++            raise HTTPException(status_code=400, detail='Só relatórios ainda não baixados podem ser descartados')
++        return {'message': 'Relatório descartado'}
++
++    # ---------- ligação código GigaMob -> produto ----------
++
++    @sales.get('/codes')
++    async def list_codes(current_user=Depends(lab_user)):
++        rows = await db.sales_code_map.find({}).to_list(None)
++        return [{'code': r['_id'], 'action': r.get('action'), 'product_id': r.get('product_id'),
++                 'size': r.get('size'), 'name': r.get('name', '')} for r in rows]
++
++    @sales.put('/codes')
++    async def save_codes(data: CodesSave, current_user=Depends(lab_user)):
++        ids = {i.product_id for i in data.items if i.action == 'map'}
++        found = {p['id']: p for p in await db.products.find(
++            {'id': {'$in': list(ids)}, 'deleted': False}, {'_id': 0, 'id': 1, 'unit': 1, 'name': 1}).to_list(None)}
++        for item in data.items:
++            if item.action not in ('map', 'ignore', 'clear'):
++                raise HTTPException(status_code=400, detail='Ação inválida')
++            if item.action == 'map':
++                product = found.get(item.product_id)
++                if not product:
++                    raise HTTPException(status_code=404, detail=f'Produto não encontrado para o código {item.code}')
++                if item.size not in SIZES or SIZES[item.size]['kind'] != product_kind(product):
++                    raise HTTPException(status_code=400, detail=f"Tamanho inválido para {product.get('name')} (código {item.code})")
++        for item in data.items:
++            code = item.code.strip()
++            if item.action == 'clear':
++                await db.sales_code_map.delete_one({'_id': code})
++                continue
++            fields = {'action': item.action, 'name': item.name[:120], 'updated_at': now_iso(), 'updated_by': who(current_user),
++                      'product_id': item.product_id if item.action == 'map' else None,
++                      'size': item.size if item.action == 'map' else None}
++            await db.sales_code_map.update_one({'_id': code}, {'$set': fields}, upsert=True)
++        return {'saved': len(data.items)}
++
++    # ---------- baixar ----------
++
++    @sales.post('/imports/{import_id}/confirm')
++    async def confirm_import(import_id: str, data: ConfirmData, current_user=Depends(lab_user)):
++        doc = await get_doc(import_id)
++        if doc['status'] != 'pendente':
++            raise HTTPException(status_code=400, detail='Este relatório já foi baixado ou cancelado')
++        state = await build_state(doc)
++        if state['blocking']:
++            raise HTTPException(status_code=400, detail=' '.join(BLOCK_MESSAGES[b] for b in state['blocking']))
++        if state['overlaps'] and not data.allow_overlap:
++            raise HTTPException(status_code=409, detail=(
++                'O período deste relatório se sobrepõe a um já baixado. Se baixar, as mesmas vendas podem sair duas vezes. '
++                'Confirme que quer continuar.'))
++        claimed = await db.sales_imports.update_one({'id': import_id, 'status': 'pendente'}, {'$set': {'status': 'baixando'}})
++        if claimed.matched_count != 1:
++            raise HTTPException(status_code=409, detail='Este relatório está sendo baixado. Aguarde')
++
++        operator = (data.operator or '').strip() or who(current_user)
++        debited, applied = [], []
++        try:
++            async with product_lock(sorted({i['product_id'] for i in state['plan']})):
++                for item in state['plan']:
++                    lots = await db.deposit_lots.find(
++                        {'product_id': item['product_id'], 'size': item['size'], 'quantity': {'$gt': 0}}, {'_id': 0}).to_list(None)
++                    allocations, missing = plan_partial(lots, item['requested'])
++                    taken = item['requested'] - missing
++                    if taken > 0:
++                        for a in allocations:
++                            await db.deposit_lots.update_one(
++                                {'id': a['lot_id']}, {'$inc': {'quantity': -a['quantity']}, '$set': {'updated_at': now_iso()}})
++                        debited.append(allocations)
++                        await db.deposit_movements.insert_one({
++                            'id': str(uuid4()), 'type': 'saida', 'origin': 'venda', 'import_id': import_id,
++                            'product_id': item['product_id'], 'product_name': item['name'], 'size': item['size'],
++                            'size_label': item['label'], 'quantity': taken, 'requested': item['requested'],
++                            'shortage': missing, 'batch_id': None,
++                            'batch_number': ', '.join(a['batch_number'] for a in allocations),
++                            'allocations': allocations, 'operator': operator,
++                            'note': f"Venda GigaMob {period_text(doc.get('period'))}", 'created_by': who(current_user),
++                            'created_at': now_iso(), 'cancelled': False,
++                        })
++                    applied.append({'product_id': item['product_id'], 'name': item['name'], 'size': item['size'],
++                                    'label': item['label'], 'requested': item['requested'], 'taken': taken, 'shortage': missing})
++                summary = {'units': sum(a['taken'] for a in applied), 'shortage_units': sum(a['shortage'] for a in applied)}
++                await db.sales_imports.update_one({'id': import_id}, {'$set': {
++                    'status': 'baixado', 'applied': applied, 'summary': summary,
++                    'shortages': [a for a in applied if a['shortage'] > 0],
++                    'confirmed_at': now_iso(), 'confirmed_by': operator}})
++        except Exception:
++            # Desfaz o que já tinha saído para não baixar duas vezes numa nova tentativa.
++            for allocations in debited:
++                for a in allocations:
++                    await db.deposit_lots.update_one({'id': a['lot_id']}, {'$inc': {'quantity': a['quantity']}})
++            await db.deposit_movements.delete_many({'import_id': import_id})
++            await db.sales_imports.update_one({'id': import_id, 'status': {'$ne': 'baixado'}}, {'$set': {'status': 'pendente'}})
++            raise
++        return await build_state(await get_doc(import_id))
++
++    @sales.post('/imports/{import_id}/cancel')
++    async def cancel_import(import_id: str, current_user=Depends(lab_user)):
++        """Desfaz uma importação inteira: as unidades voltam para o Depósito."""
++        doc = await get_doc(import_id)
++        if doc['status'] != 'baixado':
++            raise HTTPException(status_code=400, detail='Só relatórios já baixados podem ser desfeitos')
++        claimed = await db.sales_imports.update_one({'id': import_id, 'status': 'baixado'}, {'$set': {'status': 'cancelando'}})
++        if claimed.matched_count != 1:
++            raise HTTPException(status_code=409, detail='Este relatório está sendo alterado. Aguarde')
++        try:
++            moves = await db.deposit_movements.find(
++                {'import_id': import_id, 'type': 'saida', 'cancelled': {'$ne': True}}, {'_id': 0}).to_list(None)
++            async with product_lock(sorted({m['product_id'] for m in moves})):
++                for move in moves:
++                    for a in move['allocations']:
++                        await db.deposit_lots.update_one(
++                            {'id': a['lot_id']}, {'$inc': {'quantity': a['quantity']}, '$set': {'updated_at': now_iso()}})
++                    await db.deposit_movements.update_one({'id': move['id']}, {'$set': {
++                        'cancelled': True, 'cancelled_at': now_iso(), 'cancelled_by': who(current_user)}})
++        except Exception:
++            await db.sales_imports.update_one({'id': import_id, 'status': 'cancelando'}, {'$set': {'status': 'baixado'}})
++            raise
++        await db.sales_imports.update_one({'id': import_id}, {'$set': {
++            'status': 'cancelado', 'cancelled_at': now_iso(), 'cancelled_by': who(current_user)}})
++        return {'message': 'Baixa desfeita. As unidades voltaram para o Depósito'}
++
++    @sales.get('/imports')
++    async def history(current_user=Depends(lab_user)):
++        docs = await db.sales_imports.find(
++            {'status': {'$in': ['baixado', 'cancelado']}}, {'_id': 0, 'lines': 0}).sort('created_at', -1).to_list(30)
++        return [{'id': d['id'], 'status': d['status'], 'period': d.get('period'), 'created_at': d.get('created_at'),
++                 'confirmed_at': d.get('confirmed_at'), 'confirmed_by': d.get('confirmed_by'),
++                 'summary': d.get('summary', {}), 'shortages': d.get('shortages', [])} for d in docs]
++
++    router.include_router(sales)
+diff --git a/backend/finished_stock.py b/backend/finished_stock.py
+index 1b04019..7c13e9a 100644
+--- a/backend/finished_stock.py
++++ b/backend/finished_stock.py
+@@ -6,6 +6,10 @@ Coleções novas, nenhuma coleção existente é alterada:
+   finished_stock_lists      listas de gestão (estoque -> depósito)
+   finished_stock_locks      trava curta por produto durante uma movimentação
+   product_barcodes          código de barras -> produto + tamanho
++  deposit_lots              saldo do Depósito por produto + tamanho + lote
++  deposit_movements         histórico do Depósito (entradas, baixas por venda, estornos)
++  sales_code_map            código do GigaMob -> produto + tamanho (ou "ignorar")
++  sales_imports             relatórios de vendas importados (sem preços, sem o PDF)
+ 
+ Nos produtos só são gravados dois campos opcionais novos:
+   stock_sizes     tamanhos que o produto possui (ex.: ['one_liter', 'five_liter'])
+@@ -60,20 +64,31 @@ def counted_by_size(countings):
+     return totals
+ 
+ 
+-def plan_exit(lots, quantity):
+-    """Retira primeiro do lote mais antigo; lotes misturados (inventário) saem antes."""
+-    ordered = sorted(
++def _ordered(lots):
++    """Lotes misturados (inventário) saem antes; depois o lote mais antigo."""
++    return sorted(
+         (lot for lot in lots if lot.get('quantity', 0) > 0),
+         key=lambda lot: (lot.get('batch_id') is not None, lot.get('batch_date') or '', lot.get('batch_number') or ''),
+     )
++
++
++def plan_partial(lots, quantity):
++    """Retira o que existir, do lote mais antigo. Retorna (allocations, faltou)."""
+     remaining, allocations = quantity, []
+-    for lot in ordered:
++    for lot in _ordered(lots):
+         if remaining <= 0:
+             break
+         take = min(int(lot['quantity']), remaining)
+         allocations.append({'lot_id': lot['id'], 'batch_id': lot.get('batch_id'),
+-                            'batch_number': lot.get('batch_number') or MIXED, 'quantity': take})
++                            'batch_number': lot.get('batch_number') or MIXED,
++                            'batch_date': lot.get('batch_date') or '', 'quantity': take})
+         remaining -= take
++    return allocations, remaining
++
++
++def plan_exit(lots, quantity):
++    """Retira primeiro do lote mais antigo; lotes misturados (inventário) saem antes."""
++    allocations, remaining = plan_partial(lots, quantity)
+     if remaining > 0:
+         raise ValueError(f'Estoque insuficiente: disponível {quantity - remaining}, pedido {quantity}')
+     return allocations
+@@ -109,13 +124,23 @@ def should_notify(before, after, minimum):
+ class EntryCreate(BaseModel):
+     product_id: str
+     size: str
+-    quantity: int = Field(gt=0, le=1_000_000)
++    quantity: int = Field(ge=0, le=1_000_000)       # fica no Estoque
++    to_deposit: int = Field(default=0, ge=0, le=1_000_000)  # vai direto para o Depósito (só modo normal)
+     batch_id: Optional[str] = None
+     mode: str = 'normal'  # normal (limitado pela Contagem) | inventario (sem limite, lote opcional)
+     operator: str = ''
+     note: str = ''
+ 
+ 
++class DepositEntry(BaseModel):
++    product_id: str
++    size: str
++    quantity: int = Field(gt=0, le=1_000_000)
++    batch_id: Optional[str] = None
++    operator: str = ''
++    note: str = ''
++
++
+ class ExitItem(BaseModel):
+     product_id: str
+     size: str
+@@ -249,12 +274,65 @@ def setup_finished_stock_routes(api_router: APIRouter, db, get_current_user, bro
+         return None, None, None
+ 
+     async def entered_normal(product_id, size, batch_id):
++        """Unidades do lote que já saíram da Contagem: as do Estoque + as enviadas ao Depósito."""
+         rows = await db.finished_stock_movements.find({
+             'type': 'entrada', 'mode': 'normal', 'cancelled': {'$ne': True},
+             'product_id': product_id, 'size': size, 'batch_id': batch_id,
+         }, {'_id': 0, 'quantity': 1}).to_list(None)
++        rows += await db.deposit_movements.find({
++            'type': 'entrada', 'origin': 'producao', 'cancelled': {'$ne': True},
++            'product_id': product_id, 'size': size, 'batch_id': batch_id,
++        }, {'_id': 0, 'quantity': 1}).to_list(None)
+         return sum(int(r.get('quantity', 0)) for r in rows)
+ 
++    # ---------- Depósito: saldo e movimentos ----------
++
++    def deposit_lot_id(product_id, size, batch_id):
++        return f'{product_id}:{size}:{batch_id or MIXED}'
++
++    async def deposit_credit(product, size, parts):
++        """Soma unidades no Depósito. parts: [{'batch_id','batch_number','batch_date','quantity'}]."""
++        allocations = []
++        for part in parts:
++            lot_id = deposit_lot_id(product['id'], size, part.get('batch_id'))
++            number, date = part.get('batch_number') or MIXED, part.get('batch_date') or ''
++            await db.deposit_lots.update_one(
++                {'id': lot_id},
++                {'$inc': {'quantity': part['quantity']},
++                 '$set': {'updated_at': now_iso(), 'batch_number': number, 'batch_date': date},
++                 '$setOnInsert': {'product_id': product['id'], 'size': size, 'batch_id': part.get('batch_id'),
++                                  'created_at': now_iso()}},
++                upsert=True,
++            )
++            allocations.append({'lot_id': lot_id, 'batch_id': part.get('batch_id'), 'batch_number': number,
++                                'batch_date': date, 'quantity': part['quantity']})
++        return allocations
++
++    async def deposit_debit(allocations):
++        for a in allocations:
++            await db.deposit_lots.update_one(
++                {'id': a['lot_id']}, {'$inc': {'quantity': -a['quantity']}, '$set': {'updated_at': now_iso()}})
++
++    async def deposit_covers(allocations):
++        for a in allocations:
++            lot = await db.deposit_lots.find_one({'id': a['lot_id']}, {'_id': 0}) or {}
++            if int(lot.get('quantity', 0)) < a['quantity']:
++                return False
++        return True
++
++    def new_deposit_movement(product, size, allocations, *, kind, origin, operator, note, user, **extra):
++        return {
++            'id': str(uuid4()), 'type': kind, 'origin': origin,
++            'product_id': product['id'], 'product_name': product.get('name', ''),
++            'size': size, 'size_label': SIZES[size]['label'],
++            'quantity': sum(a['quantity'] for a in allocations),
++            'batch_id': allocations[0]['batch_id'] if len(allocations) == 1 else None,
++            'batch_number': ', '.join(a['batch_number'] for a in allocations),
++            'allocations': allocations, 'operator': operator, 'note': (note or '').strip(),
++            'created_by': user.get('name') or user.get('email', ''), 'created_at': now_iso(),
++            'cancelled': False, **extra,
++        }
++
+     async def size_total(product_id, size):
+         lots = await db.finished_stock_lots.find({'product_id': product_id, 'size': size}, {'_id': 0}).to_list(None)
+         return sum(int(lot.get('quantity', 0)) for lot in lots)
+@@ -303,6 +381,10 @@ def setup_finished_stock_routes(api_router: APIRouter, db, get_current_user, bro
+                 for alloc in allocations:
+                     await db.finished_stock_lots.update_one(
+                         {'id': alloc['lot_id']}, {'$inc': {'quantity': -alloc['quantity']}, '$set': {'updated_at': now_iso()}})
++                # Tudo que sai do Estoque chega ao Depósito, com os mesmos lotes.
++                dep_allocs = await deposit_credit(product, size, allocations)
++                dep = new_deposit_movement(product, size, dep_allocs, kind='entrada', origin='estoque',
++                                           operator=operator, note=note, user=user, list_id=list_id)
+                 movement = {
+                     'id': str(uuid4()), 'type': 'saida', 'mode': 'normal',
+                     'product_id': product['id'], 'product_name': product.get('name', ''),
+@@ -310,8 +392,10 @@ def setup_finished_stock_routes(api_router: APIRouter, db, get_current_user, bro
+                     'batch_id': None, 'batch_number': ', '.join(a['batch_number'] for a in allocations),
+                     'allocations': allocations, 'operator': operator, 'note': note.strip(),
+                     'list_id': list_id, 'created_by': user.get('name') or user.get('email', ''),
+-                    'created_at': now_iso(), 'cancelled': False,
++                    'created_at': now_iso(), 'cancelled': False, 'deposit_movement_id': dep['id'],
+                 }
++                dep['source_movement_id'] = movement['id']
++                await db.deposit_movements.insert_one(dep)
+                 await db.finished_stock_movements.insert_one(movement)
+                 movement.pop('_id', None)
+                 movements.append(movement)
+@@ -376,6 +460,9 @@ def setup_finished_stock_routes(api_router: APIRouter, db, get_current_user, bro
+             'type': 'entrada', 'mode': 'normal', 'cancelled': {'$ne': True}, 'product_id': product_id,
+         }, {'_id': 0, 'batch_id': 1, 'size': 1, 'quantity': 1}).to_list(None)
+         entered = {}
++        entries += await db.deposit_movements.find({
++            'type': 'entrada', 'origin': 'producao', 'cancelled': {'$ne': True}, 'product_id': product_id,
++        }, {'_id': 0, 'batch_id': 1, 'size': 1, 'quantity': 1}).to_list(None)
+         for e in entries:
+             entered[(e['batch_id'], e['size'])] = entered.get((e['batch_id'], e['size']), 0) + int(e['quantity'])
+         rows = []
+@@ -421,6 +508,10 @@ def setup_finished_stock_routes(api_router: APIRouter, db, get_current_user, bro
+     async def create_entry(data: EntryCreate, current_user=Depends(get_current_user)):
+         if data.mode not in ('normal', 'inventario'):
+             raise HTTPException(status_code=400, detail='Modo inválido')
++        if data.mode == 'inventario' and (data.quantity <= 0 or data.to_deposit):
++            raise HTTPException(status_code=400, detail='No inventário informe só a quantidade do Estoque. Para o Depósito use o inventário do Depósito')
++        if data.quantity + data.to_deposit <= 0:
++            raise HTTPException(status_code=400, detail='Informe a quantidade')
+         product = await get_product(data.product_id)
+         check_size(product, data.size)
+         batch, batch_number, batch_date = None, MIXED, ''
+@@ -431,37 +522,53 @@ def setup_finished_stock_routes(api_router: APIRouter, db, get_current_user, bro
+             batch_number, batch_date = batch.get('batch_number', ''), batch.get('date', '')
+         elif data.mode == 'normal':
+             raise HTTPException(status_code=400, detail='Selecione o lote')
++        operator = operator_name(data.operator, current_user)
+         async with product_lock([data.product_id]):
+             if data.mode == 'normal':
+                 done = await entered_normal(data.product_id, data.size, data.batch_id)
+                 available = counted[data.size] - done
+-                if data.quantity > available:
++                if data.quantity + data.to_deposit > available:
+                     raise HTTPException(status_code=400, detail=(
+                         f"O lote {batch_number} tem {counted[data.size]} unidades de {SIZES[data.size]['label']} na Contagem "
+-                        f"e {done} já entraram no estoque. Disponível: {max(available, 0)}"))
+-            batch_key = data.batch_id or MIXED
+-            lot_id = f'{data.product_id}:{data.size}:{batch_key}'
+-            await db.finished_stock_lots.update_one(
+-                {'id': lot_id},
+-                {'$inc': {'quantity': data.quantity},
+-                 '$set': {'updated_at': now_iso(), 'batch_number': batch_number, 'batch_date': batch_date},
+-                 '$setOnInsert': {'product_id': data.product_id, 'size': data.size,
+-                                  'batch_id': data.batch_id, 'created_at': now_iso()}},
+-                upsert=True,
+-            )
+-            movement = {
+-                'id': str(uuid4()), 'type': 'entrada', 'mode': data.mode,
+-                'product_id': product['id'], 'product_name': product.get('name', ''),
+-                'size': data.size, 'size_label': SIZES[data.size]['label'], 'quantity': data.quantity,
+-                'batch_id': data.batch_id, 'batch_number': batch_number,
+-                'allocations': [{'lot_id': lot_id, 'batch_id': data.batch_id, 'batch_number': batch_number, 'quantity': data.quantity}],
+-                'operator': operator_name(data.operator, current_user), 'note': data.note.strip(), 'list_id': None,
+-                'created_by': current_user.get('name') or current_user.get('email', ''),
+-                'created_at': now_iso(), 'cancelled': False,
+-            }
+-            await db.finished_stock_movements.insert_one(movement)
+-            movement.pop('_id', None)
+-        return movement
++                        f"e {done} já foram registradas (Estoque + Depósito). Disponível: {max(available, 0)}"))
++            part = {'batch_id': data.batch_id, 'batch_number': batch_number, 'batch_date': batch_date}
++            movement, dep = None, None
++            if data.to_deposit > 0:
++                allocs = await deposit_credit(product, data.size, [{**part, 'quantity': data.to_deposit}])
++                dep = new_deposit_movement(product, data.size, allocs, kind='entrada', origin='producao',
++                                           operator=operator, note=data.note, user=current_user)
++            if data.quantity > 0:
++                lot_id = f'{data.product_id}:{data.size}:{data.batch_id or MIXED}'
++                await db.finished_stock_lots.update_one(
++                    {'id': lot_id},
++                    {'$inc': {'quantity': data.quantity},
++                     '$set': {'updated_at': now_iso(), 'batch_number': batch_number, 'batch_date': batch_date},
++                     '$setOnInsert': {'product_id': data.product_id, 'size': data.size,
++                                      'batch_id': data.batch_id, 'created_at': now_iso()}},
++                    upsert=True,
++                )
++                movement = {
++                    'id': str(uuid4()), 'type': 'entrada', 'mode': data.mode,
++                    'product_id': product['id'], 'product_name': product.get('name', ''),
++                    'size': data.size, 'size_label': SIZES[data.size]['label'], 'quantity': data.quantity,
++                    'batch_id': data.batch_id, 'batch_number': batch_number,
++                    'allocations': [{'lot_id': lot_id, 'batch_id': data.batch_id, 'batch_number': batch_number, 'quantity': data.quantity}],
++                    'operator': operator, 'note': data.note.strip(), 'list_id': None,
++                    'created_by': current_user.get('name') or current_user.get('email', ''),
++                    'created_at': now_iso(), 'cancelled': False,
++                }
++                if dep:
++                    movement['deposit_movement_id'] = dep['id']
++                    dep['source_movement_id'] = movement['id']
++                await db.finished_stock_movements.insert_one(movement)
++                movement.pop('_id', None)
++            if dep:
++                await db.deposit_movements.insert_one(dep)
++                dep.pop('_id', None)
++        result = movement or dep
++        if movement:
++            result['deposit'] = dep
++        return result
+ 
+     @router.post('/exits')
+     async def create_exit(data: ExitCreate, background: BackgroundTasks, current_user=Depends(get_current_user)):
+@@ -477,18 +584,32 @@ def setup_finished_stock_routes(api_router: APIRouter, db, get_current_user, bro
+             if movement.get('cancelled'):
+                 raise HTTPException(status_code=400, detail='Esta movimentação já foi estornada')
+             sign = -1 if movement['type'] == 'entrada' else 1
++            # Parte do Depósito ligada a esta movimentação (sempre uma entrada no Depósito).
++            dep = None
++            if movement.get('deposit_movement_id'):
++                dep = await db.deposit_movements.find_one({'id': movement['deposit_movement_id']}, {'_id': 0})
++                if dep and dep.get('cancelled'):
++                    dep = None
+             if sign < 0:
+                 for alloc in movement['allocations']:
+                     lot = await db.finished_stock_lots.find_one({'id': alloc['lot_id']}, {'_id': 0}) or {}
+                     if int(lot.get('quantity', 0)) < alloc['quantity']:
+                         raise HTTPException(status_code=400, detail=(
+                             'Não é possível estornar: parte dessas unidades já saiu do estoque. Estorne a saída primeiro'))
++            if dep and not await deposit_covers(dep['allocations']):
++                raise HTTPException(status_code=400, detail=(
++                    'Não é possível estornar: parte dessas unidades já saiu do Depósito (venda ou baixa). '
++                    'Desfaça essa baixa primeiro'))
+             for alloc in movement['allocations']:
+                 await db.finished_stock_lots.update_one(
+                     {'id': alloc['lot_id']}, {'$inc': {'quantity': sign * alloc['quantity']}, '$set': {'updated_at': now_iso()}})
++            who = current_user.get('name') or current_user.get('email', '')
++            if dep:
++                await deposit_debit(dep['allocations'])
++                await db.deposit_movements.update_one({'id': dep['id']}, {'$set': {
++                    'cancelled': True, 'cancelled_at': now_iso(), 'cancelled_by': who}})
+             await db.finished_stock_movements.update_one({'id': movement_id}, {'$set': {
+-                'cancelled': True, 'cancelled_at': now_iso(),
+-                'cancelled_by': current_user.get('name') or current_user.get('email', '')}})
++                'cancelled': True, 'cancelled_at': now_iso(), 'cancelled_by': who}})
+         return {'message': 'Movimentação estornada'}
+ 
+     # ---------- lista de gestão (estoque -> depósito) ----------
+@@ -537,6 +658,89 @@ def setup_finished_stock_routes(api_router: APIRouter, db, get_current_user, bro
+             raise HTTPException(status_code=400, detail='Só listas pendentes podem ser canceladas')
+         return {'message': 'Lista cancelada'}
+ 
++    # ---------- Depósito ----------
++
++    @router.get('/deposit/overview')
++    async def deposit_overview(current_user=Depends(get_current_user)):
++        """Depósito, Estoque e Total por produto e tamanho."""
++        products = await db.products.find({'deleted': False}, {'_id': 0, 'recipes': 0, 'file_models': 0}).to_list(None)
++        dep_lots = await db.deposit_lots.find({'quantity': {'$gt': 0}}, {'_id': 0}).to_list(None)
++        stock_lots = await db.finished_stock_lots.find({'quantity': {'$gt': 0}}, {'_id': 0}).to_list(None)
++        codes = await db.product_barcodes.find({}, {'_id': 1, 'product_id': 1, 'size': 1}).to_list(None)
++        dep, stock, code_map = {}, {}, {(c['product_id'], c['size']): c['_id'] for c in codes}
++        for lot in dep_lots:
++            dep.setdefault((lot['product_id'], lot['size']), []).append(lot)
++        for lot in stock_lots:
++            stock.setdefault((lot['product_id'], lot['size']), []).append(lot)
++        result = []
++        for product in sorted(products, key=lambda p: (p.get('name') or '').lower()):
++            shown = set(product_sizes(product)) | {
++                size for (pid, size) in list(dep) + list(stock) if pid == product['id'] and size in SIZES}
++            sizes = []
++            for size in sorted(shown, key=lambda s: SIZES[s]['order']):
++                dlots = sorted(dep.get((product['id'], size), []),
++                               key=lambda lot: (lot.get('batch_id') is not None, lot.get('batch_date') or ''))
++                in_deposit = sum(int(lot['quantity']) for lot in dlots)
++                in_stock = sum(int(lot['quantity']) for lot in stock.get((product['id'], size), []))
++                sizes.append({
++                    'size': size, 'label': SIZES[size]['label'], 'deposit': in_deposit, 'stock': in_stock,
++                    'total': in_deposit + in_stock,
++                    'barcode': code_map.get((product['id'], size), ''),
++                    'internal_code': internal_code(product['id'], size),
++                    'lots': [{'batch_id': lot.get('batch_id'), 'batch_number': lot.get('batch_number') or MIXED,
++                              'quantity': int(lot['quantity'])} for lot in dlots],
++                })
++            result.append({'product_id': product['id'], 'name': product.get('name', ''),
++                           'kind': product_kind(product), 'sizes': sizes})
++        return {'sizes': [{'size': k, **v} for k, v in sorted(SIZES.items(), key=lambda kv: kv[1]['order'])],
++                'products': result}
++
++    @router.get('/deposit/movements')
++    async def deposit_movements(product_id: Optional[str] = None, limit: int = 100, current_user=Depends(get_current_user)):
++        query = {'product_id': product_id} if product_id else {}
++        return await db.deposit_movements.find(query, {'_id': 0}).sort('created_at', -1).to_list(max(1, min(limit, 500)))
++
++    @router.post('/deposit/entries')
++    async def deposit_inventory(data: DepositEntry, current_user=Depends(get_current_user)):
++        """Inventário do Depósito: sem limite da Contagem e com lote opcional ("misturado")."""
++        product = await get_product(data.product_id)
++        check_size(product, data.size)
++        part = {'batch_id': None, 'batch_number': MIXED, 'batch_date': ''}
++        if data.batch_id:
++            batch, _, _ = await find_batch(data.product_id, data.batch_id)
++            if not batch:
++                raise HTTPException(status_code=404, detail='Lote não encontrado para este produto')
++            part = {'batch_id': data.batch_id, 'batch_number': batch.get('batch_number', ''), 'batch_date': batch.get('date', '')}
++        async with product_lock([data.product_id]):
++            allocs = await deposit_credit(product, data.size, [{**part, 'quantity': data.quantity}])
++            movement = new_deposit_movement(product, data.size, allocs, kind='entrada', origin='inventario',
++                                            operator=operator_name(data.operator, current_user), note=data.note,
++                                            user=current_user)
++            await db.deposit_movements.insert_one(movement)
++            movement.pop('_id', None)
++        return movement
++
++    @router.post('/deposit/movements/{movement_id}/cancel')
++    async def cancel_deposit_movement(movement_id: str, current_user=Depends(get_current_user)):
++        movement = await db.deposit_movements.find_one({'id': movement_id}, {'_id': 0})
++        if not movement:
++            raise HTTPException(status_code=404, detail='Movimentação não encontrada')
++        if movement['type'] == 'entrada' and movement.get('origin') == 'estoque':
++            raise HTTPException(status_code=400, detail='Esta entrada veio de uma saída do Estoque. Estorne a saída na aba Estoque')
++        if movement['type'] == 'saida':
++            raise HTTPException(status_code=400, detail='Esta baixa veio do relatório de vendas. Desfaça a importação inteira em Saída → Histórico')
++        async with product_lock([movement['product_id']]):
++            movement = await db.deposit_movements.find_one({'id': movement_id}, {'_id': 0})
++            if movement.get('cancelled'):
++                raise HTTPException(status_code=400, detail='Esta movimentação já foi estornada')
++            if not await deposit_covers(movement['allocations']):
++                raise HTTPException(status_code=400, detail='Não é possível estornar: parte dessas unidades já saiu do Depósito')
++            await deposit_debit(movement['allocations'])
++            await db.deposit_movements.update_one({'id': movement_id}, {'$set': {
++                'cancelled': True, 'cancelled_at': now_iso(),
++                'cancelled_by': current_user.get('name') or current_user.get('email', '')}})
++        return {'message': 'Movimentação estornada'}
++
+     # ---------- configuração ----------
+ 
+     @router.put('/products/{product_id}/config')
+@@ -606,4 +810,8 @@ def setup_finished_stock_routes(api_router: APIRouter, db, get_current_user, bro
+                                                   'updated_at': now_iso()})
+         return {'code': code, 'product_id': data.product_id, 'size': data.size}
+ 
++    # Saída do Depósito pelo relatório de vendas (somente Laboratório)
++    from deposit_sales import setup_sales_routes
++    setup_sales_routes(router, db, get_current_user, product_lock=product_lock)
++
+     api_router.include_router(router)
+diff --git a/backend/sales_report.py b/backend/sales_report.py
+new file mode 100644
+index 0000000..b6e040f
+--- /dev/null
++++ b/backend/sales_report.py
+@@ -0,0 +1,206 @@
++"""Leitura do relatório de vendas (GigaMob, PDF) e sugestão de produto.
++
++Só funções puras: nada aqui acessa o banco. O PDF é lido em memória e
++descartado; valores/preços do relatório nunca saem deste módulo.
++"""
++from datetime import date
++from decimal import Decimal, InvalidOperation
++import difflib
++import hashlib
++import io
++import json
++import re
++import unicodedata
++
++from pypdf import PdfReader
++
++MAX_PDF_BYTES = 10 * 1024 * 1024
++
++_NUM = r'-?\d[\d.]*,\d{3}'
++_MONEY = r'-?\d[\d.]*,\d{2}'
++# Uma linha do relatório: código(13) descrição [*] unidade quantidade preço total.
++# Tolera quebras de linha dentro da linha (o PDF às vezes separa as colunas).
++ROW = re.compile(
++    rf'(?<!\d)(\d{{13}})\s+((?:(?!\d{{13}}).)+?)\s+(?:\*\s+)?([A-Za-z]{{1,5}})\s+({_NUM})\s+{_MONEY}\s+{_MONEY}',
++    re.S,
++)
++PERIOD = re.compile(r'Emiss[ãa]o:\s*(\d{2})/(\d{2})/(\d{4})\s+at[ée]\s+(\d{2})/(\d{2})/(\d{4})', re.I)
++TOTAL = re.compile(rf'Total\s+geral:\s*({_MONEY})', re.I)
++COMPANY = re.compile(r'Empresa:\s*([^\n\r]+)', re.I)
++
++
++def parse_decimal(text):
++    """'1.499,000' -> Decimal('1499.000')."""
++    try:
++        return Decimal(text.replace('.', '').replace(',', '.'))
++    except InvalidOperation:
++        raise ValueError(f'Número inválido no relatório: {text}')
++
++
++def _iso(d, m, y):
++    return date(int(y), int(m), int(d)).isoformat()
++
++
++def parse_report(data: bytes):
++    """Lê o PDF e devolve as linhas (sem nenhum valor em dinheiro).
++
++    Retorna {'lines': [...], 'period': {'start','end'}|None, 'company', 'total_quantity',
++             'sum_quantity', 'warnings': [...], 'complete': bool}
++    Levanta ValueError com mensagem em português se não for um relatório legível.
++    """
++    if not data or len(data) > MAX_PDF_BYTES:
++        raise ValueError('Arquivo vazio ou maior que 10 MB')
++    start = data.find(b'%PDF-')
++    if start < 0 or start > 4096:
++        raise ValueError('Este arquivo não é um PDF')
++    try:
++        reader = PdfReader(io.BytesIO(data[start:]))
++        text = '\n'.join((page.extract_text() or '') for page in reader.pages)
++    except Exception:
++        raise ValueError('Não foi possível ler o PDF')
++    if 'Total geral' not in text and not ROW.search(text):
++        raise ValueError('Este PDF não parece ser o relatório de vendas do GigaMob')
++
++    merged, order = {}, []
++    for code, description, unit, qty in ROW.findall(text):
++        description = re.sub(r'\s+', ' ', description).strip()
++        quantity = parse_decimal(qty)
++        if code in merged:
++            merged[code]['quantity'] += quantity
++            continue
++        merged[code] = {'code': code, 'name': description, 'unit': unit.lower(), 'quantity': quantity}
++        order.append(code)
++    if not merged:
++        raise ValueError('Nenhuma linha de produto encontrada no PDF')
++
++    lines = []
++    for code in order:
++        row = merged[code]
++        quantity = row['quantity']
++        row['quantity'] = int(quantity) if quantity == quantity.to_integral_value() else float(quantity)
++        lines.append(row)
++
++    warnings, period = [], None
++    match = PERIOD.search(text)
++    if match:
++        try:
++            period = {'start': _iso(*match.groups()[:3]), 'end': _iso(*match.groups()[3:])}
++        except ValueError:
++            warnings.append('Não consegui entender o período do relatório')
++    else:
++        warnings.append('O relatório não informa o período de emissão')
++
++    sum_quantity = sum(Decimal(str(line['quantity'])) for line in lines)
++    total_match = TOTAL.search(text)
++    total_quantity, complete = None, True
++    if total_match:
++        total_quantity = parse_decimal(total_match.group(1))
++        if total_quantity != sum_quantity:
++            complete = False
++            warnings.append(
++                f'A soma das quantidades lidas ({sum_quantity:.0f}) não bate com o total do relatório '
++                f'({total_quantity:.0f}). Alguma linha não foi lida; gere o PDF de novo')
++    else:
++        warnings.append('Não encontrei o "Total geral" no PDF. Confira se o relatório está completo')
++
++    company = COMPANY.search(text)
++    return {
++        'lines': lines, 'period': period, 'company': company.group(1).strip() if company else '',
++        'total_quantity': float(total_quantity) if total_quantity is not None else None,
++        'sum_quantity': float(sum_quantity), 'warnings': warnings, 'complete': complete,
++    }
++
++
++def fingerprint(period, lines):
++    """Identifica o relatório (período + códigos + quantidades) para barrar importação repetida."""
++    payload = json.dumps([period or {}, sorted((l['code'], str(l['quantity'])) for l in lines)], sort_keys=True)
++    return hashlib.sha256(payload.encode()).hexdigest()
++
++
++def periods_overlap(a, b):
++    if not a or not b:
++        return False
++    return a['start'] <= b['end'] and b['start'] <= a['end']
++
++
++# ---------- sugestão de produto e tamanho pelo nome ----------
++
++ABBREVIATIONS = {'LP': 'LIMPA PISO', 'ALC': 'ALCOOL', 'PF': 'PERFUMADO', 'SAB': 'SABAO', 'LIQ': 'LIQUIDO', 'DET': 'DETERGENTE'}
++SIZE_PATTERN = re.compile(r'(\d+(?:[.,]\d+)?)\s*(ML|LTS?|LITROS?|L|KGS?|GRS?|G)\b')
++LITER_UNITS = {'L', 'LT', 'LTS', 'LITRO', 'LITROS'}
++GRAM_UNITS = {'G', 'GR', 'GRS'}
++
++
++def strip_accents(text):
++    return ''.join(c for c in unicodedata.normalize('NFD', text) if unicodedata.category(c) != 'Mn')
++
++
++def _normalize(text):
++    return re.sub(r'[^A-Z0-9., ]+', ' ', strip_accents(text or '').upper())
++
++
++def size_of(description):
++    """Tamanho (chave do Estoque) citado no nome, ex.: 'PINHO GEL 2L' -> 'two_liter'."""
++    text = _normalize(description)
++    found = None
++    for match in SIZE_PATTERN.finditer(text):
++        value = float(match.group(1).replace(',', '.'))
++        unit = match.group(2)
++        if unit == 'ML' and value == 500:
++            found = 'half_liter'
++        elif unit == 'ML' and value == 1000:
++            found = 'one_liter'
++        elif unit in LITER_UNITS and value in (1, 2, 5):
++            found = {1: 'one_liter', 2: 'two_liter', 5: 'five_liter'}[int(value)]
++        elif unit in ('KG', 'KGS') and value == 1:
++            found = 'one_kg'
++        elif unit in GRAM_UNITS and value in (330, 500):
++            found = 'three_thirty_gram' if value == 330 else 'five_hundred_gram'
++        elif unit in GRAM_UNITS and value == 1000:
++            found = 'one_kg'
++    if found is None and re.search(r'\bGALAO\b|\bGALON\b', text):
++        found = 'five_liter'
++    return found
++
++
++def name_tokens(description):
++    """Palavras do nome, sem o tamanho e com abreviações expandidas (LP -> LIMPA PISO)."""
++    text = SIZE_PATTERN.sub(' ', _normalize(description))
++    tokens = []
++    for word in re.findall(r'[A-Z0-9]+', text):
++        tokens.extend(ABBREVIATIONS.get(word, word).split())
++    return tokens
++
++
++def name_score(a_tokens, b_tokens):
++    if not a_tokens or not b_tokens:
++        return 0.0
++    a, b = set(a_tokens), set(b_tokens)
++    jaccard = len(a & b) / len(a | b)
++    ratio = difflib.SequenceMatcher(None, ' '.join(a_tokens), ' '.join(b_tokens)).ratio()
++    return round(0.6 * ratio + 0.4 * jaccard, 3)
++
++
++def suggest_product(description, products, threshold=0.7):
++    """Melhor produto do Lumix para a descrição do GigaMob.
++
++    products: [{'id', 'name', 'kind'}]  (kind = 'L' ou 'Kg')
++    Retorna {'product_id', 'size', 'score', 'exact'} ou None. O tamanho só é sugerido
++    se for compatível com a unidade do produto.
++    """
++    tokens = name_tokens(description)
++    best = None
++    for product in products:
++        score = name_score(tokens, name_tokens(product['name']))
++        if score >= threshold and (best is None or score > best[0]):
++            best = (score, product)
++    if best is None:
++        return None
++    score, product = best
++    size = size_of(description)
++    if size is not None:
++        kind = {'half_liter': 'L', 'one_liter': 'L', 'two_liter': 'L', 'five_liter': 'L',
++                'three_thirty_gram': 'Kg', 'five_hundred_gram': 'Kg', 'one_kg': 'Kg'}[size]
++        if kind != product.get('kind'):
++            size = None
++    return {'product_id': product['id'], 'size': size, 'score': score, 'exact': score >= 0.95 and size is not None}
+diff --git a/backend/unit_tests/test_deposit.py b/backend/unit_tests/test_deposit.py
+new file mode 100644
+index 0000000..886c207
+--- /dev/null
++++ b/backend/unit_tests/test_deposit.py
+@@ -0,0 +1,385 @@
++"""Depósito e baixa por relatório de vendas — testes offline.
++
++PYTHONPATH=backend python -m unittest discover -s backend/unit_tests -v
++Os PDFs aqui são sintéticos (nenhum relatório real entra no repositório).
++"""
++import sys
++import unittest
++from pathlib import Path
++
++sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
++
++from sales_report import fingerprint, parse_report, periods_overlap, size_of, suggest_product
++from test_finished_stock import build
++
++LAB = {'id': 'lab', 'name': 'Lab', 'email': 'laboratoriolumix@outlook.com'}
++PROD = {'id': 'op', 'name': 'Operador', 'email': 'producao@lumix.com'}
++API = '/api/finished-stock'
++
++
++def make_pdf(lines):
++    esc = lambda t: t.replace('\\', '\\\\').replace('(', '\\(').replace(')', '\\)')
++    stream = '\n'.join(f'BT /F1 9 Tf 30 {780 - 14 * i} Td ({esc(t)}) Tj ET' for i, t in enumerate(lines)).encode('cp1252')
++    objs = [b'<< /Type /Catalog /Pages 2 0 R >>', b'<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
++            b'<< /Type /Page /Parent 2 0 R /MediaBox [0 0 842 595] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>',
++            b'<< /Length %d >>\nstream\n' % len(stream) + stream + b'\nendstream',
++            b'<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>']
++    out, offsets = bytearray(b'%PDF-1.4\n'), []
++    for i, o in enumerate(objs, 1):
++        offsets.append(len(out))
++        out += f'{i} 0 obj\n'.encode() + o + b'\nendobj\n'
++    xref = len(out)
++    out += f'xref\n0 {len(objs) + 1}\n'.encode() + b'0000000000 65535 f \n' + ''.join(f'{o:010d} 00000 n \n' for o in offsets).encode()
++    out += f'trailer\n<< /Size {len(objs) + 1} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF'.encode()
++    return bytes(out)
++
++
++def br(number, decimals):
++    """1499 -> '1.499,000' (formato numérico brasileiro do relatório)."""
++    return f'{number:,.{decimals}f}'.translate(str.maketrans(',.', '.,'))
++
++
++def report(rows, start='16/11/2026', end='16/11/2026', total=None):
++    """rows: [(codigo, descricao, unidade, quantidade)] -> bytes de um PDF no formato do GigaMob."""
++    lines = ['Relatorio de Produtos Mais e Menos Vendidos', 'Codigo Descricao Grade Und. Qtd. Vr. unitario Vr. total']
++    for code, name, unit, qty in rows:
++        lines.append(f'{code:0>13} {name} * {unit} {br(qty, 3)} 9,99 99,99')
++    soma = sum(r[3] for r in rows) if total is None else total
++    lines += [f'Total geral: {br(soma, 2)} 1.000,00',
++              'Empresa: 368 - LUMIX PRODUTOS DE LIMPEZA', f'Emissao: {start} ate {end}']
++    return make_pdf(lines)
++
++
++class ReportParsing(unittest.TestCase):
++    ROWS = [(6, 'PINHO GEL 2L', 'und', 1499), (64, 'PINHO GEL 5L', 'und', 127), (1, 'LIMPADOR PERFUMADO 2L', 'l', 7214)]
++
++    def test_reads_rows_period_and_total_without_prices(self):
++        data = parse_report(report(self.ROWS))
++        self.assertEqual([(l['code'], l['name'], l['unit'], l['quantity']) for l in data['lines']],
++                         [('0000000000006', 'PINHO GEL 2L', 'und', 1499), ('0000000000064', 'PINHO GEL 5L', 'und', 127),
++                          ('0000000000001', 'LIMPADOR PERFUMADO 2L', 'l', 7214)])
++        self.assertEqual(data['period'], {'start': '2026-11-16', 'end': '2026-11-16'})
++        self.assertTrue(data['complete'])
++        self.assertTrue(all(set(l) == {'code', 'name', 'unit', 'quantity'} for l in data['lines']))
++
++    def test_accepts_http_header_glued_before_pdf(self):
++        data = parse_report(b'HTTP/1.0 200 OK\r\nContent-Type: application/pdf\r\n\r\n' + report(self.ROWS))
++        self.assertEqual(len(data['lines']), 3)
++
++    def test_total_mismatch_marks_report_incomplete(self):
++        data = parse_report(report(self.ROWS, total=9999))
++        self.assertFalse(data['complete'])
++        self.assertIn('não bate', data['warnings'][0])
++
++    def test_rejects_non_pdf_and_unrelated_pdf(self):
++        for bad in (b'', b'texto qualquer', make_pdf(['Contrato de aluguel', 'nada de vendas aqui'])):
++            with self.subTest(bad=bad[:12]), self.assertRaises(ValueError):
++                parse_report(bad)
++
++    def test_size_from_name(self):
++        for text, size in [('PINHO GEL 2L', 'two_liter'), ('LP PINHO 5L', 'five_liter'), ('ALC. PF ALECRIM 500 ML', 'half_liter'),
++                           ('VINAGRE 2 LITROS', 'two_liter'), ('SABAO EM BARRA 500 GR', 'five_hundred_gram'),
++                           ('TIRA MANCHAS 330 GR', 'three_thirty_gram'), ('PERCARBONATO 1KG', 'one_kg'),
++                           ('DETERGENTE GALÃO', 'five_liter'), ('RODO 40 CM', None), ('VASSOURA DE PELO', None)]:
++            with self.subTest(text=text):
++                self.assertEqual(size_of(text), size)
++
++    def test_suggestion_matches_name_expands_abbreviations_and_checks_unit(self):
++        products = [{'id': 'a', 'name': 'Pinho Gel', 'kind': 'L'}, {'id': 'b', 'name': 'Limpa Piso Pinho', 'kind': 'L'},
++                    {'id': 'c', 'name': 'Sabão em Barra', 'kind': 'Kg'}]
++        self.assertEqual(suggest_product('PINHO GEL 2L', products), {'product_id': 'a', 'size': 'two_liter', 'score': 1.0, 'exact': True})
++        self.assertEqual(suggest_product('LP PINHO 5L', products)['product_id'], 'b')
++        self.assertEqual(suggest_product('SABAO EM BARRA 500 GR', products)['size'], 'five_hundred_gram')
++        self.assertIsNone(suggest_product('RODO 40 CM', products))
++        wrong_unit = suggest_product('SABAO EM BARRA 2L', products)       # 2L num produto em Kg
++        self.assertEqual((wrong_unit['product_id'], wrong_unit['size'], wrong_unit['exact']), ('c', None, False))
++
++    def test_fingerprint_and_overlap(self):
++        a, b = parse_report(report(self.ROWS)), parse_report(report(self.ROWS))
++        self.assertEqual(fingerprint(a['period'], a['lines']), fingerprint(b['period'], b['lines']))
++        c = parse_report(report(self.ROWS[:2]))
++        self.assertNotEqual(fingerprint(a['period'], a['lines']), fingerprint(c['period'], c['lines']))
++        self.assertTrue(periods_overlap({'start': '2026-11-01', 'end': '2026-11-30'}, {'start': '2026-11-16', 'end': '2026-11-16'}))
++        self.assertFalse(periods_overlap({'start': '2026-11-15', 'end': '2026-11-15'}, {'start': '2026-11-16', 'end': '2026-11-16'}))
++
++
++class DepositFlow(unittest.TestCase):
++    def setUp(self):
++        self.client, self.db, self.pushes = build(user=LAB)
++
++    def entry(self, **kw):
++        body = {'product_id': 'desinf', 'size': 'one_liter', 'quantity': 0, 'batch_id': 'b1', 'operator': 'Vitor', **kw}
++        return self.client.post(f'{API}/entries', json=body)
++
++    def exit(self, quantity, product='desinf', size='one_liter'):
++        return self.client.post(f'{API}/exits', json={'items': [{'product_id': product, 'size': size, 'quantity': quantity}]})
++
++    def row(self, product='desinf', size='one_liter'):
++        data = self.client.get(f'{API}/deposit/overview').json()
++        prod = next(p for p in data['products'] if p['product_id'] == product)
++        return next((s for s in prod['sizes'] if s['size'] == size), None)
++
++    def test_production_split_between_stock_and_deposit(self):
++        # Vitor fez 80 garrafas: 35 ficam no Estoque, as outras 45 vão para o Depósito
++        r = self.entry(quantity=35, to_deposit=45)
++        self.assertEqual(r.status_code, 200, r.text)
++        self.assertEqual((r.json()['quantity'], r.json()['deposit']['quantity']), (35, 45))
++        row = self.row()
++        self.assertEqual((row['stock'], row['deposit'], row['total']), (35, 45, 80))
++        self.assertEqual(row['lots'], [{'batch_id': 'b1', 'batch_number': '2611001', 'quantity': 45}])
++        # o lote está esgotado para a Contagem: nada mais entra
++        self.assertEqual(self.entry(quantity=1).status_code, 400)
++        self.assertEqual(self.entry(to_deposit=1).status_code, 400)
++        batches = self.client.get(f'{API}/products/desinf/batches').json()
++        self.assertEqual(next(b for b in batches if b['batch_id'] == 'b1')['sizes']['one_liter']['available'], 0)
++
++    def test_everything_can_go_straight_to_deposit(self):
++        r = self.entry(quantity=0, to_deposit=80)
++        self.assertEqual(r.status_code, 200, r.text)
++        self.assertEqual((r.json()['type'], r.json()['origin'], r.json()['quantity']), ('entrada', 'producao', 80))
++        row = self.row()
++        self.assertEqual((row['stock'], row['deposit']), (0, 80))
++
++    def test_split_cannot_exceed_counting(self):
++        r = self.entry(quantity=35, to_deposit=46)
++        self.assertEqual(r.status_code, 400)
++        self.assertIn('Disponível: 80', r.json()['detail'])
++        self.assertEqual((self.row() or {}).get('total', 0), 0)
++        self.assertEqual(self.entry(quantity=0, to_deposit=0).status_code, 400)
++
++    def test_inventory_modes_keep_their_rules(self):
++        self.assertEqual(self.entry(mode='inventario', batch_id=None, quantity=10, to_deposit=5).status_code, 400)
++        self.assertEqual(self.entry(mode='inventario', batch_id=None, quantity=0).status_code, 400)
++
++    def test_every_exit_from_stock_lands_in_deposit_with_same_lot(self):
++        self.entry(quantity=80)
++        self.assertEqual(self.exit(25).status_code, 200)
++        row = self.row()
++        self.assertEqual((row['stock'], row['deposit'], row['total']), (55, 25, 80))
++        self.assertEqual(row['lots'][0]['batch_number'], '2611001')
++        moves = self.client.get(f'{API}/deposit/movements').json()
++        self.assertEqual((moves[0]['type'], moves[0]['origin'], moves[0]['quantity']), ('entrada', 'estoque', 25))
++
++    def test_management_list_confirmation_also_feeds_deposit(self):
++        self.entry(quantity=35)
++        lst = self.client.post(f'{API}/lists', json={'items': [{'product_id': 'desinf', 'size': 'one_liter', 'quantity': 25}]}).json()
++        self.assertEqual(self.row()['deposit'], 0)     # lista só criada: nada se mexe
++        self.assertEqual(self.client.post(f"{API}/lists/{lst['id']}/confirm", json={}).status_code, 200)
++        self.assertEqual((self.row()['stock'], self.row()['deposit']), (10, 25))
++
++    def test_cancelling_a_stock_exit_takes_units_back_from_deposit(self):
++        self.entry(quantity=80)
++        out = self.exit(25).json()['movements'][0]
++        self.assertEqual(self.client.post(f"{API}/movements/{out['id']}/cancel").status_code, 200)
++        self.assertEqual((self.row()['stock'], self.row()['deposit']), (80, 0))
++
++    def test_cancelling_exit_is_refused_when_units_already_left_deposit(self):
++        self.entry(quantity=80)
++        out = self.exit(25).json()['movements'][0]
++        self.db.store.deposit_lots.update_one({'product_id': 'desinf', 'size': 'one_liter'}, {'$set': {'quantity': 5}})
++        r = self.client.post(f"{API}/movements/{out['id']}/cancel")
++        self.assertEqual(r.status_code, 400)
++        self.assertIn('Depósito', r.json()['detail'])
++        self.assertEqual(self.row()['stock'], 55)      # nada mudou
++
++    def test_cancelling_a_split_entry_cascades_to_deposit(self):
++        entry = self.entry(quantity=35, to_deposit=45).json()
++        self.assertEqual(self.client.post(f"{API}/movements/{entry['id']}/cancel").status_code, 200)
++        self.assertEqual((self.row()['stock'], self.row()['deposit']), (0, 0))
++        self.assertEqual(self.entry(quantity=80).status_code, 200)    # devolveu o limite da Contagem
++
++    def test_deposit_inventory_has_no_limit_and_can_be_undone(self):
++        r = self.client.post(f'{API}/deposit/entries', json={'product_id': 'desinf', 'size': 'one_liter', 'quantity': 500})
++        self.assertEqual(r.status_code, 200, r.text)
++        self.assertEqual(r.json()['batch_number'], 'misturado')
++        with_lot = self.client.post(f'{API}/deposit/entries', json={'product_id': 'desinf', 'size': 'one_liter', 'quantity': 900, 'batch_id': 'b0'})
++        self.assertEqual(with_lot.status_code, 200)
++        self.assertEqual(self.row()['deposit'], 1400)
++        self.assertEqual(self.entry(quantity=80).status_code, 200)    # inventário não gasta o limite da Contagem
++        self.assertEqual(self.client.post(f"{API}/deposit/movements/{r.json()['id']}/cancel").status_code, 200)
++        self.assertEqual(self.row()['deposit'], 900)
++        self.assertEqual(self.client.post(f"{API}/deposit/entries", json={'product_id': 'desinf', 'size': 'two_liter', 'quantity': 5}).status_code, 400)
++
++    def test_entries_born_from_stock_exits_cannot_be_undone_from_deposit(self):
++        self.entry(quantity=80)
++        self.exit(10)
++        move = self.client.get(f'{API}/deposit/movements').json()[0]
++        r = self.client.post(f"{API}/deposit/movements/{move['id']}/cancel")
++        self.assertEqual(r.status_code, 400)
++        self.assertIn('Estoque', r.json()['detail'])
++
++    def test_total_view_includes_sizes_that_only_exist_in_one_place(self):
++        self.client.post(f'{API}/deposit/entries', json={'product_id': 'desinf', 'size': 'five_liter', 'quantity': 7})
++        self.entry(size='five_liter', quantity=3)
++        row = self.row(size='five_liter')
++        self.assertEqual((row['stock'], row['deposit'], row['total']), (3, 7, 10))
++
++
++class SalesImport(unittest.TestCase):
++    def setUp(self):
++        self.client, self.db, self.pushes = build(user=LAB)
++        self.db.store.products.insert_many([
++            {'id': 'pinho', 'name': 'Pinho Gel', 'unit': 'Litros', 'deleted': False},
++            {'id': 'amac', 'name': 'Amaciante Azul', 'unit': 'Litros', 'deleted': False}])
++        self.add_deposit('pinho', 'two_liter', 100)
++
++    def add_deposit(self, product, size, quantity):
++        self.assertEqual(self.client.post(f'{API}/deposit/entries', json={'product_id': product, 'size': size, 'quantity': quantity}).status_code, 200)
++
++    def deposit(self, product='pinho', size='two_liter'):
++        data = self.client.get(f'{API}/deposit/overview').json()
++        prod = next(p for p in data['products'] if p['product_id'] == product)
++        return next(s for s in prod['sizes'] if s['size'] == size)['deposit']
++
++    def upload(self, rows, **kw):
++        return self.client.post(f'{API}/sales/parse', files={'file': ('r.pdf', report(rows, **kw), 'application/pdf')})
++
++    def link(self, *items):
++        r = self.client.put(f'{API}/sales/codes', json={'items': list(items)})
++        self.assertEqual(r.status_code, 200, r.text)
++
++    ROWS = [(6, 'PINHO GEL 2L', 'und', 60), (46, 'RODO 40 CM', 'und', 2), (170, 'AMACIANTE AZUL 5L', 'und', 4)]
++
++    def link_all(self):
++        self.link({'code': '0000000000006', 'action': 'map', 'product_id': 'pinho', 'size': 'two_liter'},
++                  {'code': '0000000000046', 'action': 'ignore'},
++                  {'code': '0000000000170', 'action': 'map', 'product_id': 'amac', 'size': 'five_liter'})
++
++    def test_only_laboratorio_can_use_sales_endpoints(self):
++        other, _, _ = build(user=PROD)
++        for method, url in (('post', f'{API}/sales/parse'), ('get', f'{API}/sales/imports'), ('get', f'{API}/sales/codes')):
++            r = getattr(other, method)(url)
++            self.assertEqual(r.status_code, 403, url)
++        # o Depósito em si é aberto a todos
++        self.assertEqual(other.get(f'{API}/deposit/overview').status_code, 200)
++
++    def test_rejects_files_that_are_not_the_sales_report(self):
++        r = self.client.post(f'{API}/sales/parse', files={'file': ('x.pdf', b'isto nao e pdf', 'application/pdf')})
++        self.assertEqual(r.status_code, 400)
++
++    def test_unknown_codes_are_asked_and_block_the_download(self):
++        state = self.upload(self.ROWS).json()
++        self.assertEqual((state['summary']['unmapped'], state['blocking']), (3, ['unmapped']))
++        by_code = {l['code']: l for l in state['lines']}
++        self.assertEqual(by_code['0000000000006']['suggestion']['product_id'], 'pinho')
++        self.assertTrue(by_code['0000000000006']['suggestion']['exact'])
++        self.assertIsNone(by_code['0000000000046']['suggestion'])
++        r = self.client.post(f"{API}/sales/imports/{state['id']}/confirm", json={})
++        self.assertEqual(r.status_code, 400)
++        self.assertIn('sem produto ligado', r.json()['detail'])
++        self.assertEqual(self.deposit(), 100)
++
++    def test_register_codes_without_downloading_anything(self):
++        state = self.upload(self.ROWS).json()
++        self.link_all()
++        self.assertEqual(self.client.delete(f"{API}/sales/imports/{state['id']}").status_code, 200)   # descarta o relatório
++        self.assertEqual(self.deposit(), 100)
++        self.assertEqual(len(self.client.get(f'{API}/sales/codes').json()), 3)
++        # no dia seguinte as ligações já estão salvas
++        again = self.upload(self.ROWS, start='17/11/2026', end='17/11/2026').json()
++        self.assertEqual((again['summary']['unmapped'], again['blocking']), (0, []))
++
++    def test_a_new_code_on_another_day_is_asked_again(self):
++        self.link_all()
++        state = self.upload(self.ROWS + [(999, 'LAVA ROUPAS COCO 2L', 'und', 3)], start='18/11/2026', end='18/11/2026').json()
++        self.assertEqual([l['code'] for l in state['lines'] if l['status'] == 'unmapped'], ['0000000000999'])
++        self.assertEqual(state['blocking'], ['unmapped'])
++
++    def test_download_takes_only_from_deposit_and_records_shortage(self):
++        self.link_all()
++        state = self.upload(self.ROWS).json()
++        plan = {(i['product_id'], i['size']): i for i in state['plan']}
++        self.assertEqual((plan[('pinho', 'two_liter')]['deduct'], plan[('pinho', 'two_liter')]['shortage']), (60, 0))
++        self.assertEqual((plan[('amac', 'five_liter')]['deduct'], plan[('amac', 'five_liter')]['shortage']), (0, 4))   # sem saldo
++        r = self.client.post(f"{API}/sales/imports/{state['id']}/confirm", json={})
++        self.assertEqual(r.status_code, 200, r.text)
++        done = r.json()
++        self.assertEqual((done['status'], done['summary']['units'], done['summary']['shortage_units']), ('baixado', 60, 4))
++        self.assertEqual(self.deposit(), 40)
++        moves = [m for m in self.client.get(f'{API}/deposit/movements').json() if m['origin'] == 'venda']
++        self.assertEqual([(m['product_name'], m['quantity']) for m in moves], [('Pinho Gel', 60)])   # sem movimento zerado
++        self.assertIn('16/11/2026', moves[0]['note'])
++        history = self.client.get(f'{API}/sales/imports').json()
++        self.assertEqual((history[0]['status'], history[0]['shortages'][0]['shortage']), ('baixado', 4))
++
++    def test_stock_is_never_touched_by_sales(self):
++        self.link_all()
++        self.client.post(f'{API}/entries', json={'product_id': 'desinf', 'size': 'one_liter', 'quantity': 30, 'batch_id': 'b1'})
++        state = self.upload(self.ROWS).json()
++        self.client.post(f"{API}/sales/imports/{state['id']}/confirm", json={})
++        stock = next(p for p in self.client.get(f'{API}/overview').json()['products'] if p['product_id'] == 'desinf')
++        self.assertEqual(next(s for s in stock['sizes'] if s['size'] == 'one_liter')['quantity'], 30)
++
++    def test_same_report_cannot_be_downloaded_twice(self):
++        self.link_all()
++        first = self.upload(self.ROWS).json()
++        self.assertEqual(self.client.post(f"{API}/sales/imports/{first['id']}/confirm", json={}).status_code, 200)
++        second = self.upload(self.ROWS).json()
++        self.assertEqual(second['blocking'], ['duplicate'])
++        r = self.client.post(f"{API}/sales/imports/{second['id']}/confirm", json={})
++        self.assertEqual(r.status_code, 400)
++        self.assertEqual(self.deposit(), 40)
++        self.assertEqual(self.client.post(f"{API}/sales/imports/{first['id']}/confirm", json={}).status_code, 400)   # já baixado
++
++    def test_overlapping_period_needs_explicit_confirmation(self):
++        self.link_all()
++        first = self.upload(self.ROWS).json()
++        self.client.post(f"{API}/sales/imports/{first['id']}/confirm", json={})
++        later = self.upload([(6, 'PINHO GEL 2L', 'und', 10), (46, 'RODO 40 CM', 'und', 1)], start='16/11/2026', end='16/11/2026').json()
++        self.assertEqual(len(later['overlaps']), 1)
++        self.assertEqual(self.client.post(f"{API}/sales/imports/{later['id']}/confirm", json={}).status_code, 409)
++        self.assertEqual(self.deposit(), 40)
++        ok = self.client.post(f"{API}/sales/imports/{later['id']}/confirm", json={'allow_overlap': True})
++        self.assertEqual(ok.status_code, 200, ok.text)
++        self.assertEqual(self.deposit(), 30)
++
++    def test_incomplete_or_fractional_reports_are_blocked(self):
++        self.link_all()
++        bad = self.upload(self.ROWS, total=9999).json()
++        self.assertEqual(bad['blocking'], ['incomplete'])
++        self.assertEqual(self.client.post(f"{API}/sales/imports/{bad['id']}/confirm", json={}).status_code, 400)
++        frac = self.client.post(f'{API}/sales/parse', files={'file': ('r.pdf', report([(6, 'PINHO GEL 2L', 'und', 1.5)]), 'application/pdf')}).json()
++        self.assertEqual(frac['blocking'], ['fractional'])
++
++    def test_undo_whole_import_returns_units_and_allows_reimport(self):
++        self.link_all()
++        first = self.upload(self.ROWS).json()
++        self.client.post(f"{API}/sales/imports/{first['id']}/confirm", json={})
++        self.assertEqual(self.deposit(), 40)
++        r = self.client.post(f"{API}/sales/imports/{first['id']}/cancel")
++        self.assertEqual(r.status_code, 200, r.text)
++        self.assertEqual(self.deposit(), 100)
++        self.assertEqual(self.client.post(f"{API}/sales/imports/{first['id']}/cancel").status_code, 400)
++        self.assertEqual(self.client.get(f"{API}/sales/imports/{first['id']}").json()['status'], 'cancelado')
++        again = self.upload(self.ROWS).json()
++        self.assertEqual(again['blocking'], [])        # relatório desfeito pode ser baixado de novo
++        # baixa individual de venda não é permitida pelo Depósito
++        done = self.client.post(f"{API}/sales/imports/{again['id']}/confirm", json={})
++        self.assertEqual(done.status_code, 200)
++        sale = next(m for m in self.client.get(f'{API}/deposit/movements').json() if m['origin'] == 'venda' and not m['cancelled'])
++        self.assertEqual(self.client.post(f"{API}/deposit/movements/{sale['id']}/cancel").status_code, 400)
++
++    def test_codes_validation_and_deleted_product_is_asked_again(self):
++        bad_size = self.client.put(f'{API}/sales/codes', json={'items': [{'code': '1', 'action': 'map', 'product_id': 'pinho', 'size': 'one_kg'}]})
++        self.assertEqual(bad_size.status_code, 400)
++        self.assertEqual(self.client.put(f'{API}/sales/codes', json={'items': [{'code': '1', 'action': 'map', 'product_id': 'nao-existe', 'size': 'two_liter'}]}).status_code, 404)
++        self.assertEqual(self.client.put(f'{API}/sales/codes', json={'items': [{'code': '1', 'action': 'apagar'}]}).status_code, 400)
++        self.link_all()
++        self.db.store.products.update_one({'id': 'pinho'}, {'$set': {'deleted': True}})
++        state = self.upload(self.ROWS).json()
++        stale = next(l for l in state['lines'] if l['code'] == '0000000000006')
++        self.assertEqual((stale['status'], stale['stale']), ('unmapped', True))
++
++    def test_nothing_from_the_pdf_is_stored_besides_code_name_unit_quantity(self):
++        self.link_all()
++        state = self.upload(self.ROWS).json()
++        doc = self.db.store.sales_imports.find_one({'id': state['id']})
++        self.assertTrue(all(set(l) == {'code', 'name', 'unit', 'quantity'} for l in doc['lines']))
++        flat = repr(doc)
++        self.assertNotIn('9,99', flat)
++        self.assertNotIn('99,99', flat)
++        self.assertFalse(any(isinstance(v, (bytes, bytearray)) for v in doc.values()))
++
++
++if __name__ == '__main__':
++    unittest.main()
+diff --git a/backend/unit_tests/test_finished_stock.py b/backend/unit_tests/test_finished_stock.py
+index c1e569f..cadc442 100644
+--- a/backend/unit_tests/test_finished_stock.py
++++ b/backend/unit_tests/test_finished_stock.py
+@@ -53,12 +53,12 @@ class MemoryDB:
+ USER = {'id': 'u1', 'name': 'Vitor', 'email': 'vitor@lumix.com'}
+ 
+ 
+-def build():
++def build(user=None):
+     db = MemoryDB()
+     pushes = []
+ 
+     async def fake_user():
+-        return USER
++        return user or USER
+ 
+     async def fake_push(title, body, url='/notificar'):
+         pushes.append(body)
+diff --git a/frontend/src/App.js b/frontend/src/App.js
+index d3807e2..909e1f2 100644
+--- a/frontend/src/App.js
++++ b/frontend/src/App.js
+@@ -27,6 +27,7 @@ import { Pedidos } from './pages/Pedidos';
+ import { Notificar } from './pages/Notificar';
+ import { Impressao } from './pages/Impressao';
+ import { Estoque } from './pages/Estoque';
++import { Deposito } from './pages/Deposito';
+ import './App.css';
+ 
+ const PrivateRoute = ({ children }) => {
+@@ -91,6 +92,7 @@ function App() {
+               <Route path="impressao" element={<RoleRoute allowedRoles={['laboratorio']}><Impressao /></RoleRoute>} />
+               <Route path="pedidos" element={<RoleRoute allowedRoles={['laboratorio', 'pedidos']}><Pedidos /></RoleRoute>} />
+               <Route path="estoque" element={<RoleRoute allowedRoles={['laboratorio', 'producao']}><Estoque /></RoleRoute>} />
++              <Route path="deposito" element={<RoleRoute allowedRoles={['laboratorio', 'producao']}><Deposito /></RoleRoute>} />
+               <Route path="notificar" element={<RoleRoute allowedRoles={['laboratorio', 'producao']}><Notificar /></RoleRoute>} />
+               <Route path="team" element={<RoleRoute allowedRoles={['laboratorio']}><Team /></RoleRoute>} />
+               <Route path="trash" element={<RoleRoute allowedRoles={['laboratorio']}><Trash /></RoleRoute>} />
+diff --git a/frontend/src/components/Layout.js b/frontend/src/components/Layout.js
+index 3b51825..98f0ac6 100644
+--- a/frontend/src/components/Layout.js
++++ b/frontend/src/components/Layout.js
+@@ -30,6 +30,7 @@ import {
+   Search,
+   Printer,
+   Warehouse,
++  Container,
+ } from 'lucide-react';
+ 
+ const LAB_EMAIL = 'laboratoriolumix@outlook.com';
+@@ -63,6 +64,7 @@ const menuCategories = [
+     title: 'ESTOQUE',
+     items: [
+       { path: '/estoque', icon: Warehouse, label: 'Estoque', roles: ['laboratorio', 'producao'] },
++      { path: '/deposito', icon: Container, label: 'Depósito', roles: ['laboratorio', 'producao'] },
+       { path: '/products', icon: Package, label: 'Produtos', roles: ['laboratorio'] },
+       { path: '/raw-materials', icon: Boxes, label: 'Matérias-Primas', roles: ['laboratorio'] },
+       { path: '/suppliers', icon: Truck, label: 'Fornecedores', roles: ['laboratorio'] },
+diff --git a/frontend/src/components/SalesImportDialog.js b/frontend/src/components/SalesImportDialog.js
+new file mode 100644
+index 0000000..abbe39b
+--- /dev/null
++++ b/frontend/src/components/SalesImportDialog.js
+@@ -0,0 +1,431 @@
++import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
++import api from '../lib/api';
++import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
++import {
++  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
++  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
++} from './ui/alert-dialog';
++import { Button } from './ui/button';
++import { Input } from './ui/input';
++import { Combobox } from './ui/combobox';
++import { toast } from 'sonner';
++import {
++  FileUp, Link2, History, Search, Check, Ban, AlertTriangle, ShieldAlert, Undo2, CheckSquare, Square, Lock,
++} from 'lucide-react';
++import { sizesForKind, errorMessage } from '../lib/stockSizes';
++
++const fmtDate = (iso) => (iso ? iso.split('-').reverse().join('/') : '');
++const periodLabel = (p) => (!p ? 'sem período' : p.start === p.end ? fmtDate(p.start) : `${fmtDate(p.start)} a ${fmtDate(p.end)}`);
++const fmtDateTime = (iso) => {
++  try { return new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); }
++  catch { return iso || ''; }
++};
++const num = (n) => Number(n).toLocaleString('pt-BR');
++
++const complete = (v) => Boolean(v) && (v.action === 'ignore' || (v.action === 'map' && v.product_id && v.size));
++const current = (row) => (row.status === 'mapped' ? { action: 'map', product_id: row.product_id, size: row.size }
++  : row.status === 'ignored' ? { action: 'ignore' } : null);
++const same = (a, b) => Boolean(a) && Boolean(b) && a.action === b.action && (a.action === 'ignore' || (a.product_id === b.product_id && a.size === b.size));
++
++// ---------- uma linha do relatório: ligar a um produto + tamanho, ou ignorar ----------
++const CodeRow = ({ row, value, products, onChange }) => {
++  const product = products.find((p) => p.product_id === value?.product_id);
++  const sizes = sizesForKind(product?.kind || 'L');
++  const ignored = value?.action === 'ignore';
++  const sug = row.suggestion;
++  const sugProduct = sug && products.find((p) => p.product_id === sug.product_id);
++  const useSuggestion = () => onChange({ action: 'map', product_id: sug.product_id, size: sug.size || '' });
++
++  return (
++    <div className={`rounded-lg border p-2.5 space-y-2 ${row.status === 'unmapped' && !complete(value) ? 'border-amber-300' : ''}`}
++         data-testid={`code-row-${row.code}`}>
++      <div className="flex items-start justify-between gap-2">
++        <div className="min-w-0">
++          <p className="font-semibold text-sm leading-tight">{row.name}</p>
++          <p className="text-[11px] text-muted-foreground">Código {row.code.replace(/^0+/, '')} · vendeu {num(row.quantity)}</p>
++        </div>
++        <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
++          row.status === 'mapped' ? 'bg-emerald-500/15 text-emerald-600' : row.status === 'ignored' ? 'bg-muted text-muted-foreground' : 'bg-amber-500/15 text-amber-600'}`}>
++          {row.status === 'mapped' ? 'Ligado' : row.status === 'ignored' ? 'Ignorado' : row.stale ? 'Produto apagado' : 'Sem produto'}
++        </span>
++      </div>
++      <div className="grid grid-cols-[1fr_auto] gap-2 items-center">
++        <div className={`min-w-0 ${ignored ? 'opacity-40 pointer-events-none' : ''}`}>
++          <Combobox options={products.map((p) => ({ value: p.product_id, label: p.name }))} value={ignored ? '' : (value?.product_id || '')}
++                    onChange={(id) => onChange({ action: 'map', product_id: id, size: '' })}
++                    placeholder="Produto do Lumix" searchPlaceholder="Nome do produto..." emptyText="Nenhum produto" />
++        </div>
++        <select aria-label="Tamanho" disabled={ignored || !product} value={ignored ? '' : (value?.size || '')}
++                onChange={(e) => onChange({ ...value, action: 'map', size: e.target.value })}
++                className="h-10 rounded-md border bg-background px-2 text-sm disabled:opacity-40">
++          <option value="">Tamanho</option>
++          {sizes.map((s) => <option key={s.size} value={s.size}>{s.label}</option>)}
++        </select>
++      </div>
++      <div className="flex flex-wrap items-center gap-2">
++        <Button type="button" size="sm" variant={ignored ? 'default' : 'outline'} onClick={() => onChange(ignored ? null : { action: 'ignore' })}>
++          <Ban className="w-3.5 h-3.5 mr-1" /> {ignored ? 'Ignorado (não é nosso)' : 'Ignorar'}
++        </Button>
++        {sug && sugProduct && !complete(value) && (
++          <Button type="button" size="sm" variant="outline" onClick={useSuggestion} className="border-primary text-primary">
++            Sugestão: {sugProduct.name}{sug.size ? ` ${sizes.find((s) => s.size === sug.size)?.label || ''}` : ''}
++          </Button>
++        )}
++        {value?.suggested && complete(value) && <span className="text-[11px] text-primary">sugerido pelo nome</span>}
++      </div>
++    </div>
++  );
++};
++
++/**
++ * Saída do Depósito pelo relatório de vendas do GigaMob (PDF). Somente Laboratório.
++ * O PDF é lido no servidor e descartado: nada de preço é guardado.
++ */
++export const SalesImportDialog = ({ open, onOpenChange, products, onDone }) => {
++  const [view, setView] = useState('start'); // start | review | done | history
++  const [intent, setIntent] = useState('sale');
++  const [uploading, setUploading] = useState(false);
++  const [state, setState] = useState(null);
++  const [draft, setDraft] = useState({});
++  const [filter, setFilter] = useState('pending');
++  const [search, setSearch] = useState('');
++  const [allowOverlap, setAllowOverlap] = useState(false);
++  const [saving, setSaving] = useState(false);
++  const [confirming, setConfirming] = useState(false);
++  const [askConfirm, setAskConfirm] = useState(false);
++  const [history, setHistory] = useState([]);
++  const [undoTarget, setUndoTarget] = useState(null);
++  const inputRef = useRef(null);
++  const stateRef = useRef(null);
++  stateRef.current = state;
++
++  const options = useMemo(() => [...products].sort((a, b) => a.name.localeCompare(b.name)), [products]);
++
++  const reset = useCallback(() => {
++    setView('start'); setState(null); setDraft({}); setFilter('pending'); setSearch('');
++    setAllowOverlap(false); setUploading(false); setConfirming(false); setAskConfirm(false);
++  }, []);
++
++  useEffect(() => { if (open) reset(); }, [open, reset]);
++
++  const discardPending = useCallback(() => {
++    const s = stateRef.current;
++    if (s && s.status === 'pendente') api.delete(`/finished-stock/sales/imports/${s.id}`).catch(() => {});
++  }, []);
++
++  const close = (o) => { if (!o) { discardPending(); } onOpenChange(o); };
++
++  const initDraft = (st, keep = {}) => {
++    const d = {};
++    st.lines.forEach((r) => {
++      if (keep[r.code] && r.status === 'unmapped') { d[r.code] = keep[r.code]; return; }
++      const cur = current(r);
++      if (cur) d[r.code] = cur;
++      else if (r.suggestion?.exact) d[r.code] = { action: 'map', product_id: r.suggestion.product_id, size: r.suggestion.size, suggested: true };
++    });
++    setDraft(d);
++  };
++
++  const pick = (kind) => { setIntent(kind); inputRef.current?.click(); };
++
++  const onFile = async (e) => {
++    const file = e.target.files?.[0];
++    e.target.value = '';
++    if (!file) return;
++    setUploading(true);
++    try {
++      const form = new FormData();
++      form.append('file', file);
++      const r = await api.post('/finished-stock/sales/parse', form, { headers: { 'Content-Type': 'multipart/form-data' } });
++      setState(r.data); initDraft(r.data); setView('review');
++      setFilter(r.data.summary.unmapped > 0 ? 'pending' : 'all');
++    } catch (err) { toast.error(errorMessage(err, 'Não foi possível ler o PDF')); }
++    finally { setUploading(false); }
++  };
++
++  const rows = state?.lines || [];
++  const setRowDraft = (code, value) => setDraft((d) => {
++    const next = { ...d };
++    if (value) next[code] = value; else delete next[code];
++    return next;
++  });
++
++  const savable = rows.filter((r) => complete(draft[r.code]) && (r.status === 'unmapped' || !same(draft[r.code], current(r))));
++  const noSuggestion = rows.filter((r) => r.status === 'unmapped' && !draft[r.code] && !r.suggestion);
++  const counts = {
++    pending: rows.filter((r) => r.status === 'unmapped').length,
++    mapped: rows.filter((r) => r.status === 'mapped').length,
++    ignored: rows.filter((r) => r.status === 'ignored').length,
++  };
++
++  const visible = rows.filter((r) => {
++    if (filter === 'pending' && r.status !== 'unmapped') return false;
++    if (filter === 'mapped' && r.status !== 'mapped') return false;
++    if (filter === 'ignored' && r.status !== 'ignored') return false;
++    const q = search.trim().toLowerCase();
++    return !q || r.name.toLowerCase().includes(q) || r.code.includes(q);
++  });
++
++  const refresh = async (keep) => {
++    const r = await api.get(`/finished-stock/sales/imports/${state.id}`);
++    setState(r.data); initDraft(r.data, keep);
++    return r.data;
++  };
++
++  const saveLinks = async () => {
++    if (!savable.length) return;
++    setSaving(true);
++    try {
++      await api.put('/finished-stock/sales/codes', {
++        items: savable.map((r) => ({ code: r.code, action: draft[r.code].action, product_id: draft[r.code].product_id, size: draft[r.code].size, name: r.name })),
++      });
++      toast.success(`${savable.length} código(s) ligados`);
++      const kept = {};
++      Object.entries(draft).forEach(([code, v]) => { if (!complete(v)) kept[code] = v; });
++      await refresh(kept);
++    } catch (err) { toast.error(errorMessage(err, 'Erro ao salvar as ligações')); }
++    finally { setSaving(false); }
++  };
++
++  const ignoreRest = () => setDraft((d) => {
++    const next = { ...d };
++    noSuggestion.forEach((r) => { next[r.code] = { action: 'ignore' }; });
++    return next;
++  });
++
++  const finishRegister = () => { discardPending(); setState(null); onOpenChange(false); toast.success('Códigos cadastrados'); };
++
++  const confirmSale = async () => {
++    setAskConfirm(false); setConfirming(true);
++    try {
++      const r = await api.post(`/finished-stock/sales/imports/${state.id}/confirm`, { allow_overlap: allowOverlap });
++      setState(r.data); setView('done'); onDone?.();
++    } catch (err) { toast.error(errorMessage(err, 'Não foi possível baixar')); }
++    finally { setConfirming(false); }
++  };
++
++  const loadHistory = async () => {
++    try { setHistory((await api.get('/finished-stock/sales/imports')).data); }
++    catch (err) { toast.error(errorMessage(err, 'Erro ao carregar o histórico')); }
++  };
++  const openHistory = () => { discardPending(); setState(null); setView('history'); loadHistory(); };
++
++  const undo = async () => {
++    const t = undoTarget; setUndoTarget(null);
++    try {
++      await api.post(`/finished-stock/sales/imports/${t.id}/cancel`);
++      toast.success('Baixa desfeita: as unidades voltaram para o Depósito');
++      loadHistory(); onDone?.();
++    } catch (err) { toast.error(errorMessage(err, 'Não foi possível desfazer')); }
++  };
++
++  const blockMessages = {
++    unmapped: 'Ligue ou ignore todos os códigos pendentes.',
++    fractional: 'Há quantidade fracionada num produto ligado. Confira o PDF.',
++    incomplete: 'O PDF não foi lido por completo. Gere o relatório de novo.',
++    duplicate: 'Este relatório já foi baixado.',
++  };
++  const isSale = intent === 'sale';
++  const unsaved = savable.length > 0;
++  const canConfirm = state && state.status === 'pendente' && state.blocking.length === 0 && !unsaved
++    && (state.overlaps.length === 0 || allowOverlap) && !confirming;
++  const shortage = state?.summary?.shortage_units || 0;
++
++  return (
++    <>
++      <Dialog open={open} onOpenChange={close}>
++        <DialogContent className="bg-card border-border max-w-2xl max-h-[94vh] overflow-y-auto [&>*]:min-w-0">
++          <DialogHeader>
++            <DialogTitle className="flex items-center gap-2">
++              <FileUp className="w-5 h-5" /> {view === 'history' ? 'Histórico de baixas' : isSale || view === 'start' ? 'Saída do Depósito — relatório de vendas' : 'Cadastrar códigos do GigaMob'}
++            </DialogTitle>
++          </DialogHeader>
++
++          <input ref={inputRef} type="file" accept="application/pdf,.pdf" className="hidden" onChange={onFile} data-testid="sales-file" />
++
++          {view === 'start' && (
++            <div className="space-y-4">
++              <div className="flex items-start gap-2 rounded-lg bg-muted p-3 text-sm">
++                <Lock className="w-4 h-4 mt-0.5 shrink-0" />
++                <p>O relatório é <b>confidencial</b>. O Lumix lê o PDF e o descarta: <b>o arquivo e os valores em R$ não ficam guardados</b>. Só ficam o código, o nome e a quantidade vendida.</p>
++              </div>
++              <Button className="w-full h-14 bg-primary hover:bg-primary/90 text-base" disabled={uploading} onClick={() => pick('sale')} data-testid="pick-sale">
++                <FileUp className="w-5 h-5 mr-2" /> {uploading && isSale ? 'Lendo o PDF...' : 'Anexar relatório e baixar vendas'}
++              </Button>
++              <Button variant="outline" className="w-full h-12" disabled={uploading} onClick={() => pick('register')} data-testid="pick-register">
++                <Link2 className="w-5 h-5 mr-2" /> {uploading && !isSale ? 'Lendo o PDF...' : 'Só cadastrar os códigos (não baixa nada)'}
++              </Button>
++              <p className="text-xs text-muted-foreground">
++                Use "só cadastrar" com um relatório grande (ex.: do mês) para ligar todos os produtos de uma vez. Depois, no dia a dia, só aparecem os códigos novos.
++              </p>
++              <Button variant="ghost" className="w-full" onClick={openHistory}><History className="w-4 h-4 mr-2" /> Ver histórico de baixas</Button>
++            </div>
++          )}
++
++          {view === 'review' && state && (
++            <div className="space-y-4">
++              <div className="rounded-lg border p-3 text-sm space-y-1">
++                <p><b>Relatório de {periodLabel(state.period)}</b>{state.company ? ` · ${state.company}` : ''}</p>
++                <p className="text-muted-foreground">
++                  {state.summary.lines} produtos · <b className="text-emerald-600">{state.summary.mapped} ligados</b> · {state.summary.ignored} ignorados ·{' '}
++                  <b className={state.summary.unmapped ? 'text-amber-600' : ''}>{state.summary.unmapped} sem produto</b>
++                </p>
++              </div>
++
++              {state.warnings.map((w) => (
++                <p key={w} className="flex gap-2 text-sm rounded-md bg-amber-50 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200 p-2"><AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" /> {w}</p>
++              ))}
++              {state.duplicate && (
++                <p className="flex gap-2 text-sm rounded-md bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-200 p-2" data-testid="dup-alert">
++                  <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" /> Este relatório já foi baixado em {fmtDateTime(state.duplicate.confirmed_at)}. Não dá para baixar de novo.
++                </p>
++              )}
++
++              <div className="flex gap-2 overflow-x-auto pb-1">
++                {[['pending', `Pendentes (${counts.pending})`], ['mapped', `Ligados (${counts.mapped})`], ['ignored', `Ignorados (${counts.ignored})`], ['all', 'Todos']].map(([k, label]) => (
++                  <button key={k} type="button" onClick={() => setFilter(k)}
++                          className={`px-3 h-9 rounded-full border-2 text-sm font-semibold whitespace-nowrap transition ${filter === k ? 'border-primary bg-primary text-primary-foreground' : 'border-border hover:border-primary/50'}`}>{label}</button>
++                ))}
++              </div>
++              <div className="relative">
++                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
++                <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Filtrar por nome ou código" className="pl-9" />
++              </div>
++
++              {counts.pending > 0 && (
++                <p className="text-xs text-muted-foreground">
++                  Códigos que o Lumix ainda não conhece. Ligue cada um ao produto e tamanho, ou toque em <b>Ignorar</b> se não é produção da Lumix (vassoura, rodo, pano...).
++                  O que o nome acertou com certeza já vem preenchido: confira.
++                </p>
++              )}
++
++              <div className="space-y-2 max-h-[42vh] overflow-y-auto pr-1" data-testid="code-list">
++                {visible.map((r) => (
++                  <CodeRow key={r.code} row={r} products={options} value={draft[r.code]} onChange={(v) => setRowDraft(r.code, v)} />
++                ))}
++                {visible.length === 0 && <p className="text-sm text-muted-foreground p-2">Nada aqui.</p>}
++              </div>
++
++              <div className="flex flex-col sm:flex-row gap-2">
++                {noSuggestion.length > 0 && (
++                  <Button type="button" variant="outline" className="flex-1" onClick={ignoreRest} data-testid="ignore-rest">
++                    <Ban className="w-4 h-4 mr-1" /> Ignorar os {noSuggestion.length} sem sugestão
++                  </Button>
++                )}
++                <Button type="button" className="flex-1 bg-primary hover:bg-primary/90" disabled={!savable.length || saving} onClick={saveLinks} data-testid="save-links">
++                  <Check className="w-4 h-4 mr-1" /> Salvar ligações ({savable.length})
++                </Button>
++              </div>
++
++              {!isSale && (
++                <Button type="button" variant="outline" className="w-full h-12" onClick={finishRegister} disabled={unsaved}>
++                  {unsaved ? 'Salve as ligações antes de concluir' : counts.pending ? `Concluir (ainda faltam ${counts.pending})` : 'Concluir — tudo ligado'}
++                </Button>
++              )}
++
++              {isSale && (
++                <div className="space-y-3 border-t pt-3">
++                  <p className="font-semibold text-sm">O que vai sair do Depósito</p>
++                  {state.plan.length === 0 && <p className="text-sm text-muted-foreground">Nenhum produto ligado neste relatório tem venda a baixar.</p>}
++                  <div className="divide-y rounded-lg border text-sm" data-testid="plan">
++                    {state.plan.map((i) => (
++                      <div key={`${i.product_id}-${i.size}`} className="flex items-center justify-between gap-2 p-2">
++                        <span className="min-w-0 truncate">{i.name} <b>{i.label}</b></span>
++                        <span className="shrink-0 text-right">
++                          <b>{num(i.deduct)}</b> <span className="text-muted-foreground">de {num(i.requested)} vendidas</span>
++                          {i.shortage > 0 && <span className="block text-[11px] text-red-600 font-semibold">falta {num(i.shortage)} no Depósito</span>}
++                        </span>
++                      </div>
++                    ))}
++                  </div>
++                  {shortage > 0 && (
++                    <p className="flex gap-2 text-sm rounded-md bg-amber-50 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200 p-2">
++                      <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
++                      O Depósito não tem saldo para {num(shortage)} unidade(s). Será baixado só o que existe e a falta fica registrada para acertar na contagem.
++                    </p>
++                  )}
++                  {state.overlaps.length > 0 && (
++                    <button type="button" onClick={() => setAllowOverlap(!allowOverlap)} data-testid="allow-overlap"
++                            className={`w-full flex items-start gap-2 rounded-lg border p-2 text-left ${allowOverlap ? 'border-amber-500 bg-amber-50 dark:bg-amber-900/20' : 'border-amber-300'}`}>
++                      {allowOverlap ? <CheckSquare className="w-5 h-5 shrink-0 text-amber-600" /> : <Square className="w-5 h-5 shrink-0 text-amber-600" />}
++                      <span className="text-sm">O período deste relatório se sobrepõe a uma baixa já feita ({state.overlaps.map((o) => periodLabel(o.period)).join(', ')}). As mesmas vendas podem sair duas vezes. <b>Quero baixar mesmo assim.</b></span>
++                    </button>
++                  )}
++                  {state.blocking.map((b) => <p key={b} className="text-sm text-red-600">• {blockMessages[b]}</p>)}
++                  {unsaved && <p className="text-sm text-amber-700">• Salve as ligações antes de baixar.</p>}
++                  <Button className="w-full h-12 bg-primary hover:bg-primary/90" disabled={!canConfirm} onClick={() => setAskConfirm(true)} data-testid="confirm-sale">
++                    {confirming ? 'Baixando...' : `Baixar ${num(state.summary.units)} unidades do Depósito`}
++                  </Button>
++                </div>
++              )}
++            </div>
++          )}
++
++          {view === 'done' && state && (
++            <div className="space-y-4" data-testid="sale-done">
++              <p className="flex items-center gap-2 text-lg font-bold text-emerald-600"><Check className="w-5 h-5" /> Baixa concluída</p>
++              <p className="text-sm">Relatório de {periodLabel(state.period)}: <b>{num(state.summary.units)}</b> unidades saíram do Depósito.</p>
++              {state.summary.shortage_units > 0 && (
++                <div className="rounded-lg border border-red-300 p-3 text-sm space-y-1">
++                  <p className="font-semibold text-red-600">Sem saldo no Depósito ({num(state.summary.shortage_units)} unidades)</p>
++                  {state.plan.filter((i) => i.shortage > 0).map((i) => (
++                    <p key={`${i.product_id}-${i.size}`}>{i.name} {i.label}: faltaram <b>{num(i.shortage)}</b></p>
++                  ))}
++                  <p className="text-xs text-muted-foreground">Confira na contagem do Depósito (Inventário).</p>
++                </div>
++              )}
++              <Button className="w-full" onClick={() => onOpenChange(false)}>Fechar</Button>
++            </div>
++          )}
++
++          {view === 'history' && (
++            <div className="space-y-3">
++              {history.length === 0 && <p className="text-sm text-muted-foreground">Nenhuma baixa feita ainda.</p>}
++              {history.map((h) => (
++                <div key={h.id} className={`rounded-lg border p-3 text-sm space-y-1 ${h.status === 'cancelado' ? 'opacity-60' : ''}`}>
++                  <div className="flex items-center justify-between gap-2">
++                    <p className="font-semibold">{periodLabel(h.period)} {h.status === 'cancelado' && <span className="text-xs font-normal">(desfeita)</span>}</p>
++                    {h.status === 'baixado' && (
++                      <Button size="sm" variant="outline" onClick={() => setUndoTarget(h)}><Undo2 className="w-4 h-4 mr-1" /> Desfazer</Button>
++                    )}
++                  </div>
++                  <p className="text-muted-foreground">{num(h.summary?.units || 0)} unidades · {h.confirmed_by || ''} · {fmtDateTime(h.confirmed_at)}</p>
++                  {(h.shortages || []).length > 0 && <p className="text-xs text-red-600">Sem saldo: {h.shortages.map((s) => `${s.name} ${s.label} (${num(s.shortage)})`).join(', ')}</p>}
++                </div>
++              ))}
++              <Button variant="outline" className="w-full" onClick={reset}>Voltar</Button>
++            </div>
++          )}
++        </DialogContent>
++      </Dialog>
++
++      <AlertDialog open={askConfirm} onOpenChange={setAskConfirm}>
++        <AlertDialogContent>
++          <AlertDialogHeader>
++            <AlertDialogTitle>Baixar {state ? num(state.summary.units) : 0} unidades do Depósito?</AlertDialogTitle>
++            <AlertDialogDescription>
++              Relatório de {state ? periodLabel(state.period) : ''}. A baixa sai só do Depósito{shortage > 0 ? ` e ${num(shortage)} unidade(s) ficam registradas como falta de saldo` : ''}. Você pode desfazer depois pelo histórico.
++            </AlertDialogDescription>
++          </AlertDialogHeader>
++          <AlertDialogFooter>
++            <AlertDialogCancel>Voltar</AlertDialogCancel>
++            <AlertDialogAction onClick={confirmSale} className="bg-primary" data-testid="confirm-yes">Baixar</AlertDialogAction>
++          </AlertDialogFooter>
++        </AlertDialogContent>
++      </AlertDialog>
++
++      <AlertDialog open={Boolean(undoTarget)} onOpenChange={(o) => !o && setUndoTarget(null)}>
++        <AlertDialogContent>
++          <AlertDialogHeader>
++            <AlertDialogTitle>Desfazer a baixa de {undoTarget ? periodLabel(undoTarget.period) : ''}?</AlertDialogTitle>
++            <AlertDialogDescription>As {undoTarget ? num(undoTarget.summary?.units || 0) : 0} unidades voltam para o Depósito e o relatório poderá ser baixado de novo.</AlertDialogDescription>
++          </AlertDialogHeader>
++          <AlertDialogFooter>
++            <AlertDialogCancel>Voltar</AlertDialogCancel>
++            <AlertDialogAction onClick={undo} className="bg-primary">Desfazer</AlertDialogAction>
++          </AlertDialogFooter>
++        </AlertDialogContent>
++      </AlertDialog>
++    </>
++  );
++};
+diff --git a/frontend/src/context/AuthContext.js b/frontend/src/context/AuthContext.js
+index 4f6de4a..588a639 100644
+--- a/frontend/src/context/AuthContext.js
++++ b/frontend/src/context/AuthContext.js
+@@ -79,7 +79,7 @@ export const AuthProvider = ({ children }) => {
+     if (path === '/in-production') return Boolean(user);
+     if (role === 'laboratorio') return true;
+     // Rotas permitidas para produção
+-    const producaoRoutes = ['/counting', '/samples', '/archives', '/dashboard', '/estoque'];
++    const producaoRoutes = ['/counting', '/samples', '/archives', '/dashboard', '/estoque', '/deposito'];
+     return producaoRoutes.some(route => path.startsWith(route));
+   };
+ 
+diff --git a/frontend/src/pages/Deposito.js b/frontend/src/pages/Deposito.js
+new file mode 100644
+index 0000000..16c515b
+--- /dev/null
++++ b/frontend/src/pages/Deposito.js
+@@ -0,0 +1,262 @@
++import React, { useCallback, useEffect, useMemo, useState } from 'react';
++import api from '../lib/api';
++import { useAuth } from '../context/AuthContext';
++import { Button } from '../components/ui/button';
++import { Card } from '../components/ui/card';
++import { Input } from '../components/ui/input';
++import {
++  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
++  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
++} from '../components/ui/alert-dialog';
++import { toast } from 'sonner';
++import {
++  Search, Camera, ClipboardList, FileUp, History, Undo2, PackageOpen, ChevronDown, ChevronUp, Warehouse, Layers,
++} from 'lucide-react';
++import { BarcodeScanner } from '../components/BarcodeScanner';
++import { StockBottle } from '../components/StockBottle';
++import { SalesImportDialog } from '../components/SalesImportDialog';
++import { MovementDialog } from './Estoque';
++import { STOCK_SIZES, errorMessage } from '../lib/stockSizes';
++
++const MIXED = 'misturado';
++const ORIGIN = { estoque: 'Veio do Estoque', producao: 'Direto da produção', inventario: 'Inventário', venda: 'Venda GigaMob' };
++
++const fmtDateTime = (iso) => {
++  try { return new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); }
++  catch { return iso; }
++};
++const batchLabel = (n) => (!n || n === MIXED ? 'Lotes misturados' : `Lote ${n}`);
++
++export const Deposito = () => {
++  const { user, role } = useAuth();
++  const isLab = role === 'laboratorio';
++  const [data, setData] = useState({ products: [] });
++  const [loading, setLoading] = useState(true);
++  const [movements, setMovements] = useState([]);
++  const [team, setTeam] = useState([]);
++  const [view, setView] = useState('deposit'); // deposit | total
++  const [search, setSearch] = useState('');
++  const [sizeFilter, setSizeFilter] = useState('');
++  const [showZero, setShowZero] = useState(false);
++  const [highlight, setHighlight] = useState(null);
++  const [expanded, setExpanded] = useState({});
++  const [showHistory, setShowHistory] = useState(false);
++  const [scanOpen, setScanOpen] = useState(false);
++  const [inventoryOpen, setInventoryOpen] = useState(false);
++  const [salesOpen, setSalesOpen] = useState(false);
++  const [undoTarget, setUndoTarget] = useState(null);
++
++  const load = useCallback(async () => {
++    try {
++      const [o, m] = await Promise.all([
++        api.get('/finished-stock/deposit/overview'),
++        api.get('/finished-stock/deposit/movements', { params: { limit: 60 } }),
++      ]);
++      setData(o.data); setMovements(m.data);
++    } catch (e) { toast.error(errorMessage(e, 'Erro ao carregar o Depósito')); }
++    finally { setLoading(false); }
++  }, []);
++
++  useEffect(() => {
++    load();
++    api.get('/team').then((r) => setTeam((r.data || []).filter((t) => t.active !== false))).catch(() => {});
++  }, [load]);
++
++  const amount = (s) => (view === 'total' ? s.total : s.deposit);
++
++  const usedSizes = useMemo(() => {
++    const set = new Set();
++    data.products.forEach((p) => p.sizes.forEach((s) => set.add(s.size)));
++    return STOCK_SIZES.filter((s) => set.has(s.size));
++  }, [data]);
++
++  const visible = useMemo(() => {
++    const q = search.trim().toLowerCase();
++    return data.products
++      .filter((p) => !q || p.name.toLowerCase().includes(q) || p.sizes.some((s) => s.barcode && s.barcode === search.trim()))
++      .map((p) => ({ ...p, sizes: p.sizes.filter((s) => (!sizeFilter || s.size === sizeFilter) && (showZero || amount(s) > 0)) }))
++      .filter((p) => p.sizes.length > 0);
++  }, [data, search, sizeFilter, showZero, view]);
++
++  const totalUnits = visible.reduce((a, p) => a + p.sizes.reduce((b, s) => b + amount(s), 0), 0);
++  const empty = data.products.every((p) => p.sizes.every((s) => s.deposit === 0));
++
++  // Mesmo formato do Estoque, para reaproveitar o diálogo de inventário
++  const asStockShape = useMemo(() => data.products.map((p) => ({
++    product_id: p.product_id, name: p.name, kind: p.kind,
++    sizes: p.sizes.map((s) => ({ size: s.size, label: s.label, quantity: s.deposit, minimum: 0, low: false, lots: s.lots })),
++  })), [data]);
++
++  const onScan = useCallback(async (code) => {
++    setScanOpen(false);
++    try {
++      const r = await api.get(`/finished-stock/barcode/${encodeURIComponent(code)}`);
++      setSearch(r.data.name); setSizeFilter(r.data.size); setShowZero(true);
++      setHighlight(`${r.data.product_id}:${r.data.size}`);
++      toast.success(`${r.data.name} ${r.data.label}`);
++    } catch (e) { toast.error(errorMessage(e, 'Código não encontrado')); }
++  }, []);
++
++  const onSearchKey = (e) => {
++    if (e.key === 'Enter' && /^(\d{6,}|LX[0-9A-F]{10,11})$/i.test(search.trim())) onScan(search.trim());
++  };
++
++  const undo = async () => {
++    const m = undoTarget; setUndoTarget(null);
++    try {
++      await api.post(`/finished-stock/deposit/movements/${m.id}/cancel`);
++      toast.success('Movimentação estornada'); load();
++    } catch (e) { toast.error(errorMessage(e, 'Não foi possível estornar')); }
++  };
++
++  return (
++    <div className="space-y-6">
++      <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
++        <div>
++          <h1 className="text-4xl md:text-5xl font-bold mb-1">Depósito</h1>
++          <p className="text-muted-foreground">O que está guardado no depósito, separado por tamanho</p>
++        </div>
++        {isLab && (
++          <div className="grid grid-cols-2 sm:flex gap-2">
++            <Button className="h-12 bg-primary hover:bg-primary/90" onClick={() => setSalesOpen(true)} data-testid="open-sales"><FileUp className="w-5 h-5 mr-2" /> Saída</Button>
++            <Button className="h-12" variant="outline" onClick={() => setInventoryOpen(true)} data-testid="open-inventory"><ClipboardList className="w-5 h-5 mr-2" /> Inventário</Button>
++          </div>
++        )}
++      </div>
++
++      <Card className="p-4 space-y-3">
++        <div className="grid grid-cols-2 gap-2" role="tablist">
++          {[['deposit', 'Só o Depósito', Warehouse], ['total', 'Estoque total', Layers]].map(([k, label, Icon]) => (
++            <button key={k} type="button" role="tab" aria-selected={view === k} onClick={() => setView(k)} data-testid={`view-${k}`}
++                    className={`h-12 rounded-xl border-2 font-semibold flex items-center justify-center gap-2 transition ${
++                      view === k ? 'border-primary bg-primary/10' : 'border-border hover:border-primary/50'}`}>
++              <Icon className="w-4 h-4" /> {label}
++            </button>
++          ))}
++        </div>
++        {view === 'total' && <p className="text-xs text-muted-foreground">Tudo o que a empresa tem: <b>Estoque + Depósito</b>.</p>}
++
++        <div className="flex gap-2">
++          <div className="relative flex-1">
++            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
++            <Input value={search} onChange={(e) => { setSearch(e.target.value); setHighlight(null); }} onKeyDown={onSearchKey}
++                   placeholder="Pesquisar produto ou código de barras" className="pl-9 h-11" />
++          </div>
++          <Button variant="outline" className="h-11" title="Ler código de barras" onClick={() => setScanOpen(true)}><Camera className="w-5 h-5 sm:mr-2" /><span className="hidden sm:inline">Câmera</span></Button>
++        </div>
++        <div className="flex gap-2 overflow-x-auto pb-1">
++          {[{ size: '', label: 'Todos' }, ...usedSizes].map((s) => (
++            <button key={s.size || 'all'} type="button" onClick={() => setSizeFilter(s.size)}
++                    className={`px-4 h-10 rounded-full border-2 text-sm font-semibold whitespace-nowrap transition ${
++                      sizeFilter === s.size ? 'border-primary bg-primary text-primary-foreground' : 'border-border hover:border-primary/50'}`}>
++              {s.label}
++            </button>
++          ))}
++          <button type="button" onClick={() => setShowZero(!showZero)}
++                  className={`px-4 h-10 rounded-full border-2 text-sm font-semibold whitespace-nowrap transition ${showZero ? 'border-primary bg-primary/10' : 'border-border hover:border-primary/50'}`}>
++            Mostrar zerados
++          </button>
++        </div>
++        <p className="text-xs text-muted-foreground">{visible.length} {visible.length === 1 ? 'produto' : 'produtos'} · {totalUnits} {totalUnits === 1 ? 'unidade' : 'unidades'}{sizeFilter ? ` de ${STOCK_SIZES.find((s) => s.size === sizeFilter)?.label}` : ''}</p>
++      </Card>
++
++      {loading ? (
++        <p className="text-muted-foreground">Carregando...</p>
++      ) : visible.length === 0 ? (
++        <Card className="p-10 text-center text-muted-foreground" data-testid="empty">
++          <PackageOpen className="w-10 h-10 mx-auto mb-2" />
++          {empty && view === 'deposit'
++            ? <>O Depósito está vazio.{isLab ? ' Use o Inventário para lançar a contagem inicial.' : ''}<br />Tudo que sai do Estoque aparece aqui.</>
++            : 'Nenhum produto encontrado.'}
++        </Card>
++      ) : (
++        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
++          {visible.map((p) => {
++            const isOpen = expanded[p.product_id];
++            return (
++              <Card key={p.product_id} data-testid={`dep-card-${p.product_id}`} className="p-4 space-y-3">
++                <h3 className="font-bold text-lg leading-tight">{p.name}</h3>
++                <div className="grid grid-cols-4 gap-2">
++                  {p.sizes.map((s) => (
++                    <div key={s.size} data-testid={`dep-${p.product_id}-${s.size}`}
++                         className={`flex flex-col items-center justify-end gap-1 rounded-xl border p-2 min-h-28 ${highlight === `${p.product_id}:${s.size}` ? 'ring-2 ring-primary' : ''}`}>
++                      <StockBottle size={s.size} empty={amount(s) === 0} />
++                      <span className="text-xl font-bold leading-none">{amount(s)}</span>
++                      <span className="text-xs font-semibold text-muted-foreground leading-none">{s.label}</span>
++                      {view === 'total' && <span className="text-[10px] text-muted-foreground leading-none text-center">Est. {s.stock} · Dep. {s.deposit}</span>}
++                    </div>
++                  ))}
++                </div>
++                <Button size="sm" variant="ghost" className="w-full" onClick={() => setExpanded({ ...expanded, [p.product_id]: !isOpen })}>
++                  Lotes do Depósito {isOpen ? <ChevronUp className="w-4 h-4 ml-1" /> : <ChevronDown className="w-4 h-4 ml-1" />}
++                </Button>
++                {isOpen && (
++                  <div className="text-xs space-y-1 border-t pt-2">
++                    {p.sizes.every((s) => s.lots.length === 0) && <p className="text-muted-foreground">Sem unidades no Depósito.</p>}
++                    {p.sizes.map((s) => s.lots.map((l) => (
++                      <div key={`${s.size}-${l.batch_number}`} className="flex justify-between">
++                        <span>{s.label} · {batchLabel(l.batch_number)}</span><b>{l.quantity}</b>
++                      </div>
++                    )))}
++                  </div>
++                )}
++              </Card>
++            );
++          })}
++        </div>
++      )}
++
++      <Card className="p-4">
++        <button type="button" className="w-full flex items-center justify-between font-bold" onClick={() => setShowHistory(!showHistory)}>
++          <span className="flex items-center gap-2"><History className="w-5 h-5" /> Últimas movimentações</span>
++          {showHistory ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
++        </button>
++        {showHistory && (
++          <div className="mt-3 divide-y">
++            {movements.length === 0 && <p className="text-sm text-muted-foreground py-2">Nenhuma movimentação ainda.</p>}
++            {movements.map((m) => (
++              <div key={m.id} className={`flex items-center justify-between gap-2 py-2 text-sm ${m.cancelled ? 'opacity-50 line-through' : ''}`}>
++                <div className="min-w-0">
++                  <p className="truncate">
++                    <span className={m.type === 'saida' ? 'text-orange-600 font-semibold' : 'text-primary font-semibold'}>{m.type === 'saida' ? '▲ Saída' : '▼ Entrada'}</span>{' '}
++                    {m.quantity}× {m.product_name} {m.size_label}
++                  </p>
++                  <p className="text-xs text-muted-foreground truncate">
++                    {ORIGIN[m.origin] || m.origin} · {batchLabel(m.batch_number)} · {m.operator} · {fmtDateTime(m.created_at)}{m.note ? ` · ${m.note}` : ''}
++                  </p>
++                </div>
++                {isLab && !m.cancelled && m.type === 'entrada' && m.origin !== 'estoque' && (
++                  <Button size="sm" variant="ghost" title="Estornar" onClick={() => setUndoTarget(m)}><Undo2 className="w-4 h-4" /></Button>
++                )}
++              </div>
++            ))}
++          </div>
++        )}
++      </Card>
++
++      <MovementDialog mode="inventario" open={inventoryOpen} onOpenChange={setInventoryOpen} products={asStockShape} team={team}
++                      defaultOperator={user?.name || ''} initial={null} onDone={load}
++                      entriesPath="/finished-stock/deposit/entries" title="Inventário do Depósito"
++                      hint="Conte o que está no Depósito e lance aqui. Não tem limite da Contagem e o lote é opcional." />
++      {isLab && <SalesImportDialog open={salesOpen} onOpenChange={setSalesOpen} products={data.products} onDone={load} />}
++      <BarcodeScanner open={scanOpen} onOpenChange={setScanOpen} onDetected={onScan} />
++
++      <AlertDialog open={Boolean(undoTarget)} onOpenChange={(o) => !o && setUndoTarget(null)}>
++        <AlertDialogContent>
++          <AlertDialogHeader>
++            <AlertDialogTitle>Estornar movimentação?</AlertDialogTitle>
++            <AlertDialogDescription>
++              {undoTarget && `${undoTarget.quantity}× ${undoTarget.product_name} ${undoTarget.size_label} saem do Depósito, como se não tivessem entrado.`}
++            </AlertDialogDescription>
++          </AlertDialogHeader>
++          <AlertDialogFooter>
++            <AlertDialogCancel>Voltar</AlertDialogCancel>
++            <AlertDialogAction onClick={undo} className="bg-primary">Estornar</AlertDialogAction>
++          </AlertDialogFooter>
++        </AlertDialogContent>
++      </AlertDialog>
++    </div>
++  );
++};
++
++export default Deposito;
+diff --git a/frontend/src/pages/Estoque.js b/frontend/src/pages/Estoque.js
+index e174344..55a781d 100644
+--- a/frontend/src/pages/Estoque.js
++++ b/frontend/src/pages/Estoque.js
+@@ -14,7 +14,7 @@ import {
+ import { toast } from 'sonner';
+ import {
+   ArrowDownToLine, ArrowUpFromLine, ClipboardList, Search, Camera, Printer, Check, X,
+-  Plus, Minus, Trash2, AlertTriangle, History, Undo2, PackageOpen, ChevronDown, ChevronUp, Gauge,
++  Plus, Minus, Trash2, AlertTriangle, History, Undo2, PackageOpen, ChevronDown, ChevronUp, Gauge, CheckSquare, Square,
+ } from 'lucide-react';
+ import { BarcodeScanner } from '../components/BarcodeScanner';
+ import { StockBottle } from '../components/StockBottle';
+@@ -67,12 +67,13 @@ const MODE_META = {
+   saida: { title: 'Saída para o depósito', icon: ArrowUpFromLine, button: 'Registrar saída' },
+ };
+ 
+-const MovementDialog = ({ mode, open, onOpenChange, products, team, defaultOperator, initial, onDone }) => {
++export const MovementDialog = ({ mode, open, onOpenChange, products, team, defaultOperator, initial, onDone, entriesPath = '/finished-stock/entries', title, hint }) => {
+   const [productId, setProductId] = useState('');
+   const [size, setSize] = useState('');
+   const [batches, setBatches] = useState([]);
+   const [batchId, setBatchId] = useState('');
+   const [qty, setQty] = useState('');
++  const [sendRest, setSendRest] = useState(true);
+   const [operator, setOperator] = useState('');
+   const [note, setNote] = useState('');
+   const [scanOpen, setScanOpen] = useState(false);
+@@ -85,6 +86,7 @@ const MovementDialog = ({ mode, open, onOpenChange, products, team, defaultOpera
+     setSize(initial?.size || '');
+     setBatchId(mode === 'inventario' ? MIXED : '');
+     setQty('');
++    setSendRest(true);
+     setNote('');
+     setOperator((o) => o || defaultOperator || '');
+   }, [open, initial, mode, defaultOperator]);
+@@ -116,6 +118,10 @@ const MovementDialog = ({ mode, open, onOpenChange, products, team, defaultOpera
+   const selectedBatch = batches.find((b) => b.batch_id === batchId);
+   const maxQty = mode === 'entrada' && selectedBatch && size ? selectedBatch.sizes[size]?.available
+     : mode === 'saida' ? sizeRow?.quantity : undefined;
++  // Entrada: o que fica no Estoque + o restante do lote, que vai para o Depósito
++  const batchInfo = mode === 'entrada' && selectedBatch && size ? selectedBatch.sizes[size] : null;
++  const stayQty = parseInt(qty, 10) || 0;
++  const restQty = batchInfo && sendRest ? Math.max(batchInfo.available - stayQty, 0) : 0;
+ 
+   const onScan = useCallback(async (code) => {
+     setScanOpen(false);
+@@ -129,24 +135,29 @@ const MovementDialog = ({ mode, open, onOpenChange, products, team, defaultOpera
+   }, [mode]);
+ 
+   const submit = async (keepOpen) => {
+-    const quantity = parseInt(qty, 10);
++    const quantity = parseInt(qty, 10) || 0;
+     if (!productId) return toast.error('Escolha o produto');
+     if (!size) return toast.error('Escolha o tamanho');
+     if (mode === 'entrada' && !batchId) return toast.error('Escolha o lote');
+-    if (!quantity || quantity <= 0) return toast.error('Informe a quantidade');
++    if (mode === 'entrada' ? quantity + restQty <= 0 : quantity <= 0) return toast.error('Informe a quantidade');
+     if (!operator.trim()) return toast.error('Informe quem está registrando');
+     setSaving(true);
+     try {
+       if (mode === 'saida') {
+         const r = await api.post('/finished-stock/exits', { items: [{ product_id: productId, size, quantity }], operator, note });
+-        toast.success(`Saída registrada: ${quantity} × ${product.name} ${sizeInfo(size).label}`);
++        toast.success(`Saída registrada: ${quantity} × ${product.name} ${sizeInfo(size).label} — foi para o Depósito`);
+         r.data.notifications?.forEach((n) => toast.warning(n.message, { duration: 10000 }));
+       } else {
+-        await api.post('/finished-stock/entries', {
+-          product_id: productId, size, quantity, operator, note, mode: mode === 'inventario' ? 'inventario' : 'normal',
++        const toDeposit = entriesPath !== '/finished-stock/entries';
++        await api.post(entriesPath, {
++          product_id: productId, size, quantity, operator, note,
+           batch_id: batchId && batchId !== MIXED ? batchId : null,
++          ...(toDeposit ? {} : { mode: mode === 'inventario' ? 'inventario' : 'normal', to_deposit: mode === 'entrada' ? restQty : 0 }),
+         });
+-        toast.success(`Entrada registrada: ${quantity} × ${product.name} ${sizeInfo(size).label}`);
++        const label = `${product.name} ${sizeInfo(size).label}`;
++        toast.success(mode === 'entrada'
++          ? `Registrado: ${quantity} no Estoque${restQty ? ` + ${restQty} no Depósito` : ''} (${label})`
++          : `Entrada registrada: ${quantity} × ${label}`);
+       }
+       onDone();
+       if (keepOpen) {
+@@ -168,11 +179,11 @@ const MovementDialog = ({ mode, open, onOpenChange, products, team, defaultOpera
+     <>
+       <Dialog open={open} onOpenChange={onOpenChange}>
+         <DialogContent className="bg-card border-border max-w-lg max-h-[92vh] overflow-y-auto">
+-          <DialogHeader><DialogTitle className="flex items-center gap-2"><Icon className="w-5 h-5" /> {meta.title}</DialogTitle></DialogHeader>
++          <DialogHeader><DialogTitle className="flex items-center gap-2"><Icon className="w-5 h-5" /> {title || meta.title}</DialogTitle></DialogHeader>
+           {mode === 'inventario' && (
+             <p className="text-xs rounded-md bg-amber-50 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200 p-2">
+-              Use para a contagem manual inicial ou para acertar o estoque. Não tem limite da Contagem e o lote é opcional.
+-              Depois de salvar, a tela fica aberta para o próximo produto.
++              {hint || 'Use para a contagem manual inicial ou para acertar o estoque. Não tem limite da Contagem e o lote é opcional.'}
++              {' '}Depois de salvar, a tela fica aberta para o próximo produto.
+             </p>
+           )}
+           <div className="space-y-4">
+@@ -221,13 +232,39 @@ const MovementDialog = ({ mode, open, onOpenChange, products, team, defaultOpera
+               </div>
+             )}
+ 
+-            {product && size && (
++            {product && size && mode !== 'entrada' && (
+               <div>
+                 <Label>Quantidade de unidades {maxQty != null && <span className="text-muted-foreground font-normal">(máx. {maxQty})</span>}</Label>
+                 <QuantityInput value={qty} onChange={setQty} max={maxQty} />
+               </div>
+             )}
+ 
++            {product && size && mode === 'entrada' && batchInfo && (
++              <div className="rounded-lg border p-3 space-y-3" data-testid="entry-split">
++                <p className="text-sm">
++                  Contadas neste lote: <b>{batchInfo.counted}</b>
++                  <span className="text-muted-foreground"> · ainda sem destino: </span><b>{batchInfo.available}</b>
++                </p>
++                <div>
++                  <Label>Quantas ficam no Estoque?</Label>
++                  <QuantityInput value={qty} onChange={setQty} max={batchInfo.available} />
++                </div>
++                <button type="button" onClick={() => setSendRest(!sendRest)} data-testid="send-rest"
++                        className={`w-full flex items-start gap-2 rounded-lg border p-2 text-left transition ${sendRest ? 'border-primary bg-primary/5' : ''}`}>
++                  {sendRest ? <CheckSquare className="w-5 h-5 text-primary shrink-0" /> : <Square className="w-5 h-5 text-muted-foreground shrink-0" />}
++                  <span className="text-sm">
++                    O restante vai para o <b>Depósito</b>
++                    <span className="block text-[11px] text-muted-foreground">
++                      {sendRest ? `${restQty} unidade${restQty === 1 ? '' : 's'} vão para o Depósito.` : 'Desmarcado: o restante continua sem destino (ex.: a Contagem ainda não terminou).'}
++                    </span>
++                  </span>
++                </button>
++                <p className="text-xs rounded-md bg-muted p-2" data-testid="entry-summary">
++                  Resumo: <b>{stayQty}</b> no Estoque{sendRest ? <> + <b>{restQty}</b> no Depósito</> : ''}
++                </p>
++              </div>
++            )}
++
+             <div>
+               <Label>Quem está registrando</Label>
+               <Combobox options={teamOptions} value={operator} onChange={setOperator} placeholder="Selecione" searchPlaceholder="Nome..." emptyText="Ninguém encontrado" />
+@@ -672,9 +709,9 @@ export const Estoque = () => {
+               {confirm?.type === 'list' ? 'Confirmar saída da lista?' : confirm?.type === 'cancelList' ? 'Cancelar esta lista?' : 'Estornar movimentação?'}
+             </AlertDialogTitle>
+             <AlertDialogDescription>
+-              {confirm?.type === 'list' && `Lista ${listCode(confirm.item)}: ${confirm.item.items.map((i) => `${i.quantity}× ${i.name} ${i.label}`).join(', ')}. Todos os itens saem do estoque agora. Confirme só depois da baldeação.`}
++              {confirm?.type === 'list' && `Lista ${listCode(confirm.item)}: ${confirm.item.items.map((i) => `${i.quantity}× ${i.name} ${i.label}`).join(', ')}. Todos os itens saem do Estoque e entram no Depósito agora. Confirme só depois da baldeação.`}
+               {confirm?.type === 'cancelList' && 'A lista é descartada. O estoque não muda.'}
+-              {confirm?.type === 'undo' && confirm?.item && `${confirm.item.quantity}× ${confirm.item.product_name} ${confirm.item.size_label} — o estoque volta como estava antes desta movimentação.`}
++              {confirm?.type === 'undo' && confirm?.item && `${confirm.item.quantity}× ${confirm.item.product_name} ${confirm.item.size_label} — o estoque volta como estava antes desta movimentação.${confirm.item.deposit_movement_id ? ' O Depósito também é ajustado.' : ''}`}
+             </AlertDialogDescription>
+           </AlertDialogHeader>
+           <AlertDialogFooter>
