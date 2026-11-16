@@ -14,7 +14,7 @@ import {
 import { toast } from 'sonner';
 import {
   ArrowDownToLine, ArrowUpFromLine, ClipboardList, Search, Camera, Printer, Check, X,
-  Plus, Minus, Trash2, AlertTriangle, History, Undo2, PackageOpen, ChevronDown, ChevronUp, Gauge,
+  Plus, Minus, Trash2, AlertTriangle, History, Undo2, PackageOpen, ChevronDown, ChevronUp, Gauge, CheckSquare, Square,
 } from 'lucide-react';
 import { BarcodeScanner } from '../components/BarcodeScanner';
 import { StockBottle } from '../components/StockBottle';
@@ -67,12 +67,13 @@ const MODE_META = {
   saida: { title: 'Saída para o depósito', icon: ArrowUpFromLine, button: 'Registrar saída' },
 };
 
-const MovementDialog = ({ mode, open, onOpenChange, products, team, defaultOperator, initial, onDone }) => {
+export const MovementDialog = ({ mode, open, onOpenChange, products, team, defaultOperator, initial, onDone, entriesPath = '/finished-stock/entries', title, hint }) => {
   const [productId, setProductId] = useState('');
   const [size, setSize] = useState('');
   const [batches, setBatches] = useState([]);
   const [batchId, setBatchId] = useState('');
   const [qty, setQty] = useState('');
+  const [sendRest, setSendRest] = useState(true);
   const [operator, setOperator] = useState('');
   const [note, setNote] = useState('');
   const [scanOpen, setScanOpen] = useState(false);
@@ -85,6 +86,7 @@ const MovementDialog = ({ mode, open, onOpenChange, products, team, defaultOpera
     setSize(initial?.size || '');
     setBatchId(mode === 'inventario' ? MIXED : '');
     setQty('');
+    setSendRest(true);
     setNote('');
     setOperator((o) => o || defaultOperator || '');
   }, [open, initial, mode, defaultOperator]);
@@ -116,6 +118,10 @@ const MovementDialog = ({ mode, open, onOpenChange, products, team, defaultOpera
   const selectedBatch = batches.find((b) => b.batch_id === batchId);
   const maxQty = mode === 'entrada' && selectedBatch && size ? selectedBatch.sizes[size]?.available
     : mode === 'saida' ? sizeRow?.quantity : undefined;
+  // Entrada: o que fica no Estoque + o restante do lote, que vai para o Depósito
+  const batchInfo = mode === 'entrada' && selectedBatch && size ? selectedBatch.sizes[size] : null;
+  const stayQty = parseInt(qty, 10) || 0;
+  const restQty = batchInfo && sendRest ? Math.max(batchInfo.available - stayQty, 0) : 0;
 
   const onScan = useCallback(async (code) => {
     setScanOpen(false);
@@ -129,24 +135,29 @@ const MovementDialog = ({ mode, open, onOpenChange, products, team, defaultOpera
   }, [mode]);
 
   const submit = async (keepOpen) => {
-    const quantity = parseInt(qty, 10);
+    const quantity = parseInt(qty, 10) || 0;
     if (!productId) return toast.error('Escolha o produto');
     if (!size) return toast.error('Escolha o tamanho');
     if (mode === 'entrada' && !batchId) return toast.error('Escolha o lote');
-    if (!quantity || quantity <= 0) return toast.error('Informe a quantidade');
+    if (mode === 'entrada' ? quantity + restQty <= 0 : quantity <= 0) return toast.error('Informe a quantidade');
     if (!operator.trim()) return toast.error('Informe quem está registrando');
     setSaving(true);
     try {
       if (mode === 'saida') {
         const r = await api.post('/finished-stock/exits', { items: [{ product_id: productId, size, quantity }], operator, note });
-        toast.success(`Saída registrada: ${quantity} × ${product.name} ${sizeInfo(size).label}`);
+        toast.success(`Saída registrada: ${quantity} × ${product.name} ${sizeInfo(size).label} — foi para o Depósito`);
         r.data.notifications?.forEach((n) => toast.warning(n.message, { duration: 10000 }));
       } else {
-        await api.post('/finished-stock/entries', {
-          product_id: productId, size, quantity, operator, note, mode: mode === 'inventario' ? 'inventario' : 'normal',
+        const toDeposit = entriesPath !== '/finished-stock/entries';
+        await api.post(entriesPath, {
+          product_id: productId, size, quantity, operator, note,
           batch_id: batchId && batchId !== MIXED ? batchId : null,
+          ...(toDeposit ? {} : { mode: mode === 'inventario' ? 'inventario' : 'normal', to_deposit: mode === 'entrada' ? restQty : 0 }),
         });
-        toast.success(`Entrada registrada: ${quantity} × ${product.name} ${sizeInfo(size).label}`);
+        const label = `${product.name} ${sizeInfo(size).label}`;
+        toast.success(mode === 'entrada'
+          ? `Registrado: ${quantity} no Estoque${restQty ? ` + ${restQty} no Depósito` : ''} (${label})`
+          : `Entrada registrada: ${quantity} × ${label}`);
       }
       onDone();
       if (keepOpen) {
@@ -168,11 +179,11 @@ const MovementDialog = ({ mode, open, onOpenChange, products, team, defaultOpera
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="bg-card border-border max-w-lg max-h-[92vh] overflow-y-auto">
-          <DialogHeader><DialogTitle className="flex items-center gap-2"><Icon className="w-5 h-5" /> {meta.title}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle className="flex items-center gap-2"><Icon className="w-5 h-5" /> {title || meta.title}</DialogTitle></DialogHeader>
           {mode === 'inventario' && (
             <p className="text-xs rounded-md bg-amber-50 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200 p-2">
-              Use para a contagem manual inicial ou para acertar o estoque. Não tem limite da Contagem e o lote é opcional.
-              Depois de salvar, a tela fica aberta para o próximo produto.
+              {hint || 'Use para a contagem manual inicial ou para acertar o estoque. Não tem limite da Contagem e o lote é opcional.'}
+              {' '}Depois de salvar, a tela fica aberta para o próximo produto.
             </p>
           )}
           <div className="space-y-4">
@@ -221,10 +232,36 @@ const MovementDialog = ({ mode, open, onOpenChange, products, team, defaultOpera
               </div>
             )}
 
-            {product && size && (
+            {product && size && mode !== 'entrada' && (
               <div>
                 <Label>Quantidade de unidades {maxQty != null && <span className="text-muted-foreground font-normal">(máx. {maxQty})</span>}</Label>
                 <QuantityInput value={qty} onChange={setQty} max={maxQty} />
+              </div>
+            )}
+
+            {product && size && mode === 'entrada' && batchInfo && (
+              <div className="rounded-lg border p-3 space-y-3" data-testid="entry-split">
+                <p className="text-sm">
+                  Contadas neste lote: <b>{batchInfo.counted}</b>
+                  <span className="text-muted-foreground"> · ainda sem destino: </span><b>{batchInfo.available}</b>
+                </p>
+                <div>
+                  <Label>Quantas ficam no Estoque?</Label>
+                  <QuantityInput value={qty} onChange={setQty} max={batchInfo.available} />
+                </div>
+                <button type="button" onClick={() => setSendRest(!sendRest)} data-testid="send-rest"
+                        className={`w-full flex items-start gap-2 rounded-lg border p-2 text-left transition ${sendRest ? 'border-primary bg-primary/5' : ''}`}>
+                  {sendRest ? <CheckSquare className="w-5 h-5 text-primary shrink-0" /> : <Square className="w-5 h-5 text-muted-foreground shrink-0" />}
+                  <span className="text-sm">
+                    O restante vai para o <b>Depósito</b>
+                    <span className="block text-[11px] text-muted-foreground">
+                      {sendRest ? `${restQty} unidade${restQty === 1 ? '' : 's'} vão para o Depósito.` : 'Desmarcado: o restante continua sem destino (ex.: a Contagem ainda não terminou).'}
+                    </span>
+                  </span>
+                </button>
+                <p className="text-xs rounded-md bg-muted p-2" data-testid="entry-summary">
+                  Resumo: <b>{stayQty}</b> no Estoque{sendRest ? <> + <b>{restQty}</b> no Depósito</> : ''}
+                </p>
               </div>
             )}
 
@@ -672,9 +709,9 @@ export const Estoque = () => {
               {confirm?.type === 'list' ? 'Confirmar saída da lista?' : confirm?.type === 'cancelList' ? 'Cancelar esta lista?' : 'Estornar movimentação?'}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {confirm?.type === 'list' && `Lista ${listCode(confirm.item)}: ${confirm.item.items.map((i) => `${i.quantity}× ${i.name} ${i.label}`).join(', ')}. Todos os itens saem do estoque agora. Confirme só depois da baldeação.`}
+              {confirm?.type === 'list' && `Lista ${listCode(confirm.item)}: ${confirm.item.items.map((i) => `${i.quantity}× ${i.name} ${i.label}`).join(', ')}. Todos os itens saem do Estoque e entram no Depósito agora. Confirme só depois da baldeação.`}
               {confirm?.type === 'cancelList' && 'A lista é descartada. O estoque não muda.'}
-              {confirm?.type === 'undo' && confirm?.item && `${confirm.item.quantity}× ${confirm.item.product_name} ${confirm.item.size_label} — o estoque volta como estava antes desta movimentação.`}
+              {confirm?.type === 'undo' && confirm?.item && `${confirm.item.quantity}× ${confirm.item.product_name} ${confirm.item.size_label} — o estoque volta como estava antes desta movimentação.${confirm.item.deposit_movement_id ? ' O Depósito também é ajustado.' : ''}`}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

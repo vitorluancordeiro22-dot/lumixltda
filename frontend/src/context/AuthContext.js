@@ -79,7 +79,7 @@ export const AuthProvider = ({ children }) => {
     if (path === '/in-production') return Boolean(user);
     if (role === 'laboratorio') return true;
     // Rotas permitidas para produção
-    const producaoRoutes = ['/counting', '/samples', '/archives', '/dashboard', '/estoque'];
+    const producaoRoutes = ['/counting', '/samples', '/archives', '/dashboard', '/estoque', '/deposito'];
     return producaoRoutes.some(route => path.startsWith(route));
   };
 
