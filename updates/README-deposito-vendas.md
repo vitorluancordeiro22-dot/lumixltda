@@ -21,12 +21,20 @@
 - Não há migração nem script para rodar.
 
 ## Dependências
-Nenhuma nova: `pypdf` e `python-multipart` já constam no `backend/requirements.txt`. Confirme que estão instaladas no Emergent:
+Precisa do `pypdf` (leitor de PDF) e do `python-multipart` (receber o arquivo). **Sem o `pypdf` o Lumix continua funcionando normalmente**; só a leitura do PDF avisa *"O leitor de PDF não está instalado"*.
+
+Instale no mesmo Python que roda o backend:
 ```
 cd /app/backend
+python -m pip install pypdf==6.16.1 python-multipart==0.0.20
 python -c "import pypdf, multipart; print('ok', pypdf.__version__)"
 ```
-Se der erro: `pip install pypdf==6.16.1 python-multipart==0.0.20`.
+Para o Emergent reinstalar sozinho nos próximos deploys, confira se as duas linhas estão no `requirements.txt`; se faltar, acrescente:
+```
+grep -inE "pypdf|multipart" requirements.txt
+echo "pypdf==6.16.1" >> requirements.txt
+```
+(use o `echo` só para a linha que o `grep` não mostrar)
 
 ## Quem acessa
 - O **Depósito** (quantidades) vale para quem acessa o Estoque.

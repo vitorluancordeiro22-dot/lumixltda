@@ -3,9 +3,11 @@
 PYTHONPATH=backend python -m unittest discover -s backend/unit_tests -v
 Os PDFs aqui são sintéticos (nenhum relatório real entra no repositório).
 """
+import subprocess
 import sys
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -252,6 +254,20 @@ class SalesImport(unittest.TestCase):
             self.assertEqual(r.status_code, 403, url)
         # o Depósito em si é aberto a todos
         self.assertEqual(other.get(f'{API}/deposit/overview').status_code, 200)
+
+    def test_missing_pypdf_does_not_break_the_server_and_gives_a_clear_error(self):
+        backend = str(Path(__file__).resolve().parents[1])
+        code = ("import sys; sys.modules['pypdf'] = None; sys.path.insert(0, %r); "
+                "import sales_report, deposit_sales, finished_stock; print('sobe sem pypdf')" % backend)
+        out = subprocess.run([sys.executable, '-I', '-c', code], capture_output=True, text=True)
+        self.assertEqual(out.returncode, 0, out.stderr[-400:])
+        self.assertIn('sobe sem pypdf', out.stdout)
+        with patch.dict(sys.modules, {'pypdf': None}):
+            r = self.upload([(6, 'PINHO GEL 2L', 'und', 1)])
+        self.assertEqual(r.status_code, 503)
+        self.assertIn('pip install pypdf', r.json()['detail'])
+        # o resto do Depósito continua funcionando sem pypdf
+        self.assertEqual(self.client.get(f'{API}/deposit/overview').status_code, 200)
 
     def test_rejects_files_that_are_not_the_sales_report(self):
         r = self.client.post(f'{API}/sales/parse', files={'file': ('x.pdf', b'isto nao e pdf', 'application/pdf')})

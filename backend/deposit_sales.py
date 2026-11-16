@@ -15,7 +15,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 
 from finished_stock import SIZES, MIXED, now_iso, product_kind, plan_partial
-from sales_report import MAX_PDF_BYTES, fingerprint, parse_report, periods_overlap, suggest_product
+from sales_report import MAX_PDF_BYTES, PdfSupportMissing, fingerprint, parse_report, periods_overlap, suggest_product
 
 DEFAULT_LAB_EMAILS = ('laboratoriolumix@outlook.com', 'leonicelaboratorio@lumix.com')
 PENDING_TTL = timedelta(hours=24)
@@ -163,6 +163,8 @@ def setup_sales_routes(router: APIRouter, db, get_current_user, product_lock):
         data = await file.read(MAX_PDF_BYTES + 1)
         try:
             report = await asyncio.to_thread(parse_report, data)
+        except PdfSupportMissing as exc:
+            raise HTTPException(status_code=503, detail=str(exc))
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc))
         cutoff = (datetime.now(timezone.utc) - PENDING_TTL).isoformat()

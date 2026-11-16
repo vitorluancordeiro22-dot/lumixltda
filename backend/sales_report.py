@@ -12,7 +12,6 @@ import json
 import re
 import unicodedata
 
-from pypdf import PdfReader
 
 MAX_PDF_BYTES = 10 * 1024 * 1024
 
@@ -27,6 +26,10 @@ ROW = re.compile(
 PERIOD = re.compile(r'Emiss[ãa]o:\s*(\d{2})/(\d{2})/(\d{4})\s+at[ée]\s+(\d{2})/(\d{2})/(\d{4})', re.I)
 TOTAL = re.compile(rf'Total\s+geral:\s*({_MONEY})', re.I)
 COMPANY = re.compile(r'Empresa:\s*([^\n\r]+)', re.I)
+
+
+class PdfSupportMissing(Exception):
+    """O leitor de PDF (pypdf) não está instalado no servidor."""
 
 
 def parse_decimal(text):
@@ -53,6 +56,10 @@ def parse_report(data: bytes):
     start = data.find(b'%PDF-')
     if start < 0 or start > 4096:
         raise ValueError('Este arquivo não é um PDF')
+    try:
+        from pypdf import PdfReader   # carregado só aqui: sem pypdf o servidor continua subindo
+    except ImportError:
+        raise PdfSupportMissing('O leitor de PDF (pypdf) não está instalado no servidor. Instale com: pip install pypdf==6.16.1')
     try:
         reader = PdfReader(io.BytesIO(data[start:]))
         text = '\n'.join((page.extract_text() or '') for page in reader.pages)
