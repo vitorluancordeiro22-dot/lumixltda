@@ -53,12 +53,12 @@ class MemoryDB:
 USER = {'id': 'u1', 'name': 'Vitor', 'email': 'vitor@lumix.com'}
 
 
-def build():
+def build(user=None):
     db = MemoryDB()
     pushes = []
 
     async def fake_user():
-        return USER
+        return user or USER
 
     async def fake_push(title, body, url='/notificar'):
         pushes.append(body)
