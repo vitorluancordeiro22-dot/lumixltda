@@ -217,6 +217,67 @@ class DepositFlow(unittest.TestCase):
         self.assertEqual((row['stock'], row['deposit'], row['total']), (3, 7, 10))
 
 
+class PendingBatches(unittest.TestCase):
+    """Lotes aguardando destino: nada fica "sumido" quando ninguém registra o Estoque."""
+
+    def setUp(self):
+        self.client, self.db, self.pushes = build(user=LAB)
+
+    def pending(self, since='2026-01-01'):
+        r = self.client.get(f'{API}/pending-batches', params={'since': since})
+        self.assertEqual(r.status_code, 200, r.text)
+        return r.json()
+
+    def keys(self, rows=None):
+        return sorted((r['batch_number'], r['size'], r['available']) for r in (self.pending() if rows is None else rows))
+
+    def test_finished_batches_without_destination_are_listed(self):
+        # fixture: lote ativo 2611001 (80 de 1L + 4 de 5L) e lote arquivado 2610050 (20 de 1L)
+        self.assertEqual(self.keys(), [('2610050', 'one_liter', 20), ('2611001', 'five_liter', 4), ('2611001', 'one_liter', 80)])
+
+    def test_whole_batch_to_deposit_with_nothing_left_in_stock(self):
+        r = self.client.post(f'{API}/entries', json={'product_id': 'desinf', 'size': 'one_liter', 'quantity': 0,
+                                                     'to_deposit': 80, 'batch_id': 'b1', 'operator': 'Felipe'})
+        self.assertEqual(r.status_code, 200, r.text)
+        data = self.client.get(f'{API}/deposit/overview').json()
+        row = next(s for p in data['products'] if p['product_id'] == 'desinf' for s in p['sizes'] if s['size'] == 'one_liter')
+        self.assertEqual((row['stock'], row['deposit'], row['total']), (0, 80, 80))
+        self.assertNotIn(('2611001', 'one_liter', 80), self.keys())
+        self.assertEqual(self.keys(), [('2610050', 'one_liter', 20), ('2611001', 'five_liter', 4)])
+
+    def test_split_registration_shrinks_the_pending_amount(self):
+        self.client.post(f'{API}/entries', json={'product_id': 'desinf', 'size': 'one_liter', 'quantity': 35, 'batch_id': 'b1'})
+        self.assertIn(('2611001', 'one_liter', 45), self.keys())
+        self.client.post(f'{API}/entries', json={'product_id': 'desinf', 'size': 'one_liter', 'quantity': 0, 'to_deposit': 45, 'batch_id': 'b1'})
+        self.assertNotIn('one_liter', [k[1] for k in self.keys() if k[0] == '2611001'])
+
+    def test_undoing_a_registration_brings_the_batch_back(self):
+        entry = self.client.post(f'{API}/entries', json={'product_id': 'desinf', 'size': 'one_liter', 'quantity': 0,
+                                                         'to_deposit': 80, 'batch_id': 'b1'}).json()
+        self.assertEqual(self.client.post(f"{API}/deposit/movements/{entry['id']}/cancel").status_code, 200)
+        self.assertIn(('2611001', 'one_liter', 80), self.keys())
+
+    def test_batches_still_being_counted_are_not_listed(self):
+        self.db.store.product_batches.update_one({'id': 'b1'}, {'$set': {'status': 'em_aberto'}})
+        self.assertEqual(self.keys(), [('2610050', 'one_liter', 20)])
+
+    def test_dismiss_removes_from_list_without_touching_balances(self):
+        r = self.client.post(f'{API}/pending-batches/dismiss', json={'batch_id': 'b1', 'size': 'one_liter'})
+        self.assertEqual(r.status_code, 200)
+        self.assertNotIn(('2611001', 'one_liter', 80), self.keys())
+        data = self.client.get(f'{API}/deposit/overview').json()
+        self.assertEqual([s for p in data['products'] if p['product_id'] == 'desinf' for s in p['sizes'] if s['total']], [])
+        self.assertEqual(self.client.post(f'{API}/pending-batches/dismiss', json={'batch_id': 'b1', 'size': 'xx'}).status_code, 400)
+        # o lote continua disponível na Entrada normal
+        ok = self.client.post(f'{API}/entries', json={'product_id': 'desinf', 'size': 'one_liter', 'quantity': 10, 'batch_id': 'b1'})
+        self.assertEqual(ok.status_code, 200)
+
+    def test_default_window_is_recent_batches_only(self):
+        self.assertEqual(self.pending(since='2999-01-01'), [])
+        default = self.client.get(f'{API}/pending-batches').json()   # lotes de 2026 ficam fora da janela padrão no futuro
+        self.assertIsInstance(default, list)
+
+
 class SalesImport(unittest.TestCase):
     def setUp(self):
         self.client, self.db, self.pushes = build(user=LAB)

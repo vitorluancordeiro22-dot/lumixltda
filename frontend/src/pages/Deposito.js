@@ -15,6 +15,7 @@ import {
 import { BarcodeScanner } from '../components/BarcodeScanner';
 import { StockBottle } from '../components/StockBottle';
 import { SalesImportDialog } from '../components/SalesImportDialog';
+import { PendingBatches } from '../components/PendingBatches';
 import { MovementDialog } from './Estoque';
 import { STOCK_SIZES, errorMessage } from '../lib/stockSizes';
 
@@ -45,6 +46,7 @@ export const Deposito = () => {
   const [inventoryOpen, setInventoryOpen] = useState(false);
   const [salesOpen, setSalesOpen] = useState(false);
   const [undoTarget, setUndoTarget] = useState(null);
+  const [pendingKey, setPendingKey] = useState(0);
 
   const load = useCallback(async () => {
     try {
@@ -53,6 +55,7 @@ export const Deposito = () => {
         api.get('/finished-stock/deposit/movements', { params: { limit: 60 } }),
       ]);
       setData(o.data); setMovements(m.data);
+      setPendingKey((k) => k + 1);
     } catch (e) { toast.error(errorMessage(e, 'Erro ao carregar o Depósito')); }
     finally { setLoading(false); }
   }, []);
@@ -123,6 +126,8 @@ export const Deposito = () => {
           </div>
         )}
       </div>
+
+      <PendingBatches reloadKey={pendingKey} operator={user?.name || ''} onChanged={load} />
 
       <Card className="p-4 space-y-3">
         <div className="grid grid-cols-2 gap-2" role="tablist">

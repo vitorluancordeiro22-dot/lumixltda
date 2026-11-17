@@ -10,6 +10,7 @@ Coleções novas, nenhuma coleção existente é alterada:
   deposit_movements         histórico do Depósito (entradas, baixas por venda, estornos)
   sales_code_map            código do GigaMob -> produto + tamanho (ou "ignorar")
   sales_imports             relatórios de vendas importados (sem preços, sem o PDF)
+  pending_dismissed         lotes tirados da lista "aguardando destino" (não mexe em saldo)
 
 Nos produtos só são gravados dois campos opcionais novos:
   stock_sizes     tamanhos que o produto possui (ex.: ['one_liter', 'five_liter'])
@@ -36,6 +37,7 @@ SIZES = {
 }
 MIXED = 'misturado'  # lote desconhecido / lotes misturados (inventário inicial)
 LOCK_TIMEOUT = timedelta(seconds=60)
+PENDING_DAYS = 30  # "aguardando destino" olha os lotes dos últimos 30 dias
 
 
 def now_iso():
@@ -130,6 +132,11 @@ class EntryCreate(BaseModel):
     mode: str = 'normal'  # normal (limitado pela Contagem) | inventario (sem limite, lote opcional)
     operator: str = ''
     note: str = ''
+
+
+class PendingDismiss(BaseModel):
+    batch_id: str
+    size: str
 
 
 class DepositEntry(BaseModel):
@@ -480,6 +487,66 @@ def setup_finished_stock_routes(api_router: APIRouter, db, get_current_user, bro
             rows = [r for r in rows if size in r['sizes']]
         rows.sort(key=lambda r: (r['date'], r['batch_number']), reverse=True)
         return rows
+
+    @router.get('/pending-batches')
+    async def pending_batches(since: Optional[str] = None, current_user=Depends(get_current_user)):
+        """Lotes finalizados cujas garrafas contadas ainda não têm destino (nem Estoque, nem Depósito).
+
+        Só lê: não altera nenhum saldo. `since` (AAAA-MM-DD) limita pela data do lote; padrão: últimos 30 dias.
+        """
+        if since is None:
+            since = (datetime.now(timezone.utc) - timedelta(days=PENDING_DAYS)).date().isoformat()
+        products = {p['id']: p for p in await db.products.find(
+            {'deleted': False}, {'_id': 0, 'recipes': 0, 'file_models': 0}).to_list(None)}
+        active = await db.product_batches.find(
+            {'deleted': False, 'status': 'finalizado', 'date': {'$gte': since}}, {'_id': 0}).to_list(None)
+        archived = await db.archived_product_batches.find({'date': {'$gte': since}}, {'_id': 0}).to_list(None)
+        batches = [b for b in active + archived if b.get('product_id') in products]
+        if not batches:
+            return []
+        ids = [b['id'] for b in batches]
+        active_ids = [b['id'] for b in active if b.get('product_id') in products]
+        by_batch = {}
+        for c in (await db.counting.find({'product_batch_id': {'$in': active_ids}}, {'_id': 0}).to_list(None) if active_ids else []):
+            by_batch.setdefault(c['product_batch_id'], []).append(c)
+        entered = {}
+        rows = await db.finished_stock_movements.find({
+            'type': 'entrada', 'mode': 'normal', 'cancelled': {'$ne': True}, 'batch_id': {'$in': ids},
+        }, {'_id': 0, 'batch_id': 1, 'size': 1, 'quantity': 1}).to_list(None)
+        rows += await db.deposit_movements.find({
+            'type': 'entrada', 'origin': 'producao', 'cancelled': {'$ne': True}, 'batch_id': {'$in': ids},
+        }, {'_id': 0, 'batch_id': 1, 'size': 1, 'quantity': 1}).to_list(None)
+        for r in rows:
+            entered[(r['batch_id'], r['size'])] = entered.get((r['batch_id'], r['size']), 0) + int(r['quantity'])
+        dismissed = {d['_id'] for d in await db.pending_dismissed.find({}).to_list(None)}
+        result = []
+        for batch in batches:
+            product = products[batch['product_id']]
+            counted = counted_by_size(by_batch.get(batch['id']) if batch in active else batch.get('countings_history'))
+            for size in sorted(SIZES, key=lambda k: SIZES[k]['order']):
+                available = counted[size] - entered.get((batch['id'], size), 0)
+                if counted[size] <= 0 or available <= 0 or f"{batch['id']}:{size}" in dismissed:
+                    continue
+                result.append({
+                    'batch_id': batch['id'], 'batch_number': batch.get('batch_number', ''), 'date': batch.get('date', ''),
+                    'status': 'arquivado' if batch in archived else batch.get('status', ''),
+                    'product_id': product['id'], 'product_name': product.get('name', ''), 'size': size,
+                    'label': SIZES[size]['label'], 'counted': counted[size], 'entered': counted[size] - available,
+                    'available': available,
+                })
+        result.sort(key=lambda r: (r['date'], r['batch_number'], SIZES[r['size']]['order']), reverse=True)
+        return result
+
+    @router.post('/pending-batches/dismiss')
+    async def dismiss_pending(data: PendingDismiss, current_user=Depends(get_current_user)):
+        """Tira o lote da lista "aguardando destino" (ex.: já entrou no inventário). Não mexe em saldo."""
+        if data.size not in SIZES:
+            raise HTTPException(status_code=400, detail='Tamanho inválido')
+        await db.pending_dismissed.update_one(
+            {'_id': f'{data.batch_id}:{data.size}'},
+            {'$set': {'batch_id': data.batch_id, 'size': data.size, 'at': now_iso(),
+                      'by': current_user.get('name') or current_user.get('email', '')}}, upsert=True)
+        return {'message': 'Lote retirado da lista'}
 
     @router.get('/movements')
     async def movements(product_id: Optional[str] = None, limit: int = 100, current_user=Depends(get_current_user)):

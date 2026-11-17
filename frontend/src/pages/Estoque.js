@@ -19,6 +19,7 @@ import {
 import { BarcodeScanner } from '../components/BarcodeScanner';
 import { StockBottle } from '../components/StockBottle';
 import { MinimumsManager } from '../components/MinimumsManager';
+import { PendingBatches } from '../components/PendingBatches';
 import { STOCK_SIZES, sizeInfo, errorMessage } from '../lib/stockSizes';
 import { code128Svg } from '../lib/code128';
 
@@ -84,7 +85,7 @@ export const MovementDialog = ({ mode, open, onOpenChange, products, team, defau
     if (!open) return;
     setProductId(initial?.product_id || '');
     setSize(initial?.size || '');
-    setBatchId(mode === 'inventario' ? MIXED : '');
+    setBatchId(initial?.batch_id || (mode === 'inventario' ? MIXED : ''));
     setQty('');
     setSendRest(true);
     setNote('');
@@ -246,7 +247,13 @@ export const MovementDialog = ({ mode, open, onOpenChange, products, team, defau
                   <span className="text-muted-foreground"> · ainda sem destino: </span><b>{batchInfo.available}</b>
                 </p>
                 <div>
-                  <Label>Quantas ficam no Estoque?</Label>
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <Label className="mb-0">Quantas ficam no Estoque?</Label>
+                    <Button type="button" size="sm" variant="outline" data-testid="all-to-deposit"
+                            onClick={() => { setQty(''); setSendRest(true); }}>
+                      Tudo para o Depósito
+                    </Button>
+                  </div>
                   <QuantityInput value={qty} onChange={setQty} max={batchInfo.available} />
                 </div>
                 <button type="button" onClick={() => setSendRest(!sendRest)} data-testid="send-rest"
@@ -463,6 +470,7 @@ export const Estoque = () => {
   const [dialog, setDialog] = useState({ mode: null, initial: null });
   const [listOpen, setListOpen] = useState(false);
   const [minOpen, setMinOpen] = useState(false);
+  const [pendingKey, setPendingKey] = useState(0);
   const [scanOpen, setScanOpen] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [confirm, setConfirm] = useState(null); // {type:'list'|'cancelList'|'undo', item}
@@ -474,6 +482,7 @@ export const Estoque = () => {
         api.get('/finished-stock/overview'), api.get('/finished-stock/lists'), api.get('/finished-stock/movements', { params: { limit: 60 } }),
       ]);
       setData(o.data); setLists(l.data); setMovements(m.data);
+      setPendingKey((k) => k + 1);
     } catch (e) { toast.error(errorMessage(e, 'Erro ao carregar o estoque')); }
     finally { setLoading(false); }
   }, []);
@@ -564,6 +573,9 @@ export const Estoque = () => {
           <span className="text-sm"><b>{lowCount}</b> {lowCount === 1 ? 'item está' : 'itens estão'} no estoque mínimo ou abaixo — necessita nova ordem de produção. Toque para ver.</span>
         </button>
       )}
+
+      <PendingBatches reloadKey={pendingKey} operator={defaultOperator} onChanged={load}
+                      onSplit={(r) => openMove('entrada', { product_id: r.product_id, size: r.size, batch_id: r.batch_id })} />
 
       <Card className="p-4 space-y-3">
         <div className="flex gap-2">
