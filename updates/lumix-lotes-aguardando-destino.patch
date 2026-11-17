@@ -1,0 +1,397 @@
+diff --git a/backend/finished_stock.py b/backend/finished_stock.py
+index 7c13e9a..18b3b28 100644
+--- a/backend/finished_stock.py
++++ b/backend/finished_stock.py
+@@ -10,6 +10,7 @@ Coleções novas, nenhuma coleção existente é alterada:
+   deposit_movements         histórico do Depósito (entradas, baixas por venda, estornos)
+   sales_code_map            código do GigaMob -> produto + tamanho (ou "ignorar")
+   sales_imports             relatórios de vendas importados (sem preços, sem o PDF)
++  pending_dismissed         lotes tirados da lista "aguardando destino" (não mexe em saldo)
+ 
+ Nos produtos só são gravados dois campos opcionais novos:
+   stock_sizes     tamanhos que o produto possui (ex.: ['one_liter', 'five_liter'])
+@@ -36,6 +37,7 @@ SIZES = {
+ }
+ MIXED = 'misturado'  # lote desconhecido / lotes misturados (inventário inicial)
+ LOCK_TIMEOUT = timedelta(seconds=60)
++PENDING_DAYS = 30  # "aguardando destino" olha os lotes dos últimos 30 dias
+ 
+ 
+ def now_iso():
+@@ -132,6 +134,11 @@ class EntryCreate(BaseModel):
+     note: str = ''
+ 
+ 
++class PendingDismiss(BaseModel):
++    batch_id: str
++    size: str
++
++
+ class DepositEntry(BaseModel):
+     product_id: str
+     size: str
+@@ -481,6 +488,66 @@ def setup_finished_stock_routes(api_router: APIRouter, db, get_current_user, bro
+         rows.sort(key=lambda r: (r['date'], r['batch_number']), reverse=True)
+         return rows
+ 
++    @router.get('/pending-batches')
++    async def pending_batches(since: Optional[str] = None, current_user=Depends(get_current_user)):
++        """Lotes finalizados cujas garrafas contadas ainda não têm destino (nem Estoque, nem Depósito).
++
++        Só lê: não altera nenhum saldo. `since` (AAAA-MM-DD) limita pela data do lote; padrão: últimos 30 dias.
++        """
++        if since is None:
++            since = (datetime.now(timezone.utc) - timedelta(days=PENDING_DAYS)).date().isoformat()
++        products = {p['id']: p for p in await db.products.find(
++            {'deleted': False}, {'_id': 0, 'recipes': 0, 'file_models': 0}).to_list(None)}
++        active = await db.product_batches.find(
++            {'deleted': False, 'status': 'finalizado', 'date': {'$gte': since}}, {'_id': 0}).to_list(None)
++        archived = await db.archived_product_batches.find({'date': {'$gte': since}}, {'_id': 0}).to_list(None)
++        batches = [b for b in active + archived if b.get('product_id') in products]
++        if not batches:
++            return []
++        ids = [b['id'] for b in batches]
++        active_ids = [b['id'] for b in active if b.get('product_id') in products]
++        by_batch = {}
++        for c in (await db.counting.find({'product_batch_id': {'$in': active_ids}}, {'_id': 0}).to_list(None) if active_ids else []):
++            by_batch.setdefault(c['product_batch_id'], []).append(c)
++        entered = {}
++        rows = await db.finished_stock_movements.find({
++            'type': 'entrada', 'mode': 'normal', 'cancelled': {'$ne': True}, 'batch_id': {'$in': ids},
++        }, {'_id': 0, 'batch_id': 1, 'size': 1, 'quantity': 1}).to_list(None)
++        rows += await db.deposit_movements.find({
++            'type': 'entrada', 'origin': 'producao', 'cancelled': {'$ne': True}, 'batch_id': {'$in': ids},
++        }, {'_id': 0, 'batch_id': 1, 'size': 1, 'quantity': 1}).to_list(None)
++        for r in rows:
++            entered[(r['batch_id'], r['size'])] = entered.get((r['batch_id'], r['size']), 0) + int(r['quantity'])
++        dismissed = {d['_id'] for d in await db.pending_dismissed.find({}).to_list(None)}
++        result = []
++        for batch in batches:
++            product = products[batch['product_id']]
++            counted = counted_by_size(by_batch.get(batch['id']) if batch in active else batch.get('countings_history'))
++            for size in sorted(SIZES, key=lambda k: SIZES[k]['order']):
++                available = counted[size] - entered.get((batch['id'], size), 0)
++                if counted[size] <= 0 or available <= 0 or f"{batch['id']}:{size}" in dismissed:
++                    continue
++                result.append({
++                    'batch_id': batch['id'], 'batch_number': batch.get('batch_number', ''), 'date': batch.get('date', ''),
++                    'status': 'arquivado' if batch in archived else batch.get('status', ''),
++                    'product_id': product['id'], 'product_name': product.get('name', ''), 'size': size,
++                    'label': SIZES[size]['label'], 'counted': counted[size], 'entered': counted[size] - available,
++                    'available': available,
++                })
++        result.sort(key=lambda r: (r['date'], r['batch_number'], SIZES[r['size']]['order']), reverse=True)
++        return result
++
++    @router.post('/pending-batches/dismiss')
++    async def dismiss_pending(data: PendingDismiss, current_user=Depends(get_current_user)):
++        """Tira o lote da lista "aguardando destino" (ex.: já entrou no inventário). Não mexe em saldo."""
++        if data.size not in SIZES:
++            raise HTTPException(status_code=400, detail='Tamanho inválido')
++        await db.pending_dismissed.update_one(
++            {'_id': f'{data.batch_id}:{data.size}'},
++            {'$set': {'batch_id': data.batch_id, 'size': data.size, 'at': now_iso(),
++                      'by': current_user.get('name') or current_user.get('email', '')}}, upsert=True)
++        return {'message': 'Lote retirado da lista'}
++
+     @router.get('/movements')
+     async def movements(product_id: Optional[str] = None, limit: int = 100, current_user=Depends(get_current_user)):
+         query = {'product_id': product_id} if product_id else {}
+diff --git a/backend/unit_tests/test_deposit.py b/backend/unit_tests/test_deposit.py
+index 6d5b2ac..ce62a5e 100644
+--- a/backend/unit_tests/test_deposit.py
++++ b/backend/unit_tests/test_deposit.py
+@@ -217,6 +217,67 @@ class DepositFlow(unittest.TestCase):
+         self.assertEqual((row['stock'], row['deposit'], row['total']), (3, 7, 10))
+ 
+ 
++class PendingBatches(unittest.TestCase):
++    """Lotes aguardando destino: nada fica "sumido" quando ninguém registra o Estoque."""
++
++    def setUp(self):
++        self.client, self.db, self.pushes = build(user=LAB)
++
++    def pending(self, since='2026-01-01'):
++        r = self.client.get(f'{API}/pending-batches', params={'since': since})
++        self.assertEqual(r.status_code, 200, r.text)
++        return r.json()
++
++    def keys(self, rows=None):
++        return sorted((r['batch_number'], r['size'], r['available']) for r in (self.pending() if rows is None else rows))
++
++    def test_finished_batches_without_destination_are_listed(self):
++        # fixture: lote ativo 2611001 (80 de 1L + 4 de 5L) e lote arquivado 2610050 (20 de 1L)
++        self.assertEqual(self.keys(), [('2610050', 'one_liter', 20), ('2611001', 'five_liter', 4), ('2611001', 'one_liter', 80)])
++
++    def test_whole_batch_to_deposit_with_nothing_left_in_stock(self):
++        r = self.client.post(f'{API}/entries', json={'product_id': 'desinf', 'size': 'one_liter', 'quantity': 0,
++                                                     'to_deposit': 80, 'batch_id': 'b1', 'operator': 'Felipe'})
++        self.assertEqual(r.status_code, 200, r.text)
++        data = self.client.get(f'{API}/deposit/overview').json()
++        row = next(s for p in data['products'] if p['product_id'] == 'desinf' for s in p['sizes'] if s['size'] == 'one_liter')
++        self.assertEqual((row['stock'], row['deposit'], row['total']), (0, 80, 80))
++        self.assertNotIn(('2611001', 'one_liter', 80), self.keys())
++        self.assertEqual(self.keys(), [('2610050', 'one_liter', 20), ('2611001', 'five_liter', 4)])
++
++    def test_split_registration_shrinks_the_pending_amount(self):
++        self.client.post(f'{API}/entries', json={'product_id': 'desinf', 'size': 'one_liter', 'quantity': 35, 'batch_id': 'b1'})
++        self.assertIn(('2611001', 'one_liter', 45), self.keys())
++        self.client.post(f'{API}/entries', json={'product_id': 'desinf', 'size': 'one_liter', 'quantity': 0, 'to_deposit': 45, 'batch_id': 'b1'})
++        self.assertNotIn('one_liter', [k[1] for k in self.keys() if k[0] == '2611001'])
++
++    def test_undoing_a_registration_brings_the_batch_back(self):
++        entry = self.client.post(f'{API}/entries', json={'product_id': 'desinf', 'size': 'one_liter', 'quantity': 0,
++                                                         'to_deposit': 80, 'batch_id': 'b1'}).json()
++        self.assertEqual(self.client.post(f"{API}/deposit/movements/{entry['id']}/cancel").status_code, 200)
++        self.assertIn(('2611001', 'one_liter', 80), self.keys())
++
++    def test_batches_still_being_counted_are_not_listed(self):
++        self.db.store.product_batches.update_one({'id': 'b1'}, {'$set': {'status': 'em_aberto'}})
++        self.assertEqual(self.keys(), [('2610050', 'one_liter', 20)])
++
++    def test_dismiss_removes_from_list_without_touching_balances(self):
++        r = self.client.post(f'{API}/pending-batches/dismiss', json={'batch_id': 'b1', 'size': 'one_liter'})
++        self.assertEqual(r.status_code, 200)
++        self.assertNotIn(('2611001', 'one_liter', 80), self.keys())
++        data = self.client.get(f'{API}/deposit/overview').json()
++        self.assertEqual([s for p in data['products'] if p['product_id'] == 'desinf' for s in p['sizes'] if s['total']], [])
++        self.assertEqual(self.client.post(f'{API}/pending-batches/dismiss', json={'batch_id': 'b1', 'size': 'xx'}).status_code, 400)
++        # o lote continua disponível na Entrada normal
++        ok = self.client.post(f'{API}/entries', json={'product_id': 'desinf', 'size': 'one_liter', 'quantity': 10, 'batch_id': 'b1'})
++        self.assertEqual(ok.status_code, 200)
++
++    def test_default_window_is_recent_batches_only(self):
++        self.assertEqual(self.pending(since='2999-01-01'), [])
++        default = self.client.get(f'{API}/pending-batches').json()   # lotes de 2026 ficam fora da janela padrão no futuro
++        self.assertIsInstance(default, list)
++
++
+ class SalesImport(unittest.TestCase):
+     def setUp(self):
+         self.client, self.db, self.pushes = build(user=LAB)
+diff --git a/frontend/src/components/PendingBatches.js b/frontend/src/components/PendingBatches.js
+new file mode 100644
+index 0000000..9e84be9
+--- /dev/null
++++ b/frontend/src/components/PendingBatches.js
+@@ -0,0 +1,121 @@
++import React, { useCallback, useEffect, useState } from 'react';
++import api from '../lib/api';
++import { Card } from './ui/card';
++import { Button } from './ui/button';
++import {
++  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
++  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
++} from './ui/alert-dialog';
++import { toast } from 'sonner';
++import { Hourglass, Container, Split, EyeOff, ChevronDown, ChevronUp } from 'lucide-react';
++import { StockBottle } from './StockBottle';
++import { errorMessage } from '../lib/stockSizes';
++
++const fmtDate = (d) => (d && /^\d{4}-\d{2}-\d{2}/.test(d) ? d.slice(0, 10).split('-').reverse().join('/') : d || '');
++
++/**
++ * Lotes finalizados cujas garrafas contadas ainda não foram para o Estoque nem para o Depósito.
++ * Só mostra e aciona: nada muda de saldo sem a pessoa tocar num botão.
++ */
++export const PendingBatches = ({ reloadKey = 0, operator = '', onChanged, onSplit }) => {
++  const [rows, setRows] = useState([]);
++  const [open, setOpen] = useState(true);
++  const [ask, setAsk] = useState(null); // { type: 'deposit' | 'dismiss', row }
++  const [busy, setBusy] = useState(false);
++
++  const load = useCallback(async () => {
++    try { setRows((await api.get('/finished-stock/pending-batches')).data); }
++    catch { setRows([]); }
++  }, []);
++
++  useEffect(() => { load(); }, [load, reloadKey]);
++
++  const run = async () => {
++    const { type, row } = ask;
++    setAsk(null); setBusy(true);
++    try {
++      if (type === 'deposit') {
++        await api.post('/finished-stock/entries', {
++          product_id: row.product_id, size: row.size, quantity: 0, to_deposit: row.available,
++          batch_id: row.batch_id, mode: 'normal', operator,
++        });
++        toast.success(`${row.available} × ${row.product_name} ${row.label} foram para o Depósito`);
++      } else {
++        await api.post('/finished-stock/pending-batches/dismiss', { batch_id: row.batch_id, size: row.size });
++        toast.success('Retirado da lista (nenhum saldo foi alterado)');
++      }
++      await load();
++      onChanged?.();
++    } catch (e) { toast.error(errorMessage(e, 'Não foi possível concluir')); }
++    finally { setBusy(false); }
++  };
++
++  if (!rows.length) return null;
++
++  return (
++    <Card className="p-4 space-y-3 border-amber-300" data-testid="pending-batches">
++      <button type="button" className="w-full flex items-center justify-between gap-2 text-left" onClick={() => setOpen(!open)}>
++        <span className="flex items-center gap-2 font-bold">
++          <Hourglass className="w-5 h-5 text-amber-600" /> Lotes aguardando destino
++          <span className="rounded-full bg-amber-500/15 text-amber-600 px-2 py-0.5 text-xs">{rows.length}</span>
++        </span>
++        {open ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
++      </button>
++      <p className="text-xs text-muted-foreground">
++        Garrafas já contadas que ainda não foram registradas nem no Estoque nem no Depósito.
++        Se o lote todo fica no Depósito, é só tocar em <b>Tudo para o Depósito</b>.
++      </p>
++      {open && (
++        <div className="divide-y rounded-lg border max-h-[40vh] overflow-y-auto">
++          {rows.map((r) => (
++            <div key={`${r.batch_id}-${r.size}`} className="p-3 space-y-2" data-testid={`pending-${r.batch_number}-${r.size}`}>
++              <div className="flex items-center gap-3">
++                <StockBottle size={r.size} />
++                <div className="min-w-0 flex-1">
++                  <p className="font-semibold leading-tight">{r.product_name} <span className="text-muted-foreground">{r.label}</span></p>
++                  <p className="text-xs text-muted-foreground">
++                    Lote {r.batch_number} · {fmtDate(r.date)}{r.status === 'arquivado' ? ' · arquivado' : ''}
++                  </p>
++                </div>
++                <div className="text-right shrink-0">
++                  <p className="text-xl font-bold leading-none">{r.available}</p>
++                  <p className="text-[11px] text-muted-foreground">de {r.counted}</p>
++                </div>
++              </div>
++              <div className="flex flex-wrap gap-2">
++                <Button size="sm" className="bg-primary hover:bg-primary/90" disabled={busy} onClick={() => setAsk({ type: 'deposit', row: r })} data-testid="pending-all">
++                  <Container className="w-4 h-4 mr-1" /> Tudo para o Depósito
++                </Button>
++                {onSplit && (
++                  <Button size="sm" variant="outline" disabled={busy} onClick={() => onSplit(r)} data-testid="pending-split">
++                    <Split className="w-4 h-4 mr-1" /> Dividir
++                  </Button>
++                )}
++                <Button size="sm" variant="ghost" disabled={busy} onClick={() => setAsk({ type: 'dismiss', row: r })} title="Tirar da lista">
++                  <EyeOff className="w-4 h-4" />
++                </Button>
++              </div>
++            </div>
++          ))}
++        </div>
++      )}
++
++      <AlertDialog open={Boolean(ask)} onOpenChange={(o) => !o && setAsk(null)}>
++        <AlertDialogContent>
++          <AlertDialogHeader>
++            <AlertDialogTitle>{ask?.type === 'deposit' ? 'Mandar para o Depósito?' : 'Tirar da lista?'}</AlertDialogTitle>
++            <AlertDialogDescription>
++              {ask?.type === 'deposit'
++                ? `${ask.row.available} × ${ask.row.product_name} ${ask.row.label} (lote ${ask.row.batch_number}) entram no Depósito e nada fica no Estoque. Dá para estornar depois, na aba Depósito.`
++                : 'Use quando essas garrafas já foram contadas em outro lugar (ex.: no Inventário). Nenhum saldo é alterado e o lote continua disponível na Entrada.'}
++            </AlertDialogDescription>
++          </AlertDialogHeader>
++          <AlertDialogFooter>
++            <AlertDialogCancel>Voltar</AlertDialogCancel>
++            <AlertDialogAction onClick={run} className="bg-primary" data-testid="pending-confirm">Confirmar</AlertDialogAction>
++          </AlertDialogFooter>
++        </AlertDialogContent>
++      </AlertDialog>
++    </Card>
++  );
++};
+diff --git a/frontend/src/pages/Deposito.js b/frontend/src/pages/Deposito.js
+index 16c515b..d5e9bb8 100644
+--- a/frontend/src/pages/Deposito.js
++++ b/frontend/src/pages/Deposito.js
+@@ -15,6 +15,7 @@ import {
+ import { BarcodeScanner } from '../components/BarcodeScanner';
+ import { StockBottle } from '../components/StockBottle';
+ import { SalesImportDialog } from '../components/SalesImportDialog';
++import { PendingBatches } from '../components/PendingBatches';
+ import { MovementDialog } from './Estoque';
+ import { STOCK_SIZES, errorMessage } from '../lib/stockSizes';
+ 
+@@ -45,6 +46,7 @@ export const Deposito = () => {
+   const [inventoryOpen, setInventoryOpen] = useState(false);
+   const [salesOpen, setSalesOpen] = useState(false);
+   const [undoTarget, setUndoTarget] = useState(null);
++  const [pendingKey, setPendingKey] = useState(0);
+ 
+   const load = useCallback(async () => {
+     try {
+@@ -53,6 +55,7 @@ export const Deposito = () => {
+         api.get('/finished-stock/deposit/movements', { params: { limit: 60 } }),
+       ]);
+       setData(o.data); setMovements(m.data);
++      setPendingKey((k) => k + 1);
+     } catch (e) { toast.error(errorMessage(e, 'Erro ao carregar o Depósito')); }
+     finally { setLoading(false); }
+   }, []);
+@@ -124,6 +127,8 @@ export const Deposito = () => {
+         )}
+       </div>
+ 
++      <PendingBatches reloadKey={pendingKey} operator={user?.name || ''} onChanged={load} />
++
+       <Card className="p-4 space-y-3">
+         <div className="grid grid-cols-2 gap-2" role="tablist">
+           {[['deposit', 'Só o Depósito', Warehouse], ['total', 'Estoque total', Layers]].map(([k, label, Icon]) => (
+diff --git a/frontend/src/pages/Estoque.js b/frontend/src/pages/Estoque.js
+index 55a781d..16bbb21 100644
+--- a/frontend/src/pages/Estoque.js
++++ b/frontend/src/pages/Estoque.js
+@@ -19,6 +19,7 @@ import {
+ import { BarcodeScanner } from '../components/BarcodeScanner';
+ import { StockBottle } from '../components/StockBottle';
+ import { MinimumsManager } from '../components/MinimumsManager';
++import { PendingBatches } from '../components/PendingBatches';
+ import { STOCK_SIZES, sizeInfo, errorMessage } from '../lib/stockSizes';
+ import { code128Svg } from '../lib/code128';
+ 
+@@ -84,7 +85,7 @@ export const MovementDialog = ({ mode, open, onOpenChange, products, team, defau
+     if (!open) return;
+     setProductId(initial?.product_id || '');
+     setSize(initial?.size || '');
+-    setBatchId(mode === 'inventario' ? MIXED : '');
++    setBatchId(initial?.batch_id || (mode === 'inventario' ? MIXED : ''));
+     setQty('');
+     setSendRest(true);
+     setNote('');
+@@ -246,7 +247,13 @@ export const MovementDialog = ({ mode, open, onOpenChange, products, team, defau
+                   <span className="text-muted-foreground"> · ainda sem destino: </span><b>{batchInfo.available}</b>
+                 </p>
+                 <div>
+-                  <Label>Quantas ficam no Estoque?</Label>
++                  <div className="flex items-center justify-between gap-2 mb-1">
++                    <Label className="mb-0">Quantas ficam no Estoque?</Label>
++                    <Button type="button" size="sm" variant="outline" data-testid="all-to-deposit"
++                            onClick={() => { setQty(''); setSendRest(true); }}>
++                      Tudo para o Depósito
++                    </Button>
++                  </div>
+                   <QuantityInput value={qty} onChange={setQty} max={batchInfo.available} />
+                 </div>
+                 <button type="button" onClick={() => setSendRest(!sendRest)} data-testid="send-rest"
+@@ -463,6 +470,7 @@ export const Estoque = () => {
+   const [dialog, setDialog] = useState({ mode: null, initial: null });
+   const [listOpen, setListOpen] = useState(false);
+   const [minOpen, setMinOpen] = useState(false);
++  const [pendingKey, setPendingKey] = useState(0);
+   const [scanOpen, setScanOpen] = useState(false);
+   const [showHistory, setShowHistory] = useState(false);
+   const [confirm, setConfirm] = useState(null); // {type:'list'|'cancelList'|'undo', item}
+@@ -474,6 +482,7 @@ export const Estoque = () => {
+         api.get('/finished-stock/overview'), api.get('/finished-stock/lists'), api.get('/finished-stock/movements', { params: { limit: 60 } }),
+       ]);
+       setData(o.data); setLists(l.data); setMovements(m.data);
++      setPendingKey((k) => k + 1);
+     } catch (e) { toast.error(errorMessage(e, 'Erro ao carregar o estoque')); }
+     finally { setLoading(false); }
+   }, []);
+@@ -565,6 +574,9 @@ export const Estoque = () => {
+         </button>
+       )}
+ 
++      <PendingBatches reloadKey={pendingKey} operator={defaultOperator} onChanged={load}
++                      onSplit={(r) => openMove('entrada', { product_id: r.product_id, size: r.size, batch_id: r.batch_id })} />
++
+       <Card className="p-4 space-y-3">
+         <div className="flex gap-2">
+           <div className="relative flex-1">
