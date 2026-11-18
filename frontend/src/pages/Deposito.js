@@ -16,7 +16,7 @@ import { BarcodeScanner } from '../components/BarcodeScanner';
 import { StockBottle } from '../components/StockBottle';
 import { SalesImportDialog } from '../components/SalesImportDialog';
 import { PendingBatches } from '../components/PendingBatches';
-import { MovementDialog } from './Estoque';
+import { AdjustDialog } from './Estoque';
 import { STOCK_SIZES, errorMessage } from '../lib/stockSizes';
 
 const MIXED = 'misturado';
@@ -223,14 +223,16 @@ export const Deposito = () => {
               <div key={m.id} className={`flex items-center justify-between gap-2 py-2 text-sm ${m.cancelled ? 'opacity-50 line-through' : ''}`}>
                 <div className="min-w-0">
                   <p className="truncate">
-                    <span className={m.type === 'saida' ? 'text-orange-600 font-semibold' : 'text-primary font-semibold'}>{m.type === 'saida' ? '▲ Saída' : '▼ Entrada'}</span>{' '}
-                    {m.quantity}× {m.product_name} {m.size_label}
+                    <span className={m.type === 'saida' ? 'text-orange-600 font-semibold' : m.type === 'ajuste' ? 'text-amber-600 font-semibold' : 'text-primary font-semibold'}>
+                      {m.type === 'saida' ? '▲ Saída' : m.type === 'ajuste' ? '● Inventário' : '▼ Entrada'}
+                    </span>{' '}
+                    {m.type === 'ajuste' ? `${m.product_name} ${m.size_label}: ${m.before} → ${m.after}` : `${m.quantity}× ${m.product_name} ${m.size_label}`}
                   </p>
                   <p className="text-xs text-muted-foreground truncate">
                     {ORIGIN[m.origin] || m.origin} · {batchLabel(m.batch_number)} · {m.operator} · {fmtDateTime(m.created_at)}{m.note ? ` · ${m.note}` : ''}
                   </p>
                 </div>
-                {isLab && !m.cancelled && m.type === 'entrada' && m.origin !== 'estoque' && (
+                {isLab && !m.cancelled && (m.type === 'ajuste' || (m.type === 'entrada' && m.origin !== 'estoque')) && (
                   <Button size="sm" variant="ghost" title="Estornar" onClick={() => setUndoTarget(m)}><Undo2 className="w-4 h-4" /></Button>
                 )}
               </div>
@@ -239,10 +241,9 @@ export const Deposito = () => {
         )}
       </Card>
 
-      <MovementDialog mode="inventario" open={inventoryOpen} onOpenChange={setInventoryOpen} products={asStockShape} team={team}
-                      defaultOperator={user?.name || ''} initial={null} onDone={load}
-                      entriesPath="/finished-stock/deposit/entries" title="Inventário do Depósito"
-                      hint="Conte o que está no Depósito e lance aqui. Não tem limite da Contagem e o lote é opcional." />
+      <AdjustDialog open={inventoryOpen} onOpenChange={setInventoryOpen} products={asStockShape} team={team}
+                    defaultOperator={user?.name || ''} onDone={load}
+                    endpoint="/finished-stock/deposit/adjust" title="Inventário do Depósito" place="Depósito" />
       {isLab && <SalesImportDialog open={salesOpen} onOpenChange={setSalesOpen} products={data.products} onDone={load} />}
       <BarcodeScanner open={scanOpen} onOpenChange={setScanOpen} onDetected={onScan} />
 
@@ -251,7 +252,7 @@ export const Deposito = () => {
           <AlertDialogHeader>
             <AlertDialogTitle>Estornar movimentação?</AlertDialogTitle>
             <AlertDialogDescription>
-              {undoTarget && `${undoTarget.quantity}× ${undoTarget.product_name} ${undoTarget.size_label} saem do Depósito, como se não tivessem entrado.`}
+              {undoTarget && (undoTarget.type === 'ajuste' ? `${undoTarget.product_name} ${undoTarget.size_label}: o saldo do Depósito volta de ${undoTarget.after} para ${undoTarget.before}.` : `${undoTarget.quantity}× ${undoTarget.product_name} ${undoTarget.size_label} saem do Depósito, como se não tivessem entrado.`)}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

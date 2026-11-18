@@ -217,6 +217,113 @@ class DepositFlow(unittest.TestCase):
         self.assertEqual((row['stock'], row['deposit'], row['total']), (3, 7, 10))
 
 
+class InventoryAdjust(unittest.TestCase):
+    """Inventário = contar o que existe e ACERTAR o saldo (não soma como entrada)."""
+
+    def setUp(self):
+        self.client, self.db, self.pushes = build(user=LAB)
+
+    def adjust(self, counted, where='stock', **kw):
+        url = f'{API}/deposit/adjust' if where == 'deposit' else f'{API}/adjust'
+        return self.client.post(url, json={'product_id': 'desinf', 'size': 'one_liter', 'counted': counted, 'operator': 'Vitor', **kw})
+
+    def row(self, size='one_liter'):
+        data = self.client.get(f'{API}/deposit/overview').json()
+        return next(s for p in data['products'] if p['product_id'] == 'desinf' for s in p['sizes'] if s['size'] == size)
+
+    def stock_lots(self):
+        data = self.client.get(f'{API}/overview').json()
+        row = next(s for p in data['products'] if p['product_id'] == 'desinf' for s in p['sizes'] if s['size'] == 'one_liter')
+        return [(l['batch_number'], l['quantity']) for l in row['lots']]
+
+    def test_counted_value_replaces_the_balance_instead_of_adding(self):
+        self.client.post(f'{API}/entries', json={'product_id': 'desinf', 'size': 'one_liter', 'quantity': 35, 'batch_id': 'b1'})
+        r = self.adjust(30)
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertEqual((r.json()['before'], r.json()['after'], r.json()['delta'], r.json()['type']), (35, 30, -5, 'ajuste'))
+        self.assertEqual(self.row()['stock'], 30)               # 30, e não 65
+        self.assertEqual(self.adjust(50).json()['delta'], 20)
+        self.assertEqual(self.row()['stock'], 50)
+
+    def test_count_from_zero_and_down_to_zero(self):
+        self.assertEqual(self.adjust(12).status_code, 200)
+        self.assertEqual(self.row()['stock'], 12)
+        self.assertEqual(self.stock_lots(), [('misturado', 12)])
+        self.assertEqual(self.adjust(0).status_code, 200)
+        self.assertEqual(self.row()['stock'], 0)
+
+    def test_same_value_records_nothing(self):
+        self.adjust(10)
+        r = self.adjust(10)
+        self.assertEqual((r.json()['changed'], r.json()['delta']), (False, 0))
+        moves = [m for m in self.client.get(f'{API}/movements').json() if m['type'] == 'ajuste']
+        self.assertEqual(len(moves), 1)
+
+    def test_decrease_takes_mixed_first_then_oldest_lot(self):
+        self.client.post(f'{API}/entries', json={'product_id': 'desinf', 'size': 'one_liter', 'quantity': 10, 'mode': 'inventario'})
+        self.client.post(f'{API}/entries', json={'product_id': 'desinf', 'size': 'one_liter', 'quantity': 20, 'batch_id': 'b0'})
+        self.client.post(f'{API}/entries', json={'product_id': 'desinf', 'size': 'one_liter', 'quantity': 30, 'batch_id': 'b1'})
+        self.adjust(25)                      # tira 35: 10 misturado + 20 do lote antigo + 5 do mais novo
+        self.assertEqual(self.stock_lots(), [('2611001', 25)])
+
+    def test_increase_goes_to_the_chosen_lot_or_to_mixed(self):
+        self.adjust(10, batch_id='b1')
+        self.adjust(15)
+        self.assertEqual(sorted(self.stock_lots()), [('2611001', 10), ('misturado', 5)])
+        self.assertEqual(self.adjust(20, batch_id='nao-existe').status_code, 404)
+
+    def test_inventory_does_not_use_counting_limit_or_touch_the_deposit(self):
+        self.adjust(500)
+        batches = self.client.get(f'{API}/products/desinf/batches').json()
+        self.assertEqual(next(b for b in batches if b['batch_id'] == 'b1')['sizes']['one_liter']['available'], 80)
+        self.assertEqual(self.row()['deposit'], 0)
+
+    def test_dropping_below_minimum_notifies_but_rising_does_not(self):
+        self.adjust(35)
+        self.assertEqual(self.db.store.notifications.count_documents({}), 0)
+        r = self.adjust(8)                   # mínimo do 1L = 10
+        self.assertEqual(len(r.json()['notifications']), 1)
+        self.assertIn('apenas 8 unidades', r.json()['notifications'][0]['message'])
+
+    def test_undo_adjust_in_both_directions(self):
+        up = self.adjust(40).json()
+        self.assertEqual(self.client.post(f"{API}/movements/{up['id']}/cancel").status_code, 200)
+        self.assertEqual(self.row()['stock'], 0)
+        self.adjust(40)
+        down = self.adjust(30).json()
+        self.assertEqual(self.client.post(f"{API}/movements/{down['id']}/cancel").status_code, 200)
+        self.assertEqual(self.row()['stock'], 40)
+        self.assertEqual(self.client.post(f"{API}/movements/{down['id']}/cancel").status_code, 400)   # já estornado
+
+    def test_undo_of_an_increase_is_refused_when_units_already_left(self):
+        up = self.adjust(40).json()
+        self.client.post(f'{API}/exits', json={'items': [{'product_id': 'desinf', 'size': 'one_liter', 'quantity': 30}]})
+        r = self.client.post(f"{API}/movements/{up['id']}/cancel")
+        self.assertEqual(r.status_code, 400)
+        self.assertEqual(self.row()['stock'], 10)
+
+    def test_deposit_inventory_sets_the_balance_too(self):
+        self.assertEqual(self.adjust(100, where='deposit').status_code, 200)
+        self.assertEqual(self.row()['deposit'], 100)
+        r = self.adjust(80, where='deposit')
+        self.assertEqual((r.json()['before'], r.json()['after'], r.json()['type'], r.json()['origin']), (100, 80, 'ajuste', 'inventario'))
+        self.assertEqual(self.row()['deposit'], 80)
+        self.assertEqual(self.row()['stock'], 0)                  # o Estoque não é tocado
+        self.assertEqual(self.client.post(f"{API}/deposit/movements/{r.json()['id']}/cancel").status_code, 200)
+        self.assertEqual(self.row()['deposit'], 100)
+        self.assertEqual(self.adjust(100, where='deposit').json()['changed'], False)
+
+    def test_deposit_increase_undo_is_refused_after_units_left(self):
+        up = self.adjust(50, where='deposit').json()
+        self.db.store.deposit_lots.update_one({'product_id': 'desinf', 'size': 'one_liter'}, {'$set': {'quantity': 5}})
+        self.assertEqual(self.client.post(f"{API}/deposit/movements/{up['id']}/cancel").status_code, 400)
+
+    def test_validation(self):
+        self.assertEqual(self.adjust(-1).status_code, 422)
+        self.assertEqual(self.client.post(f'{API}/adjust', json={'product_id': 'desinf', 'size': 'two_liter', 'counted': 5}).status_code, 400)
+        self.assertEqual(self.client.post(f'{API}/adjust', json={'product_id': 'nao-existe', 'size': 'one_liter', 'counted': 5}).status_code, 404)
+
+
 class PendingBatches(unittest.TestCase):
     """Lotes aguardando destino: nada fica "sumido" quando ninguém registra o Estoque."""
 

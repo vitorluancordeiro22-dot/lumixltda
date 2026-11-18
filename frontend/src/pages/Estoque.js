@@ -299,6 +299,168 @@ export const MovementDialog = ({ mode, open, onOpenChange, products, team, defau
   );
 };
 
+// ---------- inventário: contar e ACERTAR o saldo (não é entrada) ----------
+export const AdjustDialog = ({ open, onOpenChange, products, team, defaultOperator, onDone, endpoint = '/finished-stock/adjust', title = 'Inventário do Estoque', place = 'Estoque' }) => {
+  const [productId, setProductId] = useState('');
+  const [size, setSize] = useState('');
+  const [counted, setCounted] = useState('');
+  const [batches, setBatches] = useState([]);
+  const [batchId, setBatchId] = useState(MIXED);
+  const [operator, setOperator] = useState('');
+  const [note, setNote] = useState('');
+  const [scanOpen, setScanOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    setProductId(''); setSize(''); setCounted(''); setBatchId(MIXED); setNote('');
+    setOperator((o) => o || defaultOperator || '');
+  }, [open, defaultOperator]);
+
+  const product = products.find((p) => p.product_id === productId);
+  const sizeRow = product?.sizes.find((s) => s.size === size);
+  const current = sizeRow?.quantity ?? 0;
+
+  useEffect(() => { if (product && product.sizes.length === 1) setSize(product.sizes[0].size); }, [product]);
+  // Ao escolher o tamanho, o campo já vem com o que está no sistema: a pessoa só corrige o número.
+  useEffect(() => { setCounted(size && sizeRow ? String(sizeRow.quantity) : ''); setBatchId(MIXED); }, [productId, size]); // eslint-disable-line
+  useEffect(() => {
+    if (!open || !productId) { setBatches([]); return; }
+    api.get(`/finished-stock/products/${productId}/batches`).then((r) => setBatches(r.data)).catch(() => setBatches([]));
+  }, [open, productId]);
+
+  const value = counted === '' ? null : parseInt(counted, 10);
+  const diff = value === null ? null : value - current;
+
+  const removalText = () => {
+    let left = -diff;
+    const parts = [];
+    for (const l of sizeRow?.lots || []) {
+      if (left <= 0) break;
+      const take = Math.min(l.quantity, left);
+      parts.push(`${batchLabel(l.batch_number)} (${take})`);
+      left -= take;
+    }
+    return parts.join(', ');
+  };
+
+  const batchOptions = [{ value: MIXED, label: 'Lotes misturados / não sei o lote' },
+    ...batches.map((b) => ({ value: b.batch_id, label: `${b.batch_number} · ${fmtDate(b.date).slice(0, 5)}` }))];
+
+  const onScan = useCallback(async (code) => {
+    setScanOpen(false);
+    try {
+      const r = await api.get(`/finished-stock/barcode/${encodeURIComponent(code)}`);
+      setProductId(r.data.product_id); setSize(r.data.size);
+      toast.success(`${r.data.name} ${r.data.label}`);
+    } catch (e) { toast.error(errorMessage(e, 'Código não encontrado')); }
+  }, []);
+
+  const submit = async (keepOpen) => {
+    if (!productId) return toast.error('Escolha o produto');
+    if (!size) return toast.error('Escolha o tamanho');
+    if (value === null) return toast.error('Digite a quantidade contada');
+    if (!operator.trim()) return toast.error('Informe quem está contando');
+    setSaving(true);
+    try {
+      const r = await api.post(endpoint, {
+        product_id: productId, size, counted: value, operator, note,
+        batch_id: diff > 0 && batchId && batchId !== MIXED ? batchId : null,
+      });
+      const label = `${product.name} ${sizeInfo(size).label}`;
+      if (r.data.changed) toast.success(`${label}: ${r.data.before} → ${r.data.after} no ${place}`);
+      else toast.info(`${label}: o sistema já estava com ${r.data.after}. Nada a acertar.`);
+      r.data.notifications?.forEach((n) => toast.warning(n.message, { duration: 10000 }));
+      onDone?.();
+      if (keepOpen) { setProductId(''); setSize(''); setCounted(''); setNote(''); }
+      else onOpenChange(false);
+    } catch (e) { toast.error(errorMessage(e, 'Erro ao salvar a contagem')); }
+    finally { setSaving(false); }
+  };
+
+  const teamOptions = [...new Set([defaultOperator, ...team.map((t) => t.name)].filter(Boolean))].map((n) => ({ value: n, label: n }));
+
+  return (
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="bg-card border-border max-w-lg max-h-[92vh] overflow-y-auto">
+          <DialogHeader><DialogTitle className="flex items-center gap-2"><ClipboardList className="w-5 h-5" /> {title}</DialogTitle></DialogHeader>
+          <p className="text-xs rounded-md bg-amber-50 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200 p-2">
+            Conte o que <b>realmente existe</b> e digite o número. O sistema <b>acerta o saldo</b> para esse valor e registra a diferença; não soma como entrada.
+          </p>
+          <div className="space-y-4">
+            <div>
+              <Label>Produto</Label>
+              <div className="flex gap-2">
+                <div className="flex-1 min-w-0">
+                  <Combobox options={products.map((p) => ({ value: p.product_id, label: p.name }))} value={productId}
+                            onChange={(v) => { setProductId(v); setSize(''); }}
+                            placeholder="Pesquise o produto" searchPlaceholder="Nome do produto..." emptyText="Nenhum produto" />
+                </div>
+                <Button type="button" variant="outline" size="icon" className="shrink-0" onClick={() => setScanOpen(true)} title="Ler código de barras">
+                  <Camera className="w-5 h-5" />
+                </Button>
+              </div>
+            </div>
+
+            {product && (
+              <div>
+                <Label>Tamanho</Label>
+                <SizePicker sizes={product.sizes} value={size} onChange={setSize} showQty />
+              </div>
+            )}
+
+            {product && size && (
+              <div className="rounded-lg border p-3 space-y-3" data-testid="adjust-panel">
+                <p className="text-sm">
+                  No sistema agora: <b data-testid="adjust-current">{current}</b>
+                  {(sizeRow?.lots || []).length > 0 && (
+                    <span className="block text-xs text-muted-foreground">{sizeRow.lots.map((l) => `${batchLabel(l.batch_number)} (${l.quantity})`).join(' · ')}</span>
+                  )}
+                </p>
+                <div>
+                  <Label>Quantidade contada (o que realmente existe)</Label>
+                  <QuantityInput value={counted} onChange={setCounted} />
+                </div>
+                {diff !== null && (
+                  <p data-testid="adjust-diff" className={`text-sm rounded-md p-2 ${diff === 0 ? 'bg-muted' : diff > 0 ? 'bg-emerald-500/10 text-emerald-600' : 'bg-red-500/10 text-red-600'}`}>
+                    {diff === 0 && 'Sem diferença: o sistema já está certo.'}
+                    {diff > 0 && <>Diferença <b>+{diff}</b>: o saldo vai de {current} para <b>{value}</b>.</>}
+                    {diff < 0 && <>Diferença <b>{diff}</b>: o saldo vai de {current} para <b>{value}</b>. Sai de: {removalText()}.</>}
+                  </p>
+                )}
+                {diff > 0 && (
+                  <div>
+                    <Label>Lote da diferença (opcional)</Label>
+                    <Combobox options={batchOptions} value={batchId} onChange={setBatchId} placeholder="Lotes misturados"
+                              searchPlaceholder="Número do lote..." emptyText="Lote não encontrado" />
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div>
+              <Label>Quem está contando</Label>
+              <Combobox options={teamOptions} value={operator} onChange={setOperator} placeholder="Selecione" searchPlaceholder="Nome..." emptyText="Ninguém encontrado" />
+            </div>
+            <div>
+              <Label>Observação (opcional)</Label>
+              <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ex.: contagem do corredor 2" />
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Button type="button" variant="outline" className="flex-1 h-12" disabled={saving} onClick={() => submit(true)}>Salvar e continuar</Button>
+              <Button type="button" className="flex-1 h-12 bg-primary hover:bg-primary/90" disabled={saving} onClick={() => submit(false)} data-testid="adjust-save">
+                Salvar contagem
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+      <BarcodeScanner open={scanOpen} onOpenChange={setScanOpen} onDetected={onScan} />
+    </>
+  );
+};
+
 // ---------- impressão da lista de gestão ----------
 export const listCode = (list) => 'LS' + list.id.replace(/-/g, '').slice(0, 10).toUpperCase();
 
@@ -470,6 +632,7 @@ export const Estoque = () => {
   const [dialog, setDialog] = useState({ mode: null, initial: null });
   const [listOpen, setListOpen] = useState(false);
   const [minOpen, setMinOpen] = useState(false);
+  const [adjustOpen, setAdjustOpen] = useState(false);
   const [pendingKey, setPendingKey] = useState(0);
   const [scanOpen, setScanOpen] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
@@ -561,7 +724,7 @@ export const Estoque = () => {
           <Button className="h-12 bg-primary hover:bg-primary/90" onClick={() => openMove('entrada')}><ArrowDownToLine className="w-5 h-5 mr-2" /> Entrada</Button>
           <Button className="h-12" variant="outline" onClick={() => openMove('saida')}><ArrowUpFromLine className="w-5 h-5 mr-2" /> Saída</Button>
           <Button className="h-12" variant="outline" onClick={() => setListOpen(true)}><Printer className="w-5 h-5 mr-2" /> Lista de gestão</Button>
-          {isLab && <Button className="h-12" variant="outline" onClick={() => openMove('inventario')}><ClipboardList className="w-5 h-5 mr-2" /> Inventário</Button>}
+          {isLab && <Button className="h-12" variant="outline" onClick={() => setAdjustOpen(true)} data-testid="open-adjust"><ClipboardList className="w-5 h-5 mr-2" /> Inventário</Button>}
           {isLab && <Button className="h-12" variant="outline" onClick={() => setMinOpen(true)}><Gauge className="w-5 h-5 mr-2" /> Estoque mínimo</Button>}
         </div>
       </div>
@@ -690,10 +853,10 @@ export const Estoque = () => {
               <div key={m.id} className={`flex items-center justify-between gap-2 py-2 text-sm ${m.cancelled ? 'opacity-50 line-through' : ''}`}>
                 <div className="min-w-0">
                   <p className="truncate">
-                    <span className={m.type === 'saida' ? 'text-orange-600 font-semibold' : 'text-primary font-semibold'}>
-                      {m.type === 'saida' ? '▲ Saída' : m.mode === 'inventario' ? '● Inventário' : '▼ Entrada'}
+                    <span className={m.type === 'saida' ? 'text-orange-600 font-semibold' : m.type === 'ajuste' ? 'text-amber-600 font-semibold' : 'text-primary font-semibold'}>
+                      {m.type === 'saida' ? '▲ Saída' : m.type === 'ajuste' || m.mode === 'inventario' ? '● Inventário' : '▼ Entrada'}
                     </span>{' '}
-                    {m.quantity}× {m.product_name} {m.size_label}
+                    {m.type === 'ajuste' ? `${m.product_name} ${m.size_label}: ${m.before} → ${m.after}` : `${m.quantity}× ${m.product_name} ${m.size_label}`}
                   </p>
                   <p className="text-xs text-muted-foreground truncate">
                     {batchLabel(m.batch_number)} · {m.operator} · {fmtDateTime(m.created_at)}{m.note ? ` · ${m.note}` : ''}
@@ -710,6 +873,8 @@ export const Estoque = () => {
 
       <MovementDialog mode={dialog.mode} open={Boolean(dialog.mode)} onOpenChange={(o) => !o && setDialog({ mode: null, initial: null })}
                       products={data.products} team={team} defaultOperator={defaultOperator} initial={dialog.initial} onDone={load} />
+      <AdjustDialog open={adjustOpen} onOpenChange={setAdjustOpen} products={data.products} team={team}
+                    defaultOperator={defaultOperator} onDone={load} />
       <MinimumsManager open={minOpen} onOpenChange={setMinOpen} onSaved={load} />
       <ListDialog open={listOpen} onOpenChange={setListOpen} products={data.products} onCreated={load} />
       <BarcodeScanner open={scanOpen} onOpenChange={setScanOpen} onDetected={onScan} />
@@ -723,7 +888,7 @@ export const Estoque = () => {
             <AlertDialogDescription>
               {confirm?.type === 'list' && `Lista ${listCode(confirm.item)}: ${confirm.item.items.map((i) => `${i.quantity}× ${i.name} ${i.label}`).join(', ')}. Todos os itens saem do Estoque e entram no Depósito agora. Confirme só depois da baldeação.`}
               {confirm?.type === 'cancelList' && 'A lista é descartada. O estoque não muda.'}
-              {confirm?.type === 'undo' && confirm?.item && `${confirm.item.quantity}× ${confirm.item.product_name} ${confirm.item.size_label} — o estoque volta como estava antes desta movimentação.${confirm.item.deposit_movement_id ? ' O Depósito também é ajustado.' : ''}`}
+              {confirm?.type === 'undo' && confirm?.item && (confirm.item.type === 'ajuste' ? `${confirm.item.product_name} ${confirm.item.size_label}: o saldo volta de ${confirm.item.after} para ${confirm.item.before}.` : `${confirm.item.quantity}× ${confirm.item.product_name} ${confirm.item.size_label} — o estoque volta como estava antes desta movimentação.${confirm.item.deposit_movement_id ? ' O Depósito também é ajustado.' : ''}`)}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

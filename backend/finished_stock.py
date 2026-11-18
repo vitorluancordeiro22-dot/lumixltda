@@ -134,6 +134,16 @@ class EntryCreate(BaseModel):
     note: str = ''
 
 
+class AdjustData(BaseModel):
+    """Inventário: a quantidade que REALMENTE existe. O sistema acerta o saldo para esse número."""
+    product_id: str
+    size: str
+    counted: int = Field(ge=0, le=1_000_000)
+    batch_id: Optional[str] = None   # lote da diferença, quando o saldo sobe (opcional)
+    operator: str = ''
+    note: str = ''
+
+
 class PendingDismiss(BaseModel):
     batch_id: str
     size: str
@@ -637,6 +647,55 @@ def setup_finished_stock_routes(api_router: APIRouter, db, get_current_user, bro
             result['deposit'] = dep
         return result
 
+    @router.post('/adjust')
+    async def adjust_stock(data: AdjustData, background: BackgroundTasks, current_user=Depends(get_current_user)):
+        """Inventário do Estoque: o saldo passa a ser exatamente `counted` (não soma, não é entrada)."""
+        product = await get_product(data.product_id)
+        await check_size_or_stock(product, data.size)
+        part = {'batch_id': None, 'batch_number': MIXED, 'batch_date': ''}
+        if data.batch_id:
+            batch, _, _ = await find_batch(data.product_id, data.batch_id)
+            if not batch:
+                raise HTTPException(status_code=404, detail='Lote não encontrado para este produto')
+            part = {'batch_id': data.batch_id, 'batch_number': batch.get('batch_number', ''), 'batch_date': batch.get('date', '')}
+        operator = operator_name(data.operator, current_user)
+        async with product_lock([data.product_id]):
+            lots = await db.finished_stock_lots.find({'product_id': data.product_id, 'size': data.size}, {'_id': 0}).to_list(None)
+            before = sum(int(lot.get('quantity', 0)) for lot in lots)
+            delta = data.counted - before
+            if delta == 0:
+                return {'changed': False, 'before': before, 'after': before, 'delta': 0, 'notifications': []}
+            if delta > 0:
+                lot_id = f"{data.product_id}:{data.size}:{part['batch_id'] or MIXED}"
+                await db.finished_stock_lots.update_one(
+                    {'id': lot_id},
+                    {'$inc': {'quantity': delta},
+                     '$set': {'updated_at': now_iso(), 'batch_number': part['batch_number'], 'batch_date': part['batch_date']},
+                     '$setOnInsert': {'product_id': data.product_id, 'size': data.size, 'batch_id': part['batch_id'],
+                                      'created_at': now_iso()}},
+                    upsert=True)
+                allocations = [{'lot_id': lot_id, 'batch_id': part['batch_id'], 'batch_number': part['batch_number'],
+                                'batch_date': part['batch_date'], 'quantity': delta}]
+            else:
+                allocations = plan_exit(lots, -delta)       # mistura primeiro, depois o lote mais antigo
+                for a in allocations:
+                    await db.finished_stock_lots.update_one(
+                        {'id': a['lot_id']}, {'$inc': {'quantity': -a['quantity']}, '$set': {'updated_at': now_iso()}})
+            movement = {
+                'id': str(uuid4()), 'type': 'ajuste', 'mode': 'inventario',
+                'product_id': product['id'], 'product_name': product.get('name', ''),
+                'size': data.size, 'size_label': SIZES[data.size]['label'], 'quantity': abs(delta),
+                'before': before, 'after': data.counted, 'delta': delta,
+                'batch_id': None, 'batch_number': ', '.join(a['batch_number'] for a in allocations),
+                'allocations': allocations, 'operator': operator, 'note': data.note.strip(), 'list_id': None,
+                'created_by': current_user.get('name') or current_user.get('email', ''),
+                'created_at': now_iso(), 'cancelled': False,
+            }
+            await db.finished_stock_movements.insert_one(movement)
+            movement.pop('_id', None)
+            notice = await notify_low(product, data.size, before, data.counted, background) if delta < 0 else None
+        return {**movement, 'changed': True, 'notifications': [notice] if notice else []}
+
     @router.post('/exits')
     async def create_exit(data: ExitCreate, background: BackgroundTasks, current_user=Depends(get_current_user)):
         return await apply_exits(data.items, operator_name(data.operator, current_user), data.note, current_user, background)
@@ -650,7 +709,8 @@ def setup_finished_stock_routes(api_router: APIRouter, db, get_current_user, bro
             movement = await db.finished_stock_movements.find_one({'id': movement_id}, {'_id': 0})
             if movement.get('cancelled'):
                 raise HTTPException(status_code=400, detail='Esta movimentação já foi estornada')
-            sign = -1 if movement['type'] == 'entrada' else 1
+            gains = movement['type'] == 'entrada' or (movement['type'] == 'ajuste' and movement.get('delta', 0) > 0)
+            sign = -1 if gains else 1
             # Parte do Depósito ligada a esta movimentação (sempre uma entrada no Depósito).
             dep = None
             if movement.get('deposit_movement_id'):
@@ -787,6 +847,36 @@ def setup_finished_stock_routes(api_router: APIRouter, db, get_current_user, bro
             movement.pop('_id', None)
         return movement
 
+    @router.post('/deposit/adjust')
+    async def adjust_deposit(data: AdjustData, current_user=Depends(get_current_user)):
+        """Inventário do Depósito: o saldo passa a ser exatamente `counted`."""
+        product = await get_product(data.product_id)
+        await check_size_or_stock(product, data.size)
+        part = {'batch_id': None, 'batch_number': MIXED, 'batch_date': ''}
+        if data.batch_id:
+            batch, _, _ = await find_batch(data.product_id, data.batch_id)
+            if not batch:
+                raise HTTPException(status_code=404, detail='Lote não encontrado para este produto')
+            part = {'batch_id': data.batch_id, 'batch_number': batch.get('batch_number', ''), 'batch_date': batch.get('date', '')}
+        async with product_lock([data.product_id]):
+            lots = await db.deposit_lots.find({'product_id': data.product_id, 'size': data.size}, {'_id': 0}).to_list(None)
+            before = sum(int(lot.get('quantity', 0)) for lot in lots)
+            delta = data.counted - before
+            if delta == 0:
+                return {'changed': False, 'before': before, 'after': before, 'delta': 0}
+            if delta > 0:
+                allocations = await deposit_credit(product, data.size, [{**part, 'quantity': delta}])
+            else:
+                allocations = plan_exit(lots, -delta)
+                await deposit_debit(allocations)
+            movement = new_deposit_movement(
+                product, data.size, allocations, kind='ajuste', origin='inventario',
+                operator=operator_name(data.operator, current_user), note=data.note, user=current_user,
+                before=before, after=data.counted, delta=delta)
+            await db.deposit_movements.insert_one(movement)
+            movement.pop('_id', None)
+        return {**movement, 'changed': True}
+
     @router.post('/deposit/movements/{movement_id}/cancel')
     async def cancel_deposit_movement(movement_id: str, current_user=Depends(get_current_user)):
         movement = await db.deposit_movements.find_one({'id': movement_id}, {'_id': 0})
@@ -800,9 +890,15 @@ def setup_finished_stock_routes(api_router: APIRouter, db, get_current_user, bro
             movement = await db.deposit_movements.find_one({'id': movement_id}, {'_id': 0})
             if movement.get('cancelled'):
                 raise HTTPException(status_code=400, detail='Esta movimentação já foi estornada')
-            if not await deposit_covers(movement['allocations']):
-                raise HTTPException(status_code=400, detail='Não é possível estornar: parte dessas unidades já saiu do Depósito')
-            await deposit_debit(movement['allocations'])
+            gains = movement['type'] == 'entrada' or (movement['type'] == 'ajuste' and movement.get('delta', 0) > 0)
+            if gains:
+                if not await deposit_covers(movement['allocations']):
+                    raise HTTPException(status_code=400, detail='Não é possível estornar: parte dessas unidades já saiu do Depósito')
+                await deposit_debit(movement['allocations'])
+            else:   # estorno de um ajuste para baixo: as unidades voltam
+                for a in movement['allocations']:
+                    await db.deposit_lots.update_one(
+                        {'id': a['lot_id']}, {'$inc': {'quantity': a['quantity']}, '$set': {'updated_at': now_iso()}})
             await db.deposit_movements.update_one({'id': movement_id}, {'$set': {
                 'cancelled': True, 'cancelled_at': now_iso(),
                 'cancelled_by': current_user.get('name') or current_user.get('email', '')}})
