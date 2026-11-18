@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from './ui/button';
-import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Checkbox } from './ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
@@ -10,7 +9,6 @@ import api from '../lib/api';
 
 export const WhatsAppMultiBatch = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [phoneNumber, setPhoneNumber] = useState('');
   const [batches, setBatches] = useState([]);
   const [products, setProducts] = useState([]);
   const [selectedBatches, setSelectedBatches] = useState([]);
@@ -321,7 +319,6 @@ export const WhatsAppMultiBatch = () => {
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
         await navigator.share({ files: [file], title: 'Lotes Liberados', text: generateMessage() });
         setDialogOpen(false);
-        setPhoneNumber('');
         setSelectedBatches([]);
         return;
       }
@@ -331,15 +328,12 @@ export const WhatsAppMultiBatch = () => {
 
     // Desktop / sem share: baixa a imagem e abre o WhatsApp
     handleDownloadImage();
-    const target = phoneNumber.trim()
-      ? `https://wa.me/${phoneNumber.replace(/\D/g, '')}?text=${encodeURIComponent(generateMessage())}`
-      : 'https://web.whatsapp.com';
+    const target = 'https://web.whatsapp.com';
     setTimeout(() => {
       window.open(target, '_blank');
       toast.info('Anexe a imagem que foi baixada no WhatsApp.');
       setTimeout(() => {
         setDialogOpen(false);
-        setPhoneNumber('');
         setSelectedBatches([]);
       }, 1000);
     }, 500);
@@ -377,22 +371,6 @@ export const WhatsAppMultiBatch = () => {
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto space-y-4 px-6">
-          {/* Número de Telefone */}
-          <div className="space-y-2 p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border-2 border-green-200">
-            <Label className="text-green-900 font-semibold flex items-center gap-2">
-              <span>📱</span> Número de Telefone
-            </Label>
-            <Input
-              value={phoneNumber}
-              onChange={(e) => setPhoneNumber(e.target.value)}
-              placeholder="Ex: 5511999999999"
-              className="border-green-300 focus:ring-green-500 focus:border-green-500"
-            />
-            <p className="text-xs text-green-700 font-medium">
-              💡 Código do país + DDD + número (sem espaços)
-            </p>
-          </div>
-
           {/* Lotes Selecionados */}
           {selectedBatchesData.length > 0 && (
             <div className="p-4 bg-gradient-to-r from-emerald-50 to-green-50 rounded-lg border-2 border-green-300">
@@ -555,7 +533,6 @@ export const WhatsAppMultiBatch = () => {
           <Button
             onClick={() => {
               setDialogOpen(false);
-              setPhoneNumber('');
               setSelectedBatches([]);
             }}
             variant="outline"

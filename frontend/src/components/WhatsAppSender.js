@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { Button } from './ui/button';
-import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
@@ -9,7 +8,6 @@ import { toast } from 'sonner';
 
 export const WhatsAppSender = ({ batch, product, trigger }) => {
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [phoneNumber, setPhoneNumber] = useState('');
   const [customMessage, setCustomMessage] = useState('');
 
   const generateMessage = React.useCallback(() => {
@@ -20,29 +18,20 @@ export const WhatsAppSender = ({ batch, product, trigger }) => {
   }, [batch, product]);
 
   const handleSendWhatsApp = () => {
-    if (!phoneNumber.trim()) {
-      toast.error('Digite um número de telefone ou nome de grupo');
-      return;
-    }
-
-    // Limpar número (remover caracteres especiais)
-    const cleanNumber = phoneNumber.replace(/\D/g, '');
-    
     // Mensagem final (customizada ou padrão)
     const finalMessage = customMessage.trim() || generateMessage();
 
-    // Criar URL do WhatsApp Web
-    const whatsappUrl = `https://wa.me/${cleanNumber}?text=${encodeURIComponent(finalMessage)}`;
+    // Abre o WhatsApp com a mensagem pronta; a pessoa escolhe a conversa ou o grupo lá dentro
+    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(finalMessage)}`;
 
     // Abrir WhatsApp
     window.open(whatsappUrl, '_blank');
 
-    toast.success('WhatsApp aberto! Confirme o envio.');
+    toast.success('WhatsApp aberto! Escolha a conversa e confirme o envio.');
     
     // Fechar dialog
     setTimeout(() => {
       setDialogOpen(false);
-      setPhoneNumber('');
       setCustomMessage('');
     }, 500);
   };
@@ -67,22 +56,6 @@ export const WhatsAppSender = ({ batch, product, trigger }) => {
 
         <div className="space-y-4">
           <div>
-            <Label className="text-foreground">Número ou Nome do Grupo *</Label>
-            <Input
-              value={phoneNumber}
-              onChange={(e) => setPhoneNumber(e.target.value)}
-              className="bg-input border-border text-foreground"
-              placeholder="Ex: 5511999999999 ou Nome do Grupo"
-            />
-            <p className="text-xs text-muted-foreground mt-1">
-              Para número: use código do país + DDD + número (sem espaços)
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Para grupo: digite o nome exato do grupo salvo no WhatsApp
-            </p>
-          </div>
-
-          <div>
             <Label className="text-foreground">Mensagem</Label>
             <Textarea
               value={customMessage}
@@ -100,7 +73,6 @@ export const WhatsAppSender = ({ batch, product, trigger }) => {
             <Button
               onClick={() => {
                 setDialogOpen(false);
-                setPhoneNumber('');
                 setCustomMessage('');
               }}
               variant="outline"
