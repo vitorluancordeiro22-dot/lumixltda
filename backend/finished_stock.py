@@ -500,22 +500,25 @@ def setup_finished_stock_routes(api_router: APIRouter, db, get_current_user, bro
 
     @router.get('/pending-batches')
     async def pending_batches(since: Optional[str] = None, current_user=Depends(get_current_user)):
-        """Lotes finalizados cujas garrafas contadas ainda não têm destino (nem Estoque, nem Depósito).
+        """Garrafas já contadas que ainda não têm destino (nem Estoque, nem Depósito).
 
-        Só lê: não altera nenhum saldo. `since` (AAAA-MM-DD) limita pela data do lote; padrão: últimos 30 dias.
+        Inclui lote ainda ABERTO com contagem parcial (ex.: 1000 L feitos, 400 engarrafados hoje): o que já
+        foi contado não pode ficar parado na produção. Lote aberto aparece sempre; lote finalizado/arquivado
+        só se for dos últimos 30 dias (`since`, AAAA-MM-DD). Só lê: não altera nenhum saldo.
         """
         if since is None:
             since = (datetime.now(timezone.utc) - timedelta(days=PENDING_DAYS)).date().isoformat()
         products = {p['id']: p for p in await db.products.find(
             {'deleted': False}, {'_id': 0, 'recipes': 0, 'file_models': 0}).to_list(None)}
-        active = await db.product_batches.find(
-            {'deleted': False, 'status': 'finalizado', 'date': {'$gte': since}}, {'_id': 0}).to_list(None)
+        active = [b for b in await db.product_batches.find({'deleted': False}, {'_id': 0}).to_list(None)
+                  if b.get('status') != 'finalizado' or (b.get('date') or '')[:10] >= since[:10]]
         archived = await db.archived_product_batches.find({'date': {'$gte': since}}, {'_id': 0}).to_list(None)
         batches = [b for b in active + archived if b.get('product_id') in products]
         if not batches:
             return []
         ids = [b['id'] for b in batches]
         active_ids = [b['id'] for b in active if b.get('product_id') in products]
+        active_set = set(active_ids)
         by_batch = {}
         for c in (await db.counting.find({'product_batch_id': {'$in': active_ids}}, {'_id': 0}).to_list(None) if active_ids else []):
             by_batch.setdefault(c['product_batch_id'], []).append(c)
@@ -528,18 +531,24 @@ def setup_finished_stock_routes(api_router: APIRouter, db, get_current_user, bro
         }, {'_id': 0, 'batch_id': 1, 'size': 1, 'quantity': 1}).to_list(None)
         for r in rows:
             entered[(r['batch_id'], r['size'])] = entered.get((r['batch_id'], r['size']), 0) + int(r['quantity'])
-        dismissed = {d['_id'] for d in await db.pending_dismissed.find({}).to_list(None)}
+        # "Ignorar" vale só para o que já tinha sido contado: se a contagem crescer, volta a aparecer.
+        dismissed = {d['_id']: d.get('counted') for d in await db.pending_dismissed.find({}).to_list(None)}
         result = []
         for batch in batches:
             product = products[batch['product_id']]
-            counted = counted_by_size(by_batch.get(batch['id']) if batch in active else batch.get('countings_history'))
+            is_active = batch['id'] in active_set
+            counted = counted_by_size(by_batch.get(batch['id']) if is_active else batch.get('countings_history'))
             for size in sorted(SIZES, key=lambda k: SIZES[k]['order']):
                 available = counted[size] - entered.get((batch['id'], size), 0)
-                if counted[size] <= 0 or available <= 0 or f"{batch['id']}:{size}" in dismissed:
+                key = f"{batch['id']}:{size}"
+                if counted[size] <= 0 or available <= 0:
+                    continue
+                if key in dismissed and (dismissed[key] is None or counted[size] <= dismissed[key]):
                     continue
                 result.append({
                     'batch_id': batch['id'], 'batch_number': batch.get('batch_number', ''), 'date': batch.get('date', ''),
-                    'status': 'arquivado' if batch in archived else batch.get('status', ''),
+                    'status': batch.get('status', '') if is_active else 'arquivado',
+                    'open': is_active and batch.get('status') != 'finalizado',
                     'product_id': product['id'], 'product_name': product.get('name', ''), 'size': size,
                     'label': SIZES[size]['label'], 'counted': counted[size], 'entered': counted[size] - available,
                     'available': available,
@@ -552,9 +561,15 @@ def setup_finished_stock_routes(api_router: APIRouter, db, get_current_user, bro
         """Tira o lote da lista "aguardando destino" (ex.: já entrou no inventário). Não mexe em saldo."""
         if data.size not in SIZES:
             raise HTTPException(status_code=400, detail='Tamanho inválido')
+        batch = await db.product_batches.find_one({'id': data.batch_id, 'deleted': False}, {'_id': 0})
+        if batch:
+            counted = counted_by_size(await db.counting.find({'product_batch_id': data.batch_id}, {'_id': 0}).to_list(None))
+        else:
+            batch = await db.archived_product_batches.find_one({'id': data.batch_id}, {'_id': 0}) or {}
+            counted = counted_by_size(batch.get('countings_history'))
         await db.pending_dismissed.update_one(
             {'_id': f'{data.batch_id}:{data.size}'},
-            {'$set': {'batch_id': data.batch_id, 'size': data.size, 'at': now_iso(),
+            {'$set': {'batch_id': data.batch_id, 'size': data.size, 'counted': counted[data.size], 'at': now_iso(),
                       'by': current_user.get('name') or current_user.get('email', '')}}, upsert=True)
         return {'message': 'Lote retirado da lista'}
 

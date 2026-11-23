@@ -364,9 +364,42 @@ class PendingBatches(unittest.TestCase):
         self.assertEqual(self.client.post(f"{API}/deposit/movements/{entry['id']}/cancel").status_code, 200)
         self.assertIn(('2611001', 'one_liter', 80), self.keys())
 
-    def test_batches_still_being_counted_are_not_listed(self):
+    def test_open_batch_with_partial_counting_is_listed(self):
         self.db.store.product_batches.update_one({'id': 'b1'}, {'$set': {'status': 'em_aberto'}})
-        self.assertEqual(self.keys(), [('2610050', 'one_liter', 20)])
+        row = next(r for r in self.pending() if r['batch_number'] == '2611001' and r['size'] == 'one_liter')
+        self.assertEqual((row['available'], row['open'], row['status']), (80, True, 'em_aberto'))
+
+    def test_batch_made_over_several_days(self):
+        """Faz 1000 L, engarrafa 400 hoje (vai guardar) e os outros 600 em outro dia."""
+        self.db.store.product_batches.insert_one({'id': 'b9', 'product_id': 'desinf', 'batch_number': '2611099', 'date': '2020-01-01',
+                                                  'status': 'em_aberto', 'planned_liters': 1000, 'deleted': False})
+        self.db.store.counting.insert_one({'id': 'c9', 'product_batch_id': 'b9', 'one_liter': 400})
+        # lote aberto aparece sempre, mesmo muito antigo (lote finalizado antigo some da janela)
+        self.assertIn(('2611099', 'one_liter', 400), self.keys(self.pending(since='2026-11-01')))
+        self.assertNotIn('2610050', [k[0] for k in self.keys(self.pending(since='2026-11-01'))])
+        # as 400 já têm destino: 150 no Estoque e 250 no Depósito
+        r = self.client.post(f'{API}/entries', json={'product_id': 'desinf', 'size': 'one_liter', 'quantity': 150,
+                                                     'to_deposit': 250, 'batch_id': 'b9', 'operator': 'Felipe'})
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertNotIn('2611099', [k[0] for k in self.keys()])
+        # dias depois contam mais 600 no mesmo lote: só os 600 novos aguardam destino
+        self.db.store.counting.insert_one({'id': 'c10', 'product_batch_id': 'b9', 'one_liter': 600})
+        self.assertIn(('2611099', 'one_liter', 600), self.keys())
+        self.assertEqual(self.client.post(f'{API}/entries', json={'product_id': 'desinf', 'size': 'one_liter', 'quantity': 0,
+                                                                   'to_deposit': 601, 'batch_id': 'b9'}).status_code, 400)
+        self.assertEqual(self.client.post(f'{API}/entries', json={'product_id': 'desinf', 'size': 'one_liter', 'quantity': 0,
+                                                                   'to_deposit': 600, 'batch_id': 'b9'}).status_code, 200)
+        data = self.client.get(f'{API}/deposit/overview').json()
+        row = next(s for p in data['products'] if p['product_id'] == 'desinf' for s in p['sizes'] if s['size'] == 'one_liter')
+        self.assertEqual((row['stock'], row['deposit'], row['total']), (150, 850, 1000))
+        self.assertNotIn('2611099', [k[0] for k in self.keys()])
+
+    def test_dismissed_batch_comes_back_when_more_is_counted(self):
+        self.db.store.product_batches.update_one({'id': 'b1'}, {'$set': {'status': 'em_aberto'}})
+        self.client.post(f'{API}/pending-batches/dismiss', json={'batch_id': 'b1', 'size': 'one_liter'})
+        self.assertNotIn(('2611001', 'one_liter', 80), self.keys())
+        self.db.store.counting.insert_one({'id': 'c-extra', 'product_batch_id': 'b1', 'one_liter': 20})
+        self.assertIn(('2611001', 'one_liter', 100), self.keys())    # o que foi ignorado antes volta junto com o novo
 
     def test_dismiss_removes_from_list_without_touching_balances(self):
         r = self.client.post(f'{API}/pending-batches/dismiss', json={'batch_id': 'b1', 'size': 'one_liter'})

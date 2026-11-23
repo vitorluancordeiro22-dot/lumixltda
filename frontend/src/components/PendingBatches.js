@@ -62,8 +62,9 @@ export const PendingBatches = ({ reloadKey = 0, operator = '', onChanged, onSpli
         {open ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
       </button>
       <p className="text-xs text-muted-foreground">
-        Garrafas já contadas que ainda não foram registradas nem no Estoque nem no Depósito.
-        Se o lote todo fica no Depósito, é só tocar em <b>Tudo para o Depósito</b>.
+        Garrafas já contadas (mesmo de lote ainda aberto) que ainda não foram registradas nem no Estoque nem no Depósito.
+        Guarde o que foi engarrafado: se tudo vai para o Depósito, é só tocar em <b>Tudo para o Depósito</b>.
+        Quando contarem mais no mesmo lote, o restante aparece aqui de novo.
       </p>
       {open && (
         <div className="divide-y rounded-lg border max-h-[40vh] overflow-y-auto">
@@ -75,6 +76,7 @@ export const PendingBatches = ({ reloadKey = 0, operator = '', onChanged, onSpli
                   <p className="font-semibold leading-tight">{r.product_name} <span className="text-muted-foreground">{r.label}</span></p>
                   <p className="text-xs text-muted-foreground">
                     Lote {r.batch_number} · {fmtDate(r.date)}{r.status === 'arquivado' ? ' · arquivado' : ''}
+                    {r.open && <span className="ml-1 rounded-full bg-amber-500/15 text-amber-600 px-1.5 py-0.5 font-semibold" data-testid="open-badge">lote aberto · contagem parcial</span>}
                   </p>
                 </div>
                 <div className="text-right shrink-0">
@@ -107,7 +109,7 @@ export const PendingBatches = ({ reloadKey = 0, operator = '', onChanged, onSpli
             <AlertDialogDescription>
               {ask?.type === 'deposit'
                 ? `${ask.row.available} × ${ask.row.product_name} ${ask.row.label} (lote ${ask.row.batch_number}) entram no Depósito e nada fica no Estoque. Dá para estornar depois, na aba Depósito.`
-                : 'Use quando essas garrafas já foram contadas em outro lugar (ex.: no Inventário). Nenhum saldo é alterado e o lote continua disponível na Entrada.'}
+                : 'Use quando essas garrafas já foram contadas em outro lugar (ex.: no Inventário). Nenhum saldo é alterado e o lote continua disponível na Entrada. Se contarem mais garrafas nesse lote depois, elas voltam a aparecer aqui.'}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
