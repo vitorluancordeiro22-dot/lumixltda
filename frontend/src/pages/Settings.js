@@ -5,6 +5,7 @@ import { Card } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { User, Moon, Sun, Zap, MonitorSmartphone, Check } from 'lucide-react';
 import { BarcodeRegistry } from '../components/BarcodeRegistry';
+import { BackupManager } from '../components/BackupManager';
 
 
 const THEME_OPTIONS = [
@@ -154,6 +155,10 @@ export const Settings = () => {
                     })}
                 </div>
             </Card>
+
+            {/* Backup geral */}
+
+            <BackupManager />
 
             {/* Códigos de barras (Estoque) */}
 

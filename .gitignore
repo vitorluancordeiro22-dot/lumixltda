@@ -115,3 +115,9 @@ frontend/node_modules/.cache/default-development/9.pack
 frontend/node_modules/.cache/default-development/1.pack_
 frontend/node_modules/.cache/default-development/10.pack
 frontend/node_modules/.cache/default-development/12.pack
+
+# Backups e dumps do banco NUNCA devem ir para o Git (têm dados da empresa e hashes de senha)
+backup-*/
+backup-*.gz
+*.archive.gz
+lumix-backup-*.zip

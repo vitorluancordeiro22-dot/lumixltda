@@ -4191,6 +4191,10 @@ async def delete_notification(notif_id: str, current_user=Depends(get_current_us
 from finished_stock import setup_finished_stock_routes
 setup_finished_stock_routes(api_router, db, get_current_user, broadcast_push)
 
+# ========== BACKUP GERAL (Configurações) ==========
+from backup import setup_backup_routes
+setup_backup_routes(api_router, db, get_current_user, ROOT_DIR.parent)
+
 app.include_router(api_router)
 
 app.add_middleware(
